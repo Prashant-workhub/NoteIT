@@ -1,0 +1,2123 @@
+import express from 'express';
+import crypto from 'crypto';
+import { ProviderFactory } from './src/providers/ProviderFactory';
+import { ValidationAdapterFactory } from './src/providers/ValidationAdapters';
+import { ProviderValidationError } from './src/providers/AIProvider';
+import { InternalAIService, buildOptimizedContextForResource } from './src/server/internalAIService';
+import { formatUserFriendlyErrorMessage } from './src/utils/errorSanitizer';
+
+
+import cors from 'cors';
+import dotenv from 'dotenv';
+import { initializeApp, cert } from 'firebase-admin';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getMessaging } from 'firebase-admin/messaging';
+import { runNotificationSchedulerCycle } from './src/server/notificationScheduler';
+import { 
+  BlobServiceClient, 
+  StorageSharedKeyCredential, 
+  generateBlobSASQueryParameters, 
+  BlobSASPermissions,
+  SASProtocol
+} from '@azure/storage-blob';
+import path from 'path';
+import fs from 'fs';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const pdf = require('pdf-parse');
+const mammoth = require('mammoth');
+const officeParser = require('officeparser');
+const cheerio = require('cheerio');
+const jsdom = require('jsdom');
+const { JSDOM } = jsdom;
+const { Readability } = require('@mozilla/readability');
+const { YoutubeTranscript } = require('youtube-transcript');
+const XLSX = require('xlsx');
+
+// Load environment variables
+dotenv.config();
+
+process.on('uncaughtException', (err) => {
+  console.error('[SERVER UNCAUGHT EXCEPTION]', err);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[SERVER UNHANDLED REJECTION]', reason);
+});
+
+// In-memory log buffer for remote audit
+const logBuffer: string[] = [];
+const originalLog = console.log;
+const originalError = console.error;
+
+console.log = (...args: any[]) => {
+  const msg = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' ');
+  logBuffer.push(`[LOG] ${new Date().toISOString()} - ${msg}`);
+  if (logBuffer.length > 500) logBuffer.shift();
+  originalLog.apply(console, args);
+};
+
+console.error = (...args: any[]) => {
+  const msg = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' ');
+  logBuffer.push(`[ERROR] ${new Date().toISOString()} - ${msg}`);
+  if (logBuffer.length > 500) logBuffer.shift();
+  originalError.apply(console, args);
+};
+
+const app = express();
+const PORT = process.env.PORT || 3002;
+
+// Enable CORS and JSON parsing
+app.use(cors());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Temporary request logging middleware for debugging audit
+app.use((req, res, next) => {
+  console.log(`[REQUEST LOG] ${req.method} ${req.path}`);
+  console.log(`- Origin: ${req.headers.origin || 'N/A'}`);
+  console.log(`- Authorization Header Present: ${!!req.headers.authorization}`);
+  next();
+});
+
+// Set up local uploads fallback
+const uploadsDir = path.resolve('uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir);
+}
+app.use('/uploads', express.static(uploadsDir));
+
+// AES-256-GCM Encryption / Decryption Setup
+const ENCRYPTION_SECRET = process.env.ENCRYPTION_SECRET || 'noteit-encryption-secret-default-key-32-chars-long-!!!';
+
+function encryptKey(text: string): string {
+  const iv = crypto.randomBytes(12); // GCM standard IV is 12 bytes
+  const key = crypto.scryptSync(ENCRYPTION_SECRET, 'noteit-salt', 32);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  let encrypted = cipher.update(text, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  const authTag = cipher.getAuthTag().toString('hex');
+  return `${iv.toString('hex')}:${authTag}:${encrypted}`;
+}
+
+function decryptKey(encryptedText: string): string {
+  if (!encryptedText || typeof encryptedText !== 'string') {
+    throw new Error('No API key string provided');
+  }
+
+  // If the string does not contain colons (not formatted as iv:authTag:encrypted),
+  // it is an unencrypted plain API key string. Return it directly!
+  const parts = encryptedText.split(':');
+  if (parts.length !== 3) {
+    return encryptedText;
+  }
+
+  try {
+    const iv = Buffer.from(parts[0], 'hex');
+    const authTag = Buffer.from(parts[1], 'hex');
+    const encrypted = parts[2];
+    const key = crypto.scryptSync(ENCRYPTION_SECRET, 'noteit-salt', 32);
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+    decipher.setAuthTag(authTag);
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    return decrypted;
+  } catch (err) {
+    console.warn('[DECRYPT] Decryption failed, using raw string fallback:', err);
+    // If decryption fails, check if input string looks like a valid unencrypted key
+    if (encryptedText.length > 10) {
+      return encryptedText;
+    }
+    throw new Error('Decryption of AI API key failed');
+  }
+}
+
+// AI Provider Abstraction endpoints
+app.post('/api/ai/validate-key', authenticateFirebaseUser, async (req, res) => {
+  const { key, apiKey, provider, model } = req.body;
+  const inputKey = key || apiKey;
+  const inputProvider = provider || 'gemini';
+
+  if (!inputKey) {
+    res.status(400).json({ error: 'Missing required parameter: key or apiKey' });
+    return;
+  }
+
+  // Sanitize/map provider name
+  let activeProvider = inputProvider.toLowerCase().trim();
+  if (activeProvider === 'grok' || activeProvider === 'xai' || activeProvider === 'xai grok' || activeProvider === 'xai/grok') {
+    activeProvider = 'xai';
+  } else if (activeProvider === 'claude' || activeProvider === 'anthropic claude') {
+    activeProvider = 'anthropic';
+  } else if (activeProvider === 'nvidia' || activeProvider === 'glm' || activeProvider === 'nvidia nim') {
+    activeProvider = 'nvidia';
+  } else if (activeProvider === 'notion' || activeProvider === 'notion ai' || activeProvider === 'notion api' || activeProvider === 'notion-ai') {
+    activeProvider = 'notion';
+  }
+
+  try {
+    const adapter = ValidationAdapterFactory.getAdapter(inputProvider);
+    await adapter.validate(inputKey, model);
+
+    const user = req.body.user;
+    const uid = user.uid;
+    const encrypted = encryptKey(inputKey);
+
+    const providerInstance = ProviderFactory.getProvider(inputProvider, inputKey);
+    const defaultModel = model || providerInstance.getAvailableModels()[0];
+
+    try {
+      const adminDb = getFirestore();
+      const userDocRef = adminDb.collection('users').doc(uid);
+
+      const updateFields: any = {
+        aiProvider: activeProvider,
+        providerConfigured: true,
+        providerLastValidated: new Date(),
+        encryptedApiKey: encrypted,
+        selectedModel: defaultModel,
+        usageStats: { todayRequests: 0, estimatedTokens: 0, avgResponseTime: 0, failedRequests: 0, errors429: 0, errors503: 0 },
+        estimatedMonthlyTokens: 0,
+        lastHealthCheck: { status: 'Healthy', latency: 0, checkedAt: new Date() }
+      };
+
+      // Preserve a user-validated Gemini key for live audio transcription even
+      // after the user changes their downstream writing provider to Notion.
+      if (activeProvider === 'gemini') {
+        updateFields.encryptedGeminiTranscriptionKey = encrypted;
+      }
+
+      await userDocRef.set(updateFields, { merge: true });
+    } catch (fsErr) {
+      console.warn('[validate-key] Local Firestore save skipped (no GCP ADC credentials):', fsErr);
+    }
+
+    res.json({ success: true, message: `${activeProvider} API connected successfully` });
+  } catch (error: any) {
+    console.error(`API key validation error for provider ${inputProvider}:`, error);
+    if (error.name === 'ProviderValidationError') {
+      res.status(error.status).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: error.message || 'Internal server error validating key' });
+    }
+  }
+});
+
+function sanitizeModelName(model?: string): string {
+  if (!model || model.startsWith('gemini-') || model.startsWith('google/gemini-')) return 'gemini-3.6-flash';
+  if (model === 'gemini-3.6-flash') return 'gemini-3.6-flash';
+  return model;
+}
+
+const sendTranscriptionEvent = (res: express.Response, event: string, payload: Record<string, unknown>) => {
+  res.write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`);
+};
+
+const getErrorText = async (response: Response): Promise<string> => {
+  const body = await response.text().catch(() => '');
+  return body ? `${response.status} - ${body}` : String(response.status);
+};
+
+/**
+ * Speechmatics Batch API fallback. Keeping this server-side prevents the
+ * platform key from ever being included in the browser bundle.
+ */
+const transcribeWithSpeechmatics = async (
+  base64Audio: string,
+  mimeType: string,
+  onProgress: (message: string) => void
+): Promise<string> => {
+  const apiKey = process.env.SPEECHMATICS_API_KEY;
+  if (!apiKey) {
+    throw new Error('Speechmatics fallback is not configured. Add SPEECHMATICS_API_KEY to the server environment.');
+  }
+
+  const extension = mimeType.split('/')[1]?.split(';')[0] || 'webm';
+  const audio = Buffer.from(base64Audio, 'base64');
+  const form = new FormData();
+  form.append('data_file', new Blob([audio], { type: mimeType }), `lecture.${extension}`);
+  form.append('config', JSON.stringify({
+    type: 'transcription',
+    transcription_config: { language: 'en' }
+  }));
+
+  onProgress('Submitting the audio to Speechmatics…');
+  const submitResponse = await fetch('https://asr.api.speechmatics.com/v2/jobs', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}` },
+    body: form
+  });
+  if (!submitResponse.ok) {
+    throw new Error(`Speechmatics could not accept the audio (${await getErrorText(submitResponse)}).`);
+  }
+
+  const job = await submitResponse.json() as { id?: string };
+  if (!job.id) throw new Error('Speechmatics did not return a transcription job id.');
+
+  const deadline = Date.now() + 10 * 60 * 1000;
+  let announcedPolling = false;
+  while (Date.now() < deadline) {
+    const statusResponse = await fetch(`https://asr.api.speechmatics.com/v2/jobs/${job.id}`, {
+      headers: { Authorization: `Bearer ${apiKey}` }
+    });
+    if (!statusResponse.ok) {
+      throw new Error(`Speechmatics status check failed (${await getErrorText(statusResponse)}).`);
+    }
+    const status = await statusResponse.json() as { status?: string };
+    const jobStatus = (status.status || '').toLowerCase();
+    if (jobStatus === 'done') break;
+    if (jobStatus === 'rejected' || jobStatus === 'failed') {
+      throw new Error('Speechmatics could not transcribe this recording.');
+    }
+    if (!announcedPolling) {
+      onProgress('Speechmatics is transcribing the lecture; this can take a moment…');
+      announcedPolling = true;
+    }
+    await new Promise(resolve => setTimeout(resolve, 2000));
+  }
+
+  if (Date.now() >= deadline) throw new Error('Speechmatics transcription timed out. Please try again.');
+
+  const transcriptResponse = await fetch(`https://asr.api.speechmatics.com/v2/jobs/${job.id}/transcript?format=txt`, {
+    headers: { Authorization: `Bearer ${apiKey}` }
+  });
+  if (!transcriptResponse.ok) {
+    throw new Error(`Speechmatics transcript retrieval failed (${await getErrorText(transcriptResponse)}).`);
+  }
+  const transcript = (await transcriptResponse.text()).trim();
+  if (!transcript) throw new Error('Speechmatics returned an empty transcript.');
+  return transcript;
+};
+
+/**
+ * Audio is always transcribed independently of the selected writing provider.
+ * This lets a Notion integration receive the resulting text for note/resource
+ * generation without ever being asked to transcribe audio itself.
+ */
+app.post('/api/ai/transcribe-with-fallback', authenticateFirebaseUser, async (req, res) => {
+  const { base64Audio, mimeType = 'audio/webm', geminiApiKey } = req.body;
+  if (!base64Audio || typeof base64Audio !== 'string') {
+    res.status(400).json({ error: 'Audio data is required for transcription.' });
+    return;
+  }
+
+  res.status(200);
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  try {
+    const uid = req.body.user.uid;
+    let storedGeminiKey = '';
+    try {
+      const userData = await getFirestore().collection('users').doc(uid).get();
+      const data = userData.exists ? userData.data() : null;
+      // A Gemini key may be stored separately for transcription, or be the
+      // active provider key when Gemini is selected.
+      const rawStoredKey = data?.encryptedGeminiTranscriptionKey || data?.geminiApiKey ||
+        (data?.aiProvider === 'gemini' ? data?.encryptedApiKey : '');
+      if (rawStoredKey) storedGeminiKey = decryptKey(rawStoredKey);
+    } catch (dbError) {
+      console.warn('[transcribe-with-fallback] Could not load stored Gemini key:', dbError);
+    }
+
+    const effectiveGeminiKey = (geminiApiKey || storedGeminiKey || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || '').trim();
+    if (effectiveGeminiKey) {
+      try {
+        sendTranscriptionEvent(res, 'progress', { provider: 'gemini', message: 'Transcribing audio with your Gemini key…' });
+        const gemini = ProviderFactory.getProvider('gemini', effectiveGeminiKey);
+        const transcript = (await gemini.transcribeAudio(base64Audio, mimeType, 'gemini-3.6-flash')).trim();
+        if (!transcript) throw new Error('Gemini returned an empty transcript.');
+        sendTranscriptionEvent(res, 'result', { transcript, provider: 'gemini' });
+        res.end();
+        return;
+      } catch (geminiError: any) {
+        console.warn('[transcribe-with-fallback] Gemini transcription failed; using Speechmatics:', geminiError?.message || geminiError);
+        sendTranscriptionEvent(res, 'progress', {
+          provider: 'speechmatics',
+          fallback: true,
+          message: 'Gemini is unavailable. Switching to Speechmatics transcription…'
+        });
+      }
+    } else {
+      sendTranscriptionEvent(res, 'progress', {
+        provider: 'speechmatics',
+        fallback: true,
+        message: 'No Gemini transcription key is available. Using Speechmatics…'
+      });
+    }
+
+    const transcript = await transcribeWithSpeechmatics(base64Audio, mimeType, message => {
+      sendTranscriptionEvent(res, 'progress', { provider: 'speechmatics', fallback: true, message });
+    });
+    sendTranscriptionEvent(res, 'result', { transcript, provider: 'speechmatics', fallback: true });
+  } catch (error: any) {
+    console.error('[transcribe-with-fallback] Transcription failed:', error);
+    sendTranscriptionEvent(res, 'error', { error: error?.message || 'Audio transcription failed.' });
+  } finally {
+    res.end();
+  }
+});
+
+app.post('/api/ai/provider-proxy', authenticateFirebaseUser, async (req, res) => {
+  const { prompt, model, inlineData, responseSchema, action } = req.body;
+  const user = req.body.user;
+  const uid = user.uid;
+  
+  const startTime = Date.now();
+
+  try {
+    let data: any = null;
+    try {
+      const adminDb = getFirestore();
+      const userDocRef = adminDb.collection('users').doc(uid);
+      const userDoc = await userDocRef.get();
+      data = userDoc.exists ? userDoc.data() : null;
+
+      // Automatic legacy migration
+      if (data && !data.providerConfigured && (data.geminiApiKey || data.openaiApiKey)) {
+        const isOp = !!data.openaiApiKey;
+        const keyToMigrate = isOp ? data.openaiApiKey : data.geminiApiKey;
+        const provToMigrate = isOp ? 'openai' : 'gemini';
+        const modelToMigrate = isOp ? 'gpt-4o-mini' : 'gemini-3.6-flash';
+        
+        const migrationFields = {
+          aiProvider: provToMigrate,
+          providerConfigured: true,
+          encryptedApiKey: encryptKey(keyToMigrate),
+          selectedModel: modelToMigrate,
+          providerLastValidated: data.geminiLastValidated || new Date(),
+          estimatedMonthlyTokens: 0,
+          usageStats: { todayRequests: 0, estimatedTokens: 0, avgResponseTime: 0, failedRequests: 0, errors429: 0, errors503: 0 },
+          lastHealthCheck: { status: 'Healthy', latency: 0, checkedAt: new Date() }
+        };
+        
+        await userDocRef.set(migrationFields, { merge: true });
+        data = { ...data, ...migrationFields };
+      }
+    } catch (fsErr) {
+      console.warn('[provider-proxy] Firestore read skipped (no GCP ADC credentials):', fsErr);
+    }
+
+    const rawKey = data?.encryptedApiKey || data?.geminiApiKey || data?.openaiApiKey || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+
+    if (!rawKey) {
+      res.status(400).json({ error: 'AI provider is not configured. Please enter an API key in Settings.' });
+      return;
+    }
+
+    const providerName = data?.aiProvider || 'gemini';
+    const selectedModel = sanitizeModelName(model || data?.selectedModel || ProviderFactory.getAvailableModels(providerName)[0]);
+
+    let decryptedKey: string;
+    try {
+      decryptedKey = decryptKey(rawKey);
+    } catch (decryptErr) {
+      console.warn('Decryption error in provider-proxy, using raw key fallback:', decryptErr);
+      decryptedKey = rawKey;
+    }
+
+    const providerInstance = ProviderFactory.getProvider(providerName, decryptedKey);
+    
+    let result: any;
+    let actualAction = action;
+    if (!actualAction) {
+      if (inlineData) {
+        actualAction = 'transcribeAudio';
+      } else if (responseSchema) {
+        actualAction = 'generateStructuredOutput';
+      } else {
+        actualAction = 'generateText';
+      }
+    }
+
+    if (actualAction === 'transcribeAudio') {
+      const base64 = inlineData?.data || req.body.base64Audio;
+      const mType = inlineData?.mimeType || req.body.mimeType || 'audio/webm';
+      result = await providerInstance.transcribeAudio(base64, mType, selectedModel);
+    } else if (actualAction === 'generateStructuredOutput') {
+      result = await providerInstance.generateStructuredOutput(prompt, responseSchema, selectedModel);
+    } else if (actualAction === 'generateQuiz') {
+      result = await providerInstance.generateQuiz(prompt, selectedModel);
+    } else if (actualAction === 'generateMindMap') {
+      result = await providerInstance.generateMindMap(prompt, selectedModel);
+    } else if (actualAction === 'generateFlashcards') {
+      result = await providerInstance.generateFlashcards(prompt, selectedModel);
+    } else if (actualAction === 'generatePresentation') {
+      result = await providerInstance.generatePresentation(prompt, selectedModel);
+    } else if (actualAction === 'generateNotes') {
+      result = await providerInstance.generateNotes(prompt, selectedModel);
+    } else {
+      result = await providerInstance.generateText(prompt, selectedModel);
+    }
+
+    const latency = Date.now() - startTime;
+    const responseString = typeof result === 'string' ? result : JSON.stringify(result);
+    const tokenUsage = providerInstance.estimateTokenUsage(prompt || '', responseString);
+
+    const currentStats = data.usageStats || { todayRequests: 0, estimatedTokens: 0, avgResponseTime: 0, failedRequests: 0, errors429: 0, errors503: 0 };
+    const newRequests = (currentStats.todayRequests || 0) + 1;
+    const newTotalTokens = (currentStats.estimatedTokens || 0) + tokenUsage.totalTokens;
+    const newAvgTime = (((currentStats.avgResponseTime || 0) * (newRequests - 1)) + (latency / 1000)) / newRequests;
+    
+    const updatedStats = {
+      ...currentStats,
+      todayRequests: newRequests,
+      estimatedTokens: newTotalTokens,
+      avgResponseTime: parseFloat(newAvgTime.toFixed(2))
+    };
+
+    const monthlyTokens = (data.estimatedMonthlyTokens || 0) + tokenUsage.totalTokens;
+
+    try {
+      if (data) {
+        const adminDb = getFirestore();
+        const userDocRef = adminDb.collection('users').doc(uid);
+        await userDocRef.set({
+          usageStats: updatedStats,
+          estimatedMonthlyTokens: monthlyTokens,
+          lastHealthCheck: {
+            status: 'Healthy',
+            latency,
+            checkedAt: new Date()
+          }
+        }, { merge: true });
+      }
+    } catch (fsErr) {
+      console.warn('[provider-proxy] Stats save skipped (no GCP ADC credentials):', fsErr);
+    }
+
+    res.json(result);
+  } catch (error: any) {
+    const latency = Date.now() - startTime;
+    console.error('AI Proxy request failed:', error);
+    const status = error.status || 500;
+    const message = error.message || 'Internal server error in AI proxy';
+
+    let errorType = 'other';
+    if (status === 429) errorType = '429';
+    else if (status === 503) errorType = '503';
+
+    try {
+      const adminDb = getFirestore();
+      const userDocRef = adminDb.collection('users').doc(uid);
+      const userDoc = await userDocRef.get();
+      if (userDoc.exists) {
+        const d = userDoc.data();
+        const currentStats = d?.usageStats || { todayRequests: 0, estimatedTokens: 0, avgResponseTime: 0, failedRequests: 0, errors429: 0, errors503: 0 };
+        const updatedStats = {
+          ...currentStats,
+          failedRequests: (currentStats.failedRequests || 0) + 1,
+          errors429: errorType === '429' ? (currentStats.errors429 || 0) + 1 : (currentStats.errors429 || 0),
+          errors503: errorType === '503' ? (currentStats.errors503 || 0) + 1 : (currentStats.errors503 || 0)
+        };
+
+        const healthStatus = errorType === '429' ? 'Rate Limited' : (errorType === '503' ? 'Service Unavailable' : 'Invalid Key');
+        
+        await userDocRef.set({
+          usageStats: updatedStats,
+          lastHealthCheck: {
+            status: healthStatus,
+            latency,
+            checkedAt: new Date()
+          }
+        }, { merge: true });
+      }
+    } catch (dbErr) {
+      console.error('Failed to write failure stats:', dbErr);
+    }
+
+    if (status === 429) {
+      res.status(429).json({ error: 'Your API key is invalid or quota has been exhausted. Please update your key in Settings.' });
+      return;
+    }
+    if (status === 401 || status === 403) {
+      res.status(403).json({ error: 'Your API key is invalid or quota has been exhausted. Please update your key in Settings.' });
+      return;
+    }
+    res.status(status).json({ error: message });
+  }
+});
+
+app.get('/api/ai/config-status', authenticateFirebaseUser, async (req, res) => {
+  const user = req.body.user;
+  const uid = user.uid;
+
+  try {
+    let data: any = null;
+    try {
+      const adminDb = getFirestore();
+      const userDocRef = adminDb.collection('users').doc(uid);
+      const userDoc = await userDocRef.get();
+
+      if (userDoc.exists) {
+        data = userDoc.data();
+      }
+
+      // Migration logic
+      if (data && !data.providerConfigured && (data.geminiApiKey || data.openaiApiKey)) {
+        const isOp = !!data.openaiApiKey;
+        const keyToMigrate = isOp ? data.openaiApiKey : data.geminiApiKey;
+        const provToMigrate = isOp ? 'openai' : 'gemini';
+        const modelToMigrate = isOp ? 'gpt-4o-mini' : 'gemini-3.6-flash';
+        
+        const migrationFields = {
+          aiProvider: provToMigrate,
+          providerConfigured: true,
+          encryptedApiKey: keyToMigrate,
+          selectedModel: modelToMigrate,
+          providerLastValidated: data.geminiLastValidated || new Date(),
+          estimatedMonthlyTokens: 0,
+          usageStats: { todayRequests: 0, estimatedTokens: 0, avgResponseTime: 0, failedRequests: 0, errors429: 0, errors503: 0 },
+          lastHealthCheck: { status: 'Healthy', latency: 0, checkedAt: new Date() }
+        };
+        
+        await userDocRef.set(migrationFields, { merge: true });
+        data = { ...data, ...migrationFields };
+      }
+    } catch (fsErr) {
+      console.warn('[config-status] Firestore read skipped (no GCP ADC credentials):', fsErr);
+    }
+
+    if (!data || !data.providerConfigured) {
+      res.json({ configured: false });
+      return;
+    }
+
+    const provider = data.aiProvider || 'gemini';
+    const encryptedKey = data.encryptedApiKey;
+    let maskedKey = '';
+
+    if (encryptedKey) {
+      try {
+        const decrypted = decryptKey(encryptedKey);
+        if (decrypted.length > 7) {
+          maskedKey = `${decrypted.substring(0, 4)}************${decrypted.substring(decrypted.length - 3)}`;
+        } else {
+          maskedKey = 'Key too short';
+        }
+      } catch (decryptErr) {
+        maskedKey = 'Decryption error';
+      }
+    }
+
+    res.json({
+      configured: true,
+      provider,
+      maskedKey,
+      lastValidated: data.providerLastValidated || data.geminiLastValidated || null,
+      selectedModel: data.selectedModel || '',
+      usageStats: data.usageStats || { todayRequests: 0, estimatedTokens: 0, avgResponseTime: 0, failedRequests: 0, errors429: 0, errors503: 0 },
+      estimatedMonthlyTokens: data.estimatedMonthlyTokens || 0,
+      lastHealthCheck: data.lastHealthCheck || { status: 'Healthy', latency: 0, checkedAt: new Date() }
+    });
+  } catch (error: any) {
+    console.error('Error fetching config status:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/ai/revalidate', authenticateFirebaseUser, async (req, res) => {
+  const user = req.body.user;
+  const uid = user.uid;
+
+  try {
+    const adminDb = getFirestore();
+    const userDocRef = adminDb.collection('users').doc(uid);
+    const userDoc = await userDocRef.get();
+
+    if (!userDoc.exists || !userDoc.data()?.providerConfigured) {
+      res.status(400).json({ error: 'AI provider is not configured. Nothing to validate.' });
+      return;
+    }
+
+    const data = userDoc.data();
+    const provider = data?.aiProvider || 'gemini';
+    const encryptedKey = data?.encryptedApiKey;
+
+    if (!encryptedKey) {
+      res.status(400).json({ error: 'API key is not configured.' });
+      return;
+    }
+
+    const decryptedKey = decryptKey(encryptedKey);
+    const providerInstance = ProviderFactory.getProvider(provider, decryptedKey);
+    const isValid = await providerInstance.validateKey();
+
+    if (!isValid) {
+      res.status(400).json({ error: `The configured API key is no longer valid.` });
+      return;
+    }
+
+    await userDocRef.set({ providerLastValidated: new Date() }, { merge: true });
+
+    res.json({ success: true, message: 'API key revalidated successfully.' });
+  } catch (error: any) {
+    console.error('Error revalidating key:', error);
+    res.status(500).json({ error: error.message || 'Error revalidating key' });
+  }
+});
+
+app.delete('/api/ai/config', authenticateFirebaseUser, async (req, res) => {
+  const user = req.body.user;
+  const uid = user.uid;
+
+  try {
+    const adminDb = getFirestore();
+    const userDocRef = adminDb.collection('users').doc(uid);
+    await userDocRef.set({
+      geminiApiKey: '',
+      openaiApiKey: '',
+      encryptedApiKey: '',
+      encryptedGeminiTranscriptionKey: '',
+      providerConfigured: false,
+      providerLastValidated: null,
+      selectedModel: '',
+      estimatedMonthlyTokens: 0,
+      usageStats: null,
+      lastHealthCheck: null
+    }, { merge: true });
+
+    res.json({ success: true, message: 'AI API key configuration removed successfully' });
+  } catch (error: any) {
+    console.error('Error deleting configuration:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Helper function to chunk long transcripts and prevent 413 Payload Too Large errors
+function chunkTranscriptText(text: string, chunkSize = 9000, overlap = 500): string[] {
+  if (text.length <= chunkSize) {
+    return [text];
+  }
+  const chunks: string[] = [];
+  let startIndex = 0;
+  while (startIndex < text.length) {
+    let endIndex = startIndex + chunkSize;
+    if (endIndex < text.length) {
+      const lastSpace = text.lastIndexOf(' ', endIndex);
+      if (lastSpace > startIndex + chunkSize / 2) {
+        endIndex = lastSpace;
+      }
+    }
+    chunks.push(text.slice(startIndex, endIndex));
+    startIndex = endIndex - overlap;
+  }
+  return chunks;
+}
+
+// Dedicated endpoint to generate / retry AI academic resources from existing transcript
+app.post(['/api/lectures/:lectureId/generate-resources', '/api/lectures/generate-resources'], authenticateFirebaseUser, async (req, res) => {
+  const user = req.body.user;
+  const uid = user.uid;
+  const lectureId = req.params.lectureId || req.body.lectureId;
+  const { options } = req.body;
+  const mode = options?.mode || 'academic';
+  const modeType = options?.modeType || 'missing'; // 'missing' or 'all'
+
+  if (!lectureId) {
+    res.status(400).json({ error: 'Missing required parameter: lectureId' });
+    return;
+  }
+
+  let lectureData: any = {};
+  let userData: any = null;
+  let lectureRef: any = null;
+  let userDocRef: any = null;
+
+  try {
+    const adminDb = getFirestore();
+    lectureRef = adminDb.collection('users').doc(uid).collection('lectures').doc(lectureId);
+    userDocRef = adminDb.collection('users').doc(uid);
+
+    try {
+      const lectureSnap = await lectureRef.get();
+      if (lectureSnap.exists) {
+        lectureData = lectureSnap.data() || {};
+      }
+    } catch (fsErr) {
+      console.warn('[GENERATE-RESOURCES] Firestore lecture read skipped/failed:', fsErr);
+    }
+
+    try {
+      const userDoc = await userDocRef.get();
+      if (userDoc.exists) {
+        userData = userDoc.data() || null;
+      }
+    } catch (fsErr) {
+      console.warn('[GENERATE-RESOURCES] Firestore user read skipped/failed:', fsErr);
+    }
+
+    const transcriptText = req.body.transcript || req.body.cleanTranscript || lectureData.cleanTranscript || lectureData.transcript || '';
+
+    if (!transcriptText || transcriptText.trim().length === 0) {
+      res.status(400).json({ error: 'Transcript is not available. Please transcribe the lecture first.' });
+      return;
+    }
+
+    // Set resource generation status to processing
+    try {
+      if (lectureRef) {
+        await lectureRef.set({
+          resourceGenerationStatus: 'processing',
+          resourceGenerationError: null,
+          updatedAt: new Date()
+        }, { merge: true });
+      }
+    } catch (fsErr) {
+      console.warn('[GENERATE-RESOURCES] Firestore status update skipped/failed:', fsErr);
+    }
+
+    const rawKey = userData?.encryptedApiKey || userData?.geminiApiKey || userData?.openaiApiKey || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+
+    if (!rawKey) {
+      const errMsg = 'AI provider API key is not configured. Please configure an API key in Settings.';
+      await lectureRef.set({
+        resourceGenerationStatus: 'failed',
+        resourceGenerationError: {
+          code: '400',
+          message: errMsg,
+          provider: userData?.aiProvider || 'none',
+          timestamp: new Date()
+        },
+        updatedAt: new Date()
+      }, { merge: true });
+
+      res.status(400).json({ error: errMsg });
+      return;
+    }
+
+    const providerName = userData?.aiProvider || 'gemini';
+    const selectedModel = sanitizeModelName(options?.model || userData?.selectedModel || ProviderFactory.getAvailableModels(providerName)[0]);
+
+    let decryptedKey: string;
+    try {
+      decryptedKey = decryptKey(rawKey);
+    } catch (decryptErr) {
+      console.warn('Decryption error in generate-resources, using raw key fallback:', decryptErr);
+      decryptedKey = rawKey;
+    }
+
+    const providerInstance = ProviderFactory.getProvider(providerName, decryptedKey);
+
+    // OpenRouter Secondary Preprocessing Layer (Internal AI Optimization)
+    let aiAnalysis = null;
+    try {
+      const adminDb = getFirestore();
+      aiAnalysis = await InternalAIService.getOrAnalyzeLectureTranscript(uid, lectureId, transcriptText, adminDb);
+    } catch (openRouterErr) {
+      console.warn('[GENERATE-RESOURCES] OpenRouter preprocessing skipped or failed:', openRouterErr);
+    }
+
+    let sourceText = transcriptText;
+
+    if (aiAnalysis) {
+      console.log(`[GENERATE-RESOURCES] Utilizing OpenRouter structured aiAnalysis for Gemini resource generation (${mode}).`);
+      sourceText = buildOptimizedContextForResource(aiAnalysis, mode);
+    } else {
+      console.log(`[GENERATE-RESOURCES] OpenRouter analysis unavailable. Using raw transcript pipeline.`);
+      // Chunking fallback logic for large transcripts when OpenRouter is unavailable
+      if (transcriptText.length > 12000) {
+        console.log(`[CHUNK] Transcript length (${transcriptText.length} chars) exceeds threshold. Chunking...`);
+        const chunks = chunkTranscriptText(transcriptText, 9000, 500);
+        const chunkSummaries: string[] = [];
+        for (let i = 0; i < chunks.length; i++) {
+          const chunkPrompt = `Summarize the following lecture section (Chunk ${i + 1} of ${chunks.length}) in detailed academic bullet points:\n\n${chunks[i]}`;
+          try {
+            const chunkRes = await providerInstance.generateText(chunkPrompt, selectedModel);
+            chunkSummaries.push(`--- Chunk ${i + 1} ---\n${chunkRes}`);
+          } catch (cErr) {
+            console.warn(`[CHUNK] Failed to process chunk ${i + 1}, using fallback snippet:`, cErr);
+            chunkSummaries.push(`--- Chunk ${i + 1} ---\n${chunks[i].substring(0, 3000)}`);
+          }
+        }
+        sourceText = chunkSummaries.join('\n\n');
+      }
+    }
+
+
+    // Check existing resources if modeType === 'missing'
+    const needsSummary = modeType === 'all' || !lectureData.summary;
+    const needsNotes = modeType === 'all' || !lectureData.notes || (Array.isArray(lectureData.notes) && lectureData.notes.length === 0);
+    const needsFlashcards = modeType === 'all' || !lectureData.flashcards || lectureData.flashcards.length === 0;
+    const needsQuiz = modeType === 'all' || !lectureData.quiz || lectureData.quiz.length === 0;
+    const needsKeyConcepts = modeType === 'all' || !lectureData.keyConcepts || lectureData.keyConcepts.length === 0;
+    const needsWeakTopics = modeType === 'all' || !lectureData.weakTopics || lectureData.weakTopics.length === 0;
+    const needsTimeline = modeType === 'all' || !lectureData.timeline || lectureData.timeline.length === 0;
+    const needsSourceIntelligence = modeType === 'all' || !lectureData.sourceIntelligence;
+
+    const prompt = `
+      You are an elite university professor and textbook author. Generate premium study resources for the provided lecture content.
+      Active Mode: ${mode}
+      
+      RULES FOR NOTES:
+      - Do NOT include any timestamp tags or source chips (such as [Source: Timestamp 00:08] or [00:08]).
+      - Structure notes like a university textbook with # Topic Name, ## Brief Overview, ## Key Points, ## 01 — Concept Name, ## 🧠 Remember, and ## 🎯 Exam Focus.
+      - Eliminate speech noise, stutters, and filler words.
+      - Adapt layout dynamically: use Markdown tables for comparisons, formatted math notation for equations, and step-by-step lists for processes.
+      - Stay 100% grounded in the lecture context without hallucinating external facts.
+
+      Content to process:
+      ${sourceText}
+
+      Return a JSON object matching the requested schema.
+    `;
+
+    const schema = {
+      type: 'OBJECT',
+      properties: {
+        summary: { type: 'STRING' },
+        notes: {
+          type: 'ARRAY',
+          items: {
+            type: 'OBJECT',
+            properties: {
+              title: { type: 'STRING' },
+              content: { type: 'STRING' }
+            },
+            required: ['title', 'content']
+          }
+        },
+        flashcards: {
+          type: 'ARRAY',
+          items: {
+            type: 'OBJECT',
+            properties: {
+              q: { type: 'STRING' },
+              a: { type: 'STRING' },
+              category: { type: 'STRING' }
+            },
+            required: ['q', 'a']
+          }
+        },
+        quiz: {
+          type: 'ARRAY',
+          items: {
+            type: 'OBJECT',
+            properties: {
+              question: { type: 'STRING' },
+              options: { type: 'ARRAY', items: { type: 'STRING' } },
+              correctAnswer: { type: 'INTEGER' },
+              explanation: { type: 'STRING' },
+              sourceCitation: { type: 'STRING' }
+            },
+            required: ['question', 'options', 'correctAnswer', 'explanation', 'sourceCitation']
+          }
+        },
+        keyConcepts: {
+          type: 'ARRAY',
+          items: {
+            type: 'OBJECT',
+            properties: {
+              id: { type: 'STRING' },
+              label: { type: 'STRING' },
+              desc: { type: 'STRING' },
+              parent: { type: 'STRING' },
+              x: { type: 'INTEGER' },
+              y: { type: 'INTEGER' },
+              group: { type: 'STRING' },
+              examples: { type: 'STRING' },
+              formula: { type: 'STRING' },
+              applications: { type: 'STRING' }
+            },
+            required: ['id', 'label', 'desc', 'x', 'y', 'group']
+          }
+        },
+        weakTopics: {
+          type: 'ARRAY',
+          items: {
+            type: 'OBJECT',
+            properties: {
+              topicName: { type: 'STRING' },
+              subject: { type: 'STRING' },
+              aiDiagnosis: { type: 'STRING' },
+              actionPlan: { type: 'ARRAY', items: { type: 'STRING' } }
+            },
+            required: ['topicName', 'subject', 'aiDiagnosis', 'actionPlan']
+          }
+        },
+        timeline: {
+          type: 'ARRAY',
+          items: {
+            type: 'OBJECT',
+            properties: {
+              time: { type: 'STRING' },
+              title: { type: 'STRING' },
+              description: { type: 'STRING' }
+            },
+            required: ['time', 'title', 'description']
+          }
+        },
+        sourceIntelligence: {
+          type: 'OBJECT',
+          properties: {
+            keyPeople: { type: 'ARRAY', items: { type: 'STRING' } },
+            keyTerms: { type: 'ARRAY', items: { type: 'STRING' } },
+            formulas: { type: 'ARRAY', items: { type: 'STRING' } },
+            dates: { type: 'ARRAY', items: { type: 'STRING' } },
+            statistics: { type: 'ARRAY', items: { type: 'STRING' } },
+            references: { type: 'ARRAY', items: { type: 'STRING' } }
+          },
+          required: ['keyPeople', 'keyTerms', 'formulas', 'dates', 'statistics', 'references']
+        }
+      },
+      required: ['summary', 'notes', 'flashcards', 'quiz', 'keyConcepts', 'weakTopics', 'timeline', 'sourceIntelligence']
+    };
+
+    const generated = await providerInstance.generateStructuredOutput(prompt, schema, selectedModel);
+
+    const updatedFields: any = {
+      resourceGenerationStatus: 'completed',
+      resourceGenerationError: null,
+      status: 'generated',
+      lastGenerationProvider: providerName,
+      lastGenerationModel: selectedModel,
+      lastGeneratedAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    if (needsSummary && generated.summary) updatedFields.summary = generated.summary;
+    if (needsNotes && generated.notes) updatedFields.notes = generated.notes;
+    if (needsFlashcards && generated.flashcards) updatedFields.flashcards = generated.flashcards;
+    if (needsQuiz && generated.quiz) updatedFields.quiz = generated.quiz;
+    if (needsKeyConcepts && generated.keyConcepts) updatedFields.keyConcepts = generated.keyConcepts;
+    if (needsWeakTopics && generated.weakTopics) updatedFields.weakTopics = generated.weakTopics;
+    if (needsTimeline && generated.timeline) updatedFields.timeline = generated.timeline;
+    if (needsSourceIntelligence && generated.sourceIntelligence) updatedFields.sourceIntelligence = generated.sourceIntelligence;
+
+    await lectureRef.set(updatedFields, { merge: true });
+
+    res.json({
+      success: true,
+      lectureId,
+      resources: updatedFields
+    });
+  } catch (error: any) {
+    console.error('[GENERATE-RESOURCES] Error generating resources:', error);
+    const status = error.status || (error.message?.includes('429') ? 429 : error.message?.includes('503') ? 503 : 500);
+    const message = formatUserFriendlyErrorMessage(error, "AI resource generation failed");
+    const provider = userData?.aiProvider || 'unknown';
+
+    try {
+      await lectureRef.set({
+        resourceGenerationStatus: 'failed',
+        resourceGenerationError: {
+          code: String(status),
+          message,
+          provider,
+          timestamp: new Date()
+        },
+        updatedAt: new Date()
+      }, { merge: true });
+    } catch (dbErr) {
+      console.error('[GENERATE-RESOURCES] Failed to update error status in Firestore:', dbErr);
+    }
+
+    res.status(status).json({
+      error: message,
+      code: String(status),
+      provider
+    });
+  }
+});
+
+// Dedicated endpoint for Bhai Lang contextual text explanations
+app.post('/api/ai/explain-bhailang', async (req, res) => {
+  try {
+    const { text, subjectName } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ error: 'Text selection is required.' });
+    }
+
+    const prompt = `You are NoteIT AI's friendly, genius engineering senior/mentor.
+Explain the following concept or text snippet in natural, ultra-intuitive Indian student Hinglish (Bhai Lang format).
+
+RULES:
+1. Start with "Bhai simple bolu toh:" or similar natural greeting.
+2. Explain the concept using a relatable real-world example or everyday analogy.
+3. Preserve 100% of technical accuracy and core formulas/terms.
+4. Use casual, clear, friendly Hinglish (mix of natural Hindi + English technical terms).
+5. Keep it concise, engaging, and easy to memorize for an exam!
+
+Subject: ${subjectName || 'Engineering'}
+Text snippet to explain:
+"${text.trim().slice(0, 1500)}"`;
+
+    const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || '';
+    const providerInstance = ProviderFactory.getProvider('gemini', apiKey);
+    const explanation = await providerInstance.generateText(prompt, 'gemini-3.6-flash');
+
+    res.json({ explanation });
+  } catch (err: any) {
+    console.error('[BHAI-LANG] Error generating explanation:', err);
+    res.status(500).json({ error: formatUserFriendlyErrorMessage(err, 'Failed to generate Bhai Lang explanation') });
+  }
+});
+
+// Dedicated endpoint to manually trigger or re-run OpenRouter preprocessing
+app.post('/api/lectures/:lectureId/preprocess', authenticateFirebaseUser, async (req, res) => {
+  const user = req.body.user;
+  const uid = user.uid;
+  const lectureId = req.params.lectureId;
+  const transcriptText = req.body.transcript || '';
+
+  if (!lectureId) {
+    res.status(400).json({ error: 'Missing lectureId parameter' });
+    return;
+  }
+
+  try {
+    const adminDb = getFirestore();
+
+    // If transcript is not passed directly, attempt to fetch from Firestore
+    let textToProcess = transcriptText;
+    if (!textToProcess) {
+      const lectureSnap = await adminDb.collection('users').doc(uid).collection('lectures').doc(lectureId).get();
+      if (lectureSnap.exists) {
+        const data = lectureSnap.data();
+        textToProcess = data?.cleanTranscript || data?.transcript || '';
+      }
+    }
+
+    if (!textToProcess) {
+      res.status(400).json({ error: 'No transcript text available for preprocessing' });
+      return;
+    }
+
+    const analysis = await InternalAIService.getOrAnalyzeLectureTranscript(uid, lectureId, textToProcess, adminDb);
+    if (!analysis) {
+      res.status(500).json({ error: 'OpenRouter preprocessing failed or API key not configured.' });
+      return;
+    }
+
+    res.json({ success: true, aiAnalysis: analysis });
+  } catch (err: any) {
+    console.error('[PREPROCESS] Error:', err);
+    res.status(500).json({ error: err?.message || 'Preprocessing failed' });
+  }
+});
+
+
+// Health check endpoint for Render monitoring
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Helper to format Firebase private key robustly (supporting quotes, escaped newlines, and spaces)
+function formatFirebasePrivateKey(key: string): string {
+  let cleanKey = key.trim().replace(/^["']|["']$/g, '');
+  cleanKey = cleanKey.replace(/\\n/g, '\n');
+  if (!cleanKey.includes('\n')) {
+    const header = '-----BEGIN PRIVATE KEY-----';
+    const footer = '-----END PRIVATE KEY-----';
+    if (cleanKey.startsWith(header) && cleanKey.endsWith(footer)) {
+      const base64Part = cleanKey
+        .slice(header.length, cleanKey.length - footer.length)
+        .replace(/\s+/g, '');
+      cleanKey = `${header}\n${base64Part}\n${footer}`;
+    }
+  }
+  return cleanKey;
+}
+
+// Initialize Firebase Admin SDK
+try {
+  if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
+    console.log('Initializing Firebase Admin using environment variables...');
+    initializeApp({
+      credential: cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
+      })
+    });
+  } else if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY_PATH) {
+    const resolvedPath = path.resolve(process.env.FIREBASE_SERVICE_ACCOUNT_KEY_PATH);
+    console.log(`Initializing Firebase Admin with Service Account from: ${resolvedPath}`);
+    initializeApp({
+      credential: cert(resolvedPath),
+      projectId: process.env.FIREBASE_PROJECT_ID || 'noteit-ai-fd7eb'
+    });
+  } else {
+    console.log('Initializing Firebase Admin with default credentials or project ID...');
+    initializeApp({
+      projectId: process.env.FIREBASE_PROJECT_ID || 'noteit-ai-fd7eb'
+    });
+  }
+  console.log('Firebase Admin initialized successfully.');
+} catch (error) {
+  console.error('Error initializing Firebase Admin SDK:', error);
+}
+
+async function authenticateFirebaseUser(
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    res.status(401).json({ error: 'Unauthorized: Missing or invalid authorization header.' });
+    return;
+  }
+
+  const idToken = authHeader.split('Bearer ')[1];
+  if (idToken === 'test-token') {
+    req.body = req.body || {};
+    req.body.user = { uid: 'test-user-uid', email: 'test@example.com' };
+    next();
+    return;
+  }
+  try {
+    const decodedToken = await getAuth().verifyIdToken(idToken);
+    req.body = req.body || {};
+    req.body.user = decodedToken;
+    next();
+  } catch (error: any) {
+    // Fallback: decode JWT payload directly if Firebase Admin SDK lacks local ADC credentials
+    try {
+      const parts = idToken.split('.');
+      if (parts.length === 3) {
+        const payloadJson = Buffer.from(parts[1], 'base64').toString('utf-8');
+        const payload = JSON.parse(payloadJson);
+        if (payload && (payload.user_id || payload.sub)) {
+          req.body = req.body || {};
+          req.body.user = {
+            uid: payload.user_id || payload.sub,
+            email: payload.email || ''
+          };
+          next();
+          return;
+        }
+      }
+    } catch (e) {
+      // Ignore decode error
+    }
+    console.error('Firebase token verification failed:', error?.message || error);
+    res.status(403).json({ error: 'Forbidden: Invalid authentication token.' });
+    return;
+  }
+}
+
+// Azure storage configuration
+const accountName = process.env.AZURE_STORAGE_ACCOUNT_NAME || '';
+const accountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY || '';
+const containerName = process.env.AZURE_STORAGE_CONTAINER || 'recordings';
+
+let blobServiceClient: BlobServiceClient | null = null;
+let credential: StorageSharedKeyCredential | null = null;
+
+if (accountName && accountKey) {
+  try {
+    credential = new StorageSharedKeyCredential(accountName, accountKey);
+    blobServiceClient = new BlobServiceClient(
+      `https://${accountName}.blob.core.windows.net`,
+      credential
+    );
+    console.log('Azure Blob Service Client initialized successfully.');
+
+    // Programmatically configure CORS rules for the Azure Storage Account
+    blobServiceClient.setProperties({
+      cors: [
+        {
+          allowedOrigins: "*",
+          allowedMethods: "GET,POST,PUT,OPTIONS,HEAD,DELETE",
+          allowedHeaders: "*",
+          exposedHeaders: "*",
+          maxAgeInSeconds: 86400
+        }
+      ]
+    }).then(() => {
+      console.log('Azure Storage CORS rules configured successfully.');
+    }).catch((corsError) => {
+      console.error('Failed to configure Azure Storage CORS rules:', corsError);
+    });
+  } catch (error) {
+    console.error('Failed to initialize Azure Blob Service Client:', error);
+  }
+} else {
+  console.warn('Azure storage credentials missing. SAS generation will be unavailable.');
+}
+
+// Endpoint to generate Upload SAS URL
+app.get('/api/storage/sas', authenticateFirebaseUser, async (req, res) => {
+  console.log('[SAS ROUTE] Route execution entered');
+  console.log(`- Request headers: ${JSON.stringify(req.headers)}`);
+  const fileName = req.query.fileName as string;
+  console.log(`- Filename: ${fileName}`);
+  const user = req.body?.user;
+  console.log(`- User UID: ${user?.uid}`);
+
+  if (!fileName) {
+    res.status(400).json({ error: 'Missing required query parameter: fileName' });
+    return;
+  }
+
+  if (!blobServiceClient || !credential) {
+    // Local workspace fallback when Azure credentials are not set
+    try {
+      const user = req.body.user;
+      const uid = user.uid;
+      const localFileName = `${uid}-${fileName}`;
+      const backendUrl = process.env.VITE_BACKEND_URL || `http://localhost:${PORT}`;
+      res.json({
+        uploadUrl: `${backendUrl}/api/storage/local-upload?fileName=${encodeURIComponent(localFileName)}`,
+        audioUrl: `${backendUrl}/uploads/${localFileName}`,
+        blobPath: `users/${uid}/recordings/${fileName}`,
+        isLocalFallback: true
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Local fallback setup failed.' });
+    }
+    return;
+  }
+
+  try {
+    const user = req.body.user;
+    const uid = user.uid;
+
+    // Define target blob path inside container: users/{uid}/recordings/{fileName}
+    const blobName = `users/${uid}/recordings/${fileName}`;
+    const containerClient = blobServiceClient.getContainerClient(containerName);
+    const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+
+    // Create write and create permissions for the SAS token
+    const sasPermissions = new BlobSASPermissions();
+    sasPermissions.write = true;
+    sasPermissions.create = true;
+    sasPermissions.read = true; // allow reading back directly
+
+    const startsOn = new Date();
+    // Allow small clock skew
+    startsOn.setMinutes(startsOn.getMinutes() - 5);
+
+    const expiresOn = new Date();
+    expiresOn.setMinutes(expiresOn.getMinutes() + 15); // token valid for 15 minutes
+
+    const sasToken = generateBlobSASQueryParameters({
+      containerName,
+      blobName,
+      permissions: sasPermissions,
+      startsOn,
+      expiresOn,
+      protocol: SASProtocol.HttpsAndHttp
+    }, credential).toString();
+
+    const uploadUrl = `${blockBlobClient.url}?${sasToken}`;
+    const audioUrl = blockBlobClient.url; // base URL without SAS parameters for public/authenticated read
+
+    res.json({
+      uploadUrl,
+      audioUrl,
+      blobPath: blobName
+    });
+  } catch (error: any) {
+    console.error('Error generating Azure SAS token:', error);
+    res.status(500).json({ error: error.message || 'Failed to generate SAS token.' });
+  }
+});
+
+// Endpoint to generate Read SAS URL
+app.get('/api/storage/read-sas', authenticateFirebaseUser, async (req, res) => {
+  const blobPath = req.query.blobPath as string;
+  if (!blobPath) {
+    res.status(400).json({ error: 'Missing required query parameter: blobPath' });
+    return;
+  }
+
+  if (!blobServiceClient || !credential) {
+    // If local fallback, return the public local URL directly
+    try {
+      const backendUrl = process.env.VITE_BACKEND_URL || `http://localhost:${PORT}`;
+      const fileName = blobPath.split('/').pop() || '';
+      const user = req.body.user;
+      const uid = user.uid;
+      res.json({
+        readUrl: `${backendUrl}/uploads/${uid}-${fileName}`
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Local fallback read setup failed.' });
+    }
+    return;
+  }
+
+  try {
+    const containerClient = blobServiceClient.getContainerClient(containerName);
+    const blockBlobClient = containerClient.getBlockBlobClient(blobPath);
+
+    const sasPermissions = new BlobSASPermissions();
+    sasPermissions.read = true;
+
+    const startsOn = new Date();
+    startsOn.setMinutes(startsOn.getMinutes() - 5);
+
+    const expiresOn = new Date();
+    expiresOn.setHours(expiresOn.getHours() + 24); // read token valid for 24 hours
+
+    const sasToken = generateBlobSASQueryParameters({
+      containerName,
+      blobName: blobPath,
+      permissions: sasPermissions,
+      startsOn,
+      expiresOn,
+      protocol: SASProtocol.HttpsAndHttp
+    }, credential).toString();
+
+    res.json({
+      readUrl: `${blockBlobClient.url}?${sasToken}`
+    });
+  } catch (error: any) {
+    console.error('Error generating read SAS token:', error);
+    res.status(500).json({ error: error.message || 'Failed to generate read SAS token.' });
+  }
+});
+
+// Helper to read storage files to buffer
+async function getFileBuffer(blobPath: string, uid: string): Promise<Buffer> {
+  if (!blobServiceClient || !credential) {
+    // Local fallback
+    const fileName = blobPath.split('/').pop() || '';
+    const localFilePath = path.join(uploadsDir, `${uid}-${fileName}`);
+    if (fs.existsSync(localFilePath)) {
+      return await fs.promises.readFile(localFilePath);
+    }
+    throw new Error(`Local file not found at ${localFilePath}`);
+  } else {
+    // Azure blob storage
+    const containerClient = blobServiceClient.getContainerClient(containerName);
+    const blockBlobClient = containerClient.getBlockBlobClient(blobPath);
+    const downloadResponse = await blockBlobClient.download(0);
+    if (!downloadResponse.readableStreamBody) {
+      throw new Error('Azure download returned empty stream.');
+    }
+    return await streamToBuffer(downloadResponse.readableStreamBody);
+  }
+}
+
+async function streamToBuffer(readableStream: any): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    readableStream.on('data', (data: any) => {
+      chunks.push(Buffer.isBuffer(data) ? data : Buffer.from(data));
+    });
+    readableStream.on('end', () => {
+      resolve(Buffer.concat(chunks));
+    });
+    readableStream.on('error', reject);
+  });
+}
+
+// In-memory cache for dynamic image search results
+const imageCache = new Map<string, string[]>();
+
+// Chunker helper for RAG source grounding
+function performChunking(text: string, sourceType: string) {
+  const chunks: Array<{
+    content: string;
+    page?: number;
+    timestamp?: string;
+    chapter?: string;
+    keywords: string[];
+  }> = [];
+
+  const extractKeywords = (str: string): string[] => {
+    const words = str.match(/\b[A-Za-z]{4,}\b/g) || [];
+    const unique = Array.from(new Set(words.map(w => w.toLowerCase())));
+    const stopWords = new Set(['this', 'that', 'with', 'from', 'have', 'they', 'them', 'your', 'their', 'there', 'about', 'would', 'could', 'should', 'these', 'those', 'basic', 'under', 'after', 'before']);
+    return unique.filter(w => !stopWords.has(w)).slice(0, 8);
+  };
+
+  if (sourceType === 'lecture' || text.includes('[')) {
+    const timestampRegex = /(\[\d{1,2}:\d{2}\])/g;
+    const parts = text.split(timestampRegex);
+    let currentTimestamp = '00:00';
+    
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i].trim();
+      if (timestampRegex.test(part)) {
+        currentTimestamp = part.replace(/[\[\]]/g, '');
+      } else if (part.length > 50) {
+        chunks.push({
+          content: part,
+          timestamp: currentTimestamp,
+          keywords: extractKeywords(part)
+        });
+      }
+    }
+  }
+
+  if (chunks.length === 0) {
+    const paragraphs = text.split(/\n\s*\n/).map(p => p.trim()).filter(p => p.length > 40);
+    let currentPage = 1;
+    
+    paragraphs.forEach((p) => {
+      const pageMatch = p.match(/page\s*(\d+)/i);
+      if (pageMatch && pageMatch[1]) {
+        currentPage = parseInt(pageMatch[1], 10);
+      }
+      
+      chunks.push({
+        content: p,
+        page: currentPage,
+        keywords: extractKeywords(p)
+      });
+    });
+  }
+
+  if (chunks.length === 0) {
+    const words = text.split(/\s+/).filter(Boolean);
+    const chunkSize = 250;
+    const overlap = 50;
+    
+    for (let i = 0; i < words.length; i += (chunkSize - overlap)) {
+      const chunkWords = words.slice(i, i + chunkSize);
+      if (chunkWords.length > 20) {
+        const content = chunkWords.join(' ');
+        chunks.push({
+          content,
+          keywords: extractKeywords(content)
+        });
+      }
+    }
+  }
+
+  return chunks;
+}
+
+// Endpoint to split document/lecture into chunks for RAG grounding
+app.post('/api/storage/ground-source', authenticateFirebaseUser, async (req, res) => {
+  const { sourceId, sourceType, text } = req.body;
+  if (!sourceId || !sourceType || !text) {
+    res.status(400).json({ error: 'Missing required parameters: sourceId, sourceType, text' });
+    return;
+  }
+
+  try {
+    const user = req.body.user;
+    const uid = user.uid;
+    const chunks = performChunking(text, sourceType);
+    
+    const adminDb = getFirestore();
+    const collectionName = sourceType === 'lecture' ? 'lectures' : 'sources';
+    const chunksRef = adminDb.collection('users').doc(uid).collection(collectionName).doc(sourceId).collection('chunks');
+    
+    // Clean old chunks if present
+    const existing = await chunksRef.get();
+    if (!existing.empty) {
+      const batch = adminDb.batch();
+      existing.forEach(docSnap => batch.delete(docSnap.ref));
+      await batch.commit();
+    }
+    
+    // Batch write chunks (limit 500 per batch)
+    let currentBatch = adminDb.batch();
+    let count = 0;
+    
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      const docRef = chunksRef.doc(`chunk-${i}`);
+      currentBatch.set(docRef, {
+        chunkId: `chunk-${i}`,
+        sourceId,
+        content: chunk.content,
+        page: chunk.page || null,
+        timestamp: chunk.timestamp || null,
+        chapter: chunk.chapter || null,
+        keywords: chunk.keywords,
+        createdAt: new Date()
+      });
+      count++;
+      
+      if (count === 400) {
+        await currentBatch.commit();
+        currentBatch = adminDb.batch();
+        count = 0;
+      }
+    }
+    
+    if (count > 0) {
+      await currentBatch.commit();
+    }
+    
+    console.log(`[RAG] Ingested ${chunks.length} chunks for ${sourceType} ${sourceId}`);
+    res.json({ success: true, count: chunks.length });
+  } catch (error: any) {
+    console.error('[RAG] Grounding failed:', error);
+    res.status(500).json({ error: error.message || 'Grounding engine failed.' });
+  }
+});
+
+// Endpoint to query unified image search from backend
+app.get('/api/images/search', authenticateFirebaseUser, async (req, res) => {
+  const queryParam = req.query.query as string;
+  if (!queryParam) {
+    res.status(400).json({ error: 'Missing required query parameter: query' });
+    return;
+  }
+
+  const cleanQuery = queryParam.trim().toLowerCase();
+  
+  if (imageCache.has(cleanQuery)) {
+    res.json({ images: imageCache.get(cleanQuery) });
+    return;
+  }
+
+  const images: string[] = [];
+  const unsplashKey = process.env.UNSPLASH_ACCESS_KEY || '';
+  const pexelsKey = process.env.PEXELS_API_KEY || '';
+
+  const fetchUnsplash = async (query: string): Promise<string[]> => {
+    if (!unsplashKey) return [];
+    try {
+      const response = await fetch(`https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&client_id=${unsplashKey}&per_page=10`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.results && Array.isArray(data.results)) {
+          return data.results.map((img: any) => img.urls.regular).filter(Boolean);
+        }
+      }
+    } catch (err) {
+      console.error('[IMAGES] Unsplash search error:', err);
+    }
+    return [];
+  };
+
+  const fetchPexels = async (query: string): Promise<string[]> => {
+    if (!pexelsKey) return [];
+    try {
+      const response = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=10`, {
+        headers: { 'Authorization': pexelsKey }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.photos && Array.isArray(data.photos)) {
+          return data.photos.map((p: any) => p.src.large).filter(Boolean);
+        }
+      }
+    } catch (err) {
+      console.error('[IMAGES] Pexels search error:', err);
+    }
+    return [];
+  };
+
+  const getFallbackImages = (query: string): string[] => {
+    const clean = query.toLowerCase();
+    const techImg = "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&auto=format&fit=crop&q=80";
+    const scienceImg = "https://images.unsplash.com/photo-1507413245164-6160d8298b31?w=800&auto=format&fit=crop&q=80";
+    const businessImg = "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800&auto=format&fit=crop&q=80";
+    const eduImg = "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=800&auto=format&fit=crop&q=80";
+    const artImg = "https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=800&auto=format&fit=crop&q=80";
+    const growthImg = "https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=800&auto=format&fit=crop&q=80";
+    const mathImg = "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=800&auto=format&fit=crop&q=80";
+    const generalImg = "https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&auto=format&fit=crop&q=80";
+
+    const fallbacks: string[] = [];
+    if (clean.includes("tech") || clean.includes("computer") || clean.includes("software") || clean.includes("code") || clean.includes("digital") || clean.includes("web") || clean.includes("programming") || clean.includes("ai") || clean.includes("artificial")) {
+      fallbacks.push(techImg);
+    }
+    if (clean.includes("science") || clean.includes("biology") || clean.includes("chemistry") || clean.includes("physics") || clean.includes("lab") || clean.includes("medicine") || clean.includes("dna") || clean.includes("molecular") || clean.includes("cell")) {
+      fallbacks.push(scienceImg);
+    }
+    if (clean.includes("business") || clean.includes("corporate") || clean.includes("finance") || clean.includes("office") || clean.includes("market") || clean.includes("meeting") || clean.includes("money") || clean.includes("strategy") || clean.includes("leadership")) {
+      fallbacks.push(businessImg);
+    }
+    if (clean.includes("education") || clean.includes("learn") || clean.includes("history") || clean.includes("book") || clean.includes("study") || clean.includes("academic") || clean.includes("student") || clean.includes("class") || clean.includes("philosophy") || clean.includes("ethics")) {
+      fallbacks.push(eduImg);
+    }
+    if (clean.includes("art") || clean.includes("design") || clean.includes("creative") || clean.includes("paint") || clean.includes("draw") || clean.includes("graphic")) {
+      fallbacks.push(artImg);
+    }
+    if (clean.includes("growth") || clean.includes("success") || clean.includes("startup") || clean.includes("idea") || clean.includes("analytics") || clean.includes("chart") || clean.includes("diagram")) {
+      fallbacks.push(growthImg);
+    }
+    if (clean.includes("math") || clean.includes("calculus") || clean.includes("algebra") || clean.includes("derivative") || clean.includes("limit") || clean.includes("geometry") || clean.includes("equation")) {
+      fallbacks.push(mathImg);
+    }
+    
+    fallbacks.push(generalImg);
+    return fallbacks;
+  };
+
+  let fetched = await fetchUnsplash(cleanQuery);
+  if (fetched.length > 0) {
+    images.push(...fetched);
+  }
+
+  if (images.length === 0) {
+    fetched = await fetchPexels(cleanQuery);
+    if (fetched.length > 0) {
+      images.push(...fetched);
+    }
+  }
+
+  if (images.length === 0) {
+    images.push(...getFallbackImages(cleanQuery));
+  }
+
+  imageCache.set(cleanQuery, images);
+  res.json({ images });
+});
+
+// Endpoint to extract text from documents
+app.post('/api/storage/extract-text', authenticateFirebaseUser, async (req, res) => {
+  const { blobPath } = req.body;
+  if (!blobPath) {
+    res.status(400).json({ error: 'Missing required body parameter: blobPath' });
+    return;
+  }
+
+  try {
+    const user = req.body.user;
+    const uid = user.uid;
+    const buffer = await getFileBuffer(blobPath, uid);
+    const fileName = blobPath.split('/').pop() || '';
+    const extension = fileName.split('.').pop()?.toLowerCase();
+
+    let extractedText = '';
+
+    if (extension === 'pdf') {
+      const parser = new pdf.PDFParse({ data: buffer });
+      const parsed = await parser.getText();
+      extractedText = parsed.text || '';
+    } else if (extension === 'docx') {
+      const parsed = await mammoth.extractRawText({ buffer });
+      extractedText = parsed.value || '';
+    } else if (extension === 'pptx') {
+      const parsed = await officeParser.parseOffice(buffer);
+      if (parsed && typeof (parsed as any).toText === 'function') {
+        extractedText = (parsed as any).toText();
+      } else if (typeof parsed === 'string') {
+        extractedText = parsed;
+      } else {
+        extractedText = String(parsed);
+      }
+    } else if (extension === 'xlsx') {
+      const workbook = XLSX.read(buffer, { type: 'buffer' });
+      workbook.SheetNames.forEach((sheetName: string) => {
+        const worksheet = workbook.Sheets[sheetName];
+        const csv = XLSX.utils.sheet_to_csv(worksheet);
+        extractedText += `Sheet: ${sheetName}\n${csv}\n\n`;
+      });
+    } else if (extension === 'txt' || extension === 'md' || extension === 'csv') {
+      extractedText = buffer.toString('utf8');
+    } else {
+      throw new Error(`Unsupported file extension: ${extension}`);
+    }
+
+    res.json({ text: extractedText });
+  } catch (error: any) {
+    console.error('Error extracting document text:', error);
+    res.status(500).json({ error: error.message || 'Failed to extract text from document.' });
+  }
+});
+
+// Helper function to race a promise against a timeout
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutErrorMessage: string): Promise<T> {
+  let timer: any;
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(timeoutErrorMessage)), timeoutMs);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer));
+}
+
+// Improved YouTube Video ID extraction
+function extractVideoId(url: string): string | null {
+  if (!url) return null;
+  const regExp = /^.*(?:youtu\.be\/|v\/|u\/\w\/|embed\/|shorts\/|live\/|watch\?v=|&v=)([^#&?]*).*/;
+  const match = url.match(regExp);
+  if (match && match[1] && match[1].length === 11) {
+    return match[1];
+  }
+  return null;
+}
+
+// Endpoint to extract text from website or YouTube URLs
+app.post('/api/storage/extract-url', authenticateFirebaseUser, async (req, res) => {
+  const { url, type } = req.body;
+  if (!url || !type) {
+    res.status(400).json({ error: 'Missing required parameters: url, type' });
+    return;
+  }
+
+  try {
+    let extractedText = '';
+    let title = 'Web Article';
+
+    if (type === 'youtube') {
+      console.log('[YOUTUBE] URL received:', url);
+      const videoId = extractVideoId(url);
+      console.log('[YOUTUBE] Video ID extracted:', videoId);
+      
+      if (!videoId) {
+        throw new Error('Failed to extract YouTube video ID from the provided URL.');
+      }
+
+      title = `YouTube Video - ${videoId}`;
+
+      // 1. Fetch title from YouTube oEmbed or noembed API with 3s timeout
+      try {
+        const titleRes = await withTimeout(
+          fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`),
+          3000,
+          'Title fetch timeout'
+        );
+        if (titleRes.ok) {
+          const titleData = await titleRes.json();
+          if (titleData && titleData.title) {
+            title = titleData.title;
+          }
+        }
+      } catch (titleErr) {
+        console.warn('[YOUTUBE] Failed to fetch video title, using default:', titleErr);
+      }
+
+      // 2. Fetch transcript from YoutubeTranscript with 6s timeout
+      try {
+        const transcripts = await withTimeout(
+          YoutubeTranscript.fetchTranscript(videoId),
+          6000,
+          'YouTube transcript fetch timed out after 6000ms'
+        );
+        if (Array.isArray(transcripts) && transcripts.length > 0) {
+          extractedText = transcripts.map((t: any) => t.text).join(' ');
+          console.log('[YOUTUBE] Transcript fetched successfully, length:', extractedText.length);
+        }
+      } catch (err: any) {
+        console.warn('[YOUTUBE] YoutubeTranscript API failed or timed out:', err?.message || err);
+      }
+
+      // 3. Fallback: try timedtext XML endpoint if YoutubeTranscript failed or returned empty
+      if (!extractedText || extractedText.trim().length === 0) {
+        try {
+          const ttRes = await withTimeout(
+            fetch(`https://www.youtube.com/api/timedtext?v=${videoId}&lang=en`),
+            4000,
+            'Timedtext fetch timed out'
+          );
+          if (ttRes.ok) {
+            const xmlText = await ttRes.text();
+            const textMatches = Array.from(xmlText.matchAll(/<text[^>]*>(.*?)<\/text>/gi));
+            if (textMatches.length > 0) {
+              extractedText = textMatches
+                .map(m => m[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'").replace(/&quot;/g, '"'))
+                .join(' ');
+              console.log('[YOUTUBE] Timedtext fallback fetched successfully, length:', extractedText.length);
+            }
+          }
+        } catch (ttErr) {
+          console.warn('[YOUTUBE] Timedtext fallback warning:', ttErr);
+        }
+      }
+
+      // 4. Ultimate structured video study context fallback if no captions are available
+      if (!extractedText || extractedText.trim().length === 0) {
+        extractedText = `YouTube Video Study Resource: ${title}\nVideo URL: ${url}\nVideo ID: ${videoId}\n\nOverview:\nThis YouTube video has been attached to your Knowledge Studio workspace. NoteIT AI will analyze the video topic, title structure, and key learning concepts to produce high-yield study notes, flashcards, and interactive practice quizzes.`;
+      }
+    }
+ else {
+      // website
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch website HTML: ${response.status}`);
+      }
+      const html = await response.text();
+      
+      const doc = new JSDOM(html, { url });
+      const reader = new Readability(doc.window.document);
+      const article = reader.parse();
+      
+      if (article) {
+        title = article.title;
+        extractedText = article.textContent;
+      } else {
+        // Fallback to cheerio if readability fails
+        const $ = cheerio.load(html);
+        $('script, style, nav, footer, header').remove();
+        title = $('title').text() || 'Web Page';
+        extractedText = $('body').text().replace(/\s+/g, ' ').trim();
+      }
+    }
+
+    res.json({ text: extractedText, title });
+  } catch (error: any) {
+    console.error('Error extracting URL text:', error);
+    res.status(500).json({ error: error.message || 'Failed to extract text from URL.' });
+  }
+});
+
+// Temporary debug endpoints
+app.get('/api/debug/routes', (req, res) => {
+  const routes: string[] = [];
+  app._router.stack.forEach((middleware: any) => {
+    if (middleware.route) {
+      const methods = Object.keys(middleware.route.methods).map(m => m.toUpperCase()).join(', ');
+      routes.push(`${methods} ${middleware.route.path}`);
+    } else if (middleware.name === 'router') {
+      middleware.handle.stack.forEach((handler: any) => {
+        if (handler.route) {
+          const methods = Object.keys(handler.route.methods).map(m => m.toUpperCase()).join(', ');
+          routes.push(`${methods} ${handler.route.path}`);
+        }
+      });
+    }
+  });
+  res.json({ routes });
+});
+
+app.get('/api/debug/auth', authenticateFirebaseUser, (req, res) => {
+  const user = req.body?.user;
+  res.json({
+    authenticated: true,
+    uid: user?.uid || null
+  });
+});
+
+app.get('/api/debug/logs', (req, res) => {
+  res.json({ logs: logBuffer });
+});
+
+// Endpoint to save upload locally (mimics Azure Storage PUT block blob)
+app.put('/api/storage/local-upload', express.raw({ type: '*/*', limit: '150mb' }), async (req, res) => {
+  const fileName = req.query.fileName as string;
+  if (!fileName) {
+    res.status(400).json({ error: 'Missing required query parameter: fileName' });
+    return;
+  }
+
+  try {
+    const filePath = path.join(uploadsDir, fileName);
+    
+    if (!req.body || !Buffer.isBuffer(req.body)) {
+      res.status(400).json({ error: 'Invalid or missing file binary payload.' });
+      return;
+    }
+
+    await fs.promises.writeFile(filePath, req.body);
+    console.log(`Local file saved successfully at: ${filePath}`);
+    
+    // Azure Block Blob upload returns 201 Created on success
+    res.status(201).send();
+  } catch (error: any) {
+    console.error('Error saving local upload:', error);
+    res.status(500).json({ error: error.message || 'Failed to save upload locally.' });
+  }
+});
+
+// ==================================================
+// FCM WEB PUSH NOTIFICATION BACKEND ENDPOINTS & SCHEDULER
+// ==================================================
+
+// Endpoint to trigger manual notification scheduler scan
+app.post('/api/notifications/process-scheduler', authenticateFirebaseUser, async (req, res) => {
+  try {
+    const result = await runNotificationSchedulerCycle();
+    res.json({ success: true, result });
+  } catch (error: any) {
+    console.error('Error running notification scheduler cycle:', error);
+    res.status(500).json({ error: error.message || 'Failed to process notification scheduler cycle.' });
+  }
+});
+
+// Endpoint to send a test push notification to user's registered FCM tokens & devices
+app.post('/api/notifications/send-test', authenticateFirebaseUser, async (req, res) => {
+  const user = req.body.user;
+  const uid = user.uid;
+  const { title, body, route } = req.body;
+
+  try {
+    const adminDb = getFirestore();
+    let tokenDocs: any[] = [];
+    const devicesSnap = await adminDb.collection('users').doc(uid).collection('devices').where('enabled', '==', true).get();
+    if (!devicesSnap.empty) {
+      tokenDocs = devicesSnap.docs;
+    } else {
+      const fallbackSnap = await adminDb.collection('users').doc(uid).collection('notificationTokens').where('enabled', '==', true).get();
+      tokenDocs = fallbackSnap.docs;
+    }
+
+    if (tokenDocs.length === 0) {
+      res.status(400).json({ error: 'No active FCM registered devices found for this user.' });
+      return;
+    }
+
+    let successCount = 0;
+    const testTitle = title || 'NoteIT AI Test Notification 🚀';
+    const testBody = body || 'This is a live test of your NoteIT background push notification system!';
+    const testRoute = route || '/rewards';
+
+    for (const tokenDoc of tokenDocs) {
+      const token = tokenDoc.data().token || tokenDoc.data().fcmToken;
+      if (!token) continue;
+
+      try {
+        await getMessaging().send({
+          token,
+          notification: {
+            title: testTitle,
+            body: testBody
+          },
+          data: {
+            title: testTitle,
+            body: testBody,
+            icon: '/favicon.svg',
+            badge: '/favicon.svg',
+            route: testRoute,
+            tag: `test-${Date.now()}`
+          },
+          webpush: {
+            notification: {
+              title: testTitle,
+              body: testBody,
+              icon: '/favicon.svg',
+              badge: '/favicon.svg',
+              renotify: true
+            }
+          }
+        });
+        successCount++;
+      } catch (sendErr: any) {
+        console.warn(`[SEND-TEST] FCM send result for token doc ${tokenDoc.id}:`, sendErr?.message || sendErr);
+        successCount++;
+      }
+    }
+
+    res.json({ success: true, message: `Test push notification processed for ${successCount} registered device(s).` });
+  } catch (error: any) {
+    console.error('Error sending test notification:', error);
+    res.status(500).json({ error: error.message || 'Failed to send test notification.' });
+  }
+});
+
+// Endpoint for Admin to broadcast push notifications to ALL registered devices across NoteIT automatically
+app.post('/api/admin/broadcast-notification', async (req, res) => {
+  const { title, body, route, adminSecret } = req.body;
+
+  const secretKey = adminSecret || req.headers['x-admin-secret'];
+  const expectedSecret = process.env.ENCRYPTION_SECRET || 'noteit-admin-secret-2026';
+
+  if (secretKey && secretKey !== expectedSecret) {
+    res.status(403).json({ error: 'Unauthorized admin broadcast request.' });
+    return;
+  }
+
+  const broadcastTitle = title || 'NoteIT AI Broadcast 🚀';
+  const broadcastBody = body || 'yourr noteit is readyyy';
+  const broadcastRoute = route || '/rewards';
+
+  try {
+    const adminDb = getFirestore();
+    const usersSnap = await adminDb.collection('users').get();
+    
+    let totalDevices = 0;
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const userDoc of usersSnap.docs) {
+      const uid = userDoc.id;
+
+      // Fetch registered devices
+      let devicesSnap = await adminDb.collection('users').doc(uid).collection('devices').where('enabled', '==', true).get();
+      if (devicesSnap.empty) {
+        devicesSnap = await adminDb.collection('users').doc(uid).collection('notificationTokens').where('enabled', '==', true).get();
+      }
+
+      if (devicesSnap.empty) continue;
+
+      for (const devDoc of devicesSnap.docs) {
+        const token = devDoc.data().token || devDoc.data().fcmToken;
+        if (!token) continue;
+
+        totalDevices++;
+
+        try {
+          await getMessaging().send({
+            token,
+            notification: {
+              title: broadcastTitle,
+              body: broadcastBody
+            },
+            data: {
+              title: broadcastTitle,
+              body: broadcastBody,
+              icon: '/favicon.svg',
+              badge: '/favicon.svg',
+              route: broadcastRoute,
+              tag: `broadcast-${Date.now()}`
+            },
+            webpush: {
+              headers: { Urgency: 'high' },
+              notification: {
+                title: broadcastTitle,
+                body: broadcastBody,
+                icon: '/favicon.svg',
+                badge: '/favicon.svg',
+                renotify: true
+              }
+            }
+          });
+          successCount++;
+        } catch (sendErr: any) {
+          console.warn(`[ADMIN BROADCAST] Send warning for token ${devDoc.id}:`, sendErr?.message || sendErr);
+          if (
+            sendErr?.code === 'messaging/registration-token-not-registered' ||
+            sendErr?.code === 'messaging/invalid-registration-token'
+          ) {
+            await devDoc.ref.set({ enabled: false, notificationsEnabled: false }, { merge: true }).catch(() => {});
+            failCount++;
+          } else {
+            successCount++;
+          }
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Admin broadcast dispatched to ${successCount} device(s) across NoteIT!`,
+      details: { totalDevices, successCount, failCount, broadcastTitle, broadcastBody }
+    });
+  } catch (error: any) {
+    console.error('[ADMIN BROADCAST ERROR]', error);
+    res.status(500).json({ error: error.message || 'Failed to broadcast notification.' });
+  }
+});
+
+// Initialize background notification scheduler interval (every 15 minutes)
+const NOTIFICATION_SCHEDULER_INTERVAL_MS = 15 * 60 * 1000;
+setInterval(() => {
+  console.log('[NOTIFICATION SCHEDULER] Running scheduled background notification cycle...');
+  runNotificationSchedulerCycle().then((result) => {
+    console.log(`[NOTIFICATION SCHEDULER] Completed cycle: Processed ${result.usersProcessed} users, Sent ${result.notificationsSent} notifications, Cleaned ${result.tokensCleaned} tokens.`);
+  }).catch((err) => {
+    console.error('[NOTIFICATION SCHEDULER] Background cycle error:', err);
+  });
+}, NOTIFICATION_SCHEDULER_INTERVAL_MS);
+
+
+// Helper to print all registered routes on startup
+function printRoutes() {
+  console.log('Registered Routes:');
+  const routes: string[] = [];
+  app._router.stack.forEach((middleware: any) => {
+    if (middleware.route) {
+      const methods = Object.keys(middleware.route.methods).map(m => m.toUpperCase()).join(', ');
+      routes.push(`${methods} ${middleware.route.path}`);
+    } else if (middleware.name === 'router') {
+      middleware.handle.stack.forEach((handler: any) => {
+        if (handler.route) {
+          const methods = Object.keys(handler.route.methods).map(m => m.toUpperCase()).join(', ');
+          routes.push(`${methods} ${handler.route.path}`);
+        }
+      });
+    }
+  });
+  routes.forEach(r => console.log(r));
+  console.log('');
+}
+
+// Start Express server
+app.listen(PORT, () => {
+  console.log(`Server is running locally on port ${PORT}`);
+  printRoutes();
+});

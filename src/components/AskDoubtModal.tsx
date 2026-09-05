@@ -1,0 +1,417 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React, { useState } from 'react';
+import { X, HelpCircle, Send, Paperclip, AlertCircle, CheckCircle, MessageSquare, User } from 'lucide-react';
+import { Button, Card, Badge } from './bauhaus';
+import { validateAttachment, getAssignedFacultyForSubject, createDoubtInFirestore, getWhatsAppDeepLink, getFacultyByTeacherCode, searchFacultySuggestions, FacultySearchResult } from '../services/teacherDoubtService';
+import { DoubtItem } from '../types';
+
+interface AskDoubtModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  initialSelectedText?: string;
+  initialSubject?: string;
+  initialLectureTitle?: string;
+  initialTopic?: string;
+  studentUser: { uid: string; fullName: string; emailAddress: string; institution?: string };
+}
+
+export default function AskDoubtModal({
+  isOpen,
+  onClose,
+  initialSelectedText = '',
+  initialSubject = 'Operating Systems',
+  initialLectureTitle = '',
+  initialTopic = '',
+  studentUser
+}: AskDoubtModalProps) {
+  const [subject, setSubject] = useState(initialSubject || 'Operating Systems');
+  const [lectureTitle, setLectureTitle] = useState(initialLectureTitle || '');
+  const [topic, setTopic] = useState(initialTopic || '');
+  const [question, setQuestion] = useState('');
+  const [selectedText, setSelectedText] = useState(initialSelectedText || '');
+  
+  // Teacher Code search & suggestions state
+  const [teacherCodeInput, setTeacherCodeInput] = useState('');
+  const [matchedTeacher, setMatchedTeacher] = useState<{ teacherId: string; teacherName: string; whatsappNumber: string; teacherCode: string } | null>(null);
+  const [searchingCode, setSearchingCode] = useState(false);
+  const [codeSearchResult, setCodeSearchResult] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<FacultySearchResult[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  
+  // Attachment file state
+  const [file, setFile] = useState<File | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+  
+  // Status state
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [submittedDoubt, setSubmittedDoubt] = useState<DoubtItem | null>(null);
+
+  if (!isOpen) return null;
+
+  const handleTeacherCodeSearch = async (code: string) => {
+    setTeacherCodeInput(code);
+    setCodeSearchResult(null);
+    const clean = code.trim().toUpperCase();
+
+    if (clean.length >= 4) {
+      // 1. Fetch suggestions list for autocomplete
+      const results = await searchFacultySuggestions(clean);
+      setSuggestions(results);
+      setShowSuggestions(true);
+
+      // 2. Fetch exact matching faculty object if available
+      setSearchingCode(true);
+      const res = await getFacultyByTeacherCode(clean);
+      setSearchingCode(false);
+
+      if (res) {
+        setMatchedTeacher(res);
+        setCodeSearchResult(`✓ Connected: ${res.teacherName} (${res.teacherCode})`);
+      } else {
+        setMatchedTeacher(null);
+      }
+    } else {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      setMatchedTeacher(null);
+    }
+  };
+
+  const handleSelectFaculty = (item: FacultySearchResult) => {
+    setTeacherCodeInput(item.teacherCode);
+    setMatchedTeacher(item);
+    setCodeSearchResult(`✓ Connected: ${item.teacherName} (${item.teacherCode})`);
+    setShowSuggestions(false);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFileError(null);
+    if (e.target.files && e.target.files[0]) {
+      const selectedFile = e.target.files[0];
+      const validation = validateAttachment(selectedFile);
+      if (!validation.valid) {
+        setFileError(validation.error || 'Invalid file.');
+        setFile(null);
+      } else {
+        setFile(selectedFile);
+      }
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (!question.trim() && !selectedText.trim()) {
+      setError('Please provide a question or select text for your doubt.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // 1. If teacher matched by Teacher Code, use them; else fallback to assigned subject faculty
+      const faculty = matchedTeacher 
+        ? { teacherId: matchedTeacher.teacherId, teacherName: matchedTeacher.teacherName, whatsappNumber: matchedTeacher.whatsappNumber }
+        : await getAssignedFacultyForSubject(subject, studentUser.institution);
+
+      // 2. Prepare metadata reference for attachment if present
+      let attachmentUrl = '';
+      let attachmentType = '';
+      let attachmentName = '';
+      let attachmentSize = 0;
+
+      if (file) {
+        attachmentName = file.name;
+        attachmentType = file.type;
+        attachmentSize = file.size;
+        attachmentUrl = `file_placeholder_${Date.now()}_${file.name}`;
+      }
+
+      // 3. Save doubt to Firestore
+      const newDoubtData: Omit<DoubtItem, 'id' | 'createdAt' | 'status'> = {
+        studentId: studentUser.uid || 'student_demo',
+        studentName: studentUser.fullName || 'Student Scholar',
+        studentUniversity: studentUser.institution || 'Chandigarh University',
+        studentClass: 'B.Tech CSE',
+        subjectId: 'subj_dynamic',
+        subjectName: subject,
+        teacherId: faculty.teacherId,
+        teacherName: faculty.teacherName,
+        lectureTitle: lectureTitle || undefined,
+        topic: topic || 'General Doubt',
+        question: question.trim(),
+        selectedText: selectedText || undefined,
+        attachmentUrl: attachmentUrl || undefined,
+        attachmentType: attachmentType || undefined,
+        attachmentName: attachmentName || undefined,
+        attachmentSize: attachmentSize || undefined,
+        priority: 'medium'
+      };
+
+      const docId = await createDoubtInFirestore(newDoubtData);
+
+      const completeDoubt: DoubtItem = {
+        ...newDoubtData,
+        id: docId,
+        createdAt: new Date().toISOString(),
+        status: 'NEW'
+      };
+
+      setSubmittedDoubt(completeDoubt);
+    } catch (err: any) {
+      console.error('Error submitting doubt:', err);
+      setError(err?.message || 'Failed to submit doubt. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[10000] bg-black/75 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+      <Card shadow="lg" className="w-full max-w-lg bg-[var(--card-bg)] border-2 border-[var(--border-main)] space-y-5 p-6 relative shadow-paper-lg">
+        
+        {/* Header with Profile Icon & Cancel Cross Icon */}
+        <div className="flex items-center justify-between border-b-2 border-[var(--border-main)] pb-3">
+          {/* Profile Identity & Section Title */}
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-9 w-9 rounded-[6px] border-2 border-[var(--border-main)] bg-[#FFC400] text-[#111111] flex items-center justify-center font-extrabold text-sm font-heading shrink-0 shadow-paper-sm">
+              {studentUser.fullName ? studentUser.fullName.charAt(0).toUpperCase() : <User size={18} />}
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <h2 className="font-heading font-extrabold text-base md:text-lg uppercase text-[var(--text-primary)] truncate">
+                  {submittedDoubt ? 'DOUBT SUBMITTED' : 'ASK ACADEMIC DOUBT'}
+                </h2>
+              </div>
+              <p className="text-[10px] font-mono text-[var(--text-secondary)] uppercase truncate">
+                Scholar: <span className="text-[var(--text-primary)] font-bold">{studentUser.fullName || 'Student'}</span> • {studentUser.institution || 'Cognitive Lab'}
+              </p>
+            </div>
+          </div>
+
+          {/* Cancel Cross Button */}
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--card-bg)] text-[var(--text-primary)] hover:bg-[#FF4D4D] hover:text-white transition-colors cursor-pointer shrink-0 shadow-paper-sm"
+            title="Cancel & Return to Dashboard"
+          >
+            <X size={20} className="stroke-[3]" />
+          </button>
+        </div>
+
+        {error && (
+          <div className="p-3 rounded-[4px] bg-[#FF4D4D]/15 border-2 border-[#FF4D4D] text-[#FF4D4D] text-xs font-mono font-bold flex items-center gap-2">
+            <AlertCircle size={16} />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {submittedDoubt ? (
+          /* SUCCESS SUBMISSION CARD WITH STUDENT-TRIGGERED WHATSAPP BUTTON (SAFEGUARD #5 & PHASE 12) */
+          <div className="space-y-5 py-2 text-center">
+            <div className="w-12 h-12 rounded-[6px] bg-[#19B56B]/20 text-[#19B56B] border-2 border-[#19B56B] flex items-center justify-center mx-auto">
+              <CheckCircle size={24} />
+            </div>
+
+            <div>
+              <h3 className="font-heading font-extrabold text-lg text-[var(--text-primary)] uppercase">
+                Doubt Submitted Successfully!
+              </h3>
+              <p className="text-xs font-mono text-[var(--text-secondary)] mt-1">
+                Assigned to: <strong className="text-[var(--text-primary)]">{submittedDoubt.teacherName || 'Subject Faculty'}</strong>
+              </p>
+            </div>
+
+            <div className="p-4 rounded-[6px] bg-[var(--panel-bg)] border-2 border-[var(--border-main)] text-left space-y-2 text-xs font-mono">
+              <div className="flex justify-between border-b border-[var(--border-main)] pb-1.5">
+                <span className="text-[var(--text-secondary)]">Subject:</span>
+                <span className="font-bold text-[var(--text-primary)]">{submittedDoubt.subjectName}</span>
+              </div>
+              <div className="flex justify-between border-b border-[var(--border-main)] pb-1.5">
+                <span className="text-[var(--text-secondary)]">Doubt ID:</span>
+                <span className="font-bold text-[var(--text-primary)]">{submittedDoubt.id}</span>
+              </div>
+              <div>
+                <span className="text-[var(--text-secondary)] block">Question / Context:</span>
+                <p className="text-[var(--text-primary)] font-semibold mt-1">
+                  {submittedDoubt.question}
+                </p>
+              </div>
+            </div>
+
+            {/* STUDENT-TRIGGERED WHATSAPP BUTTON */}
+            <div className="space-y-3 pt-2">
+              <p className="text-[11px] font-mono text-[var(--text-secondary)]">
+                You can optionally notify your faculty member on WhatsApp with your prefilled doubt details:
+              </p>
+              
+              <a
+                href={getWhatsAppDeepLink(submittedDoubt)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-3 rounded-[6px] bg-[#25D366] text-[#111111] font-mono font-extrabold text-xs uppercase tracking-wide border-2 border-[var(--border-main)] shadow-paper-sm hover:bg-[#22bf5b] transition-colors flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <MessageSquare size={16} />
+                <span>[ 💬 Open WhatsApp Chat ]</span>
+              </a>
+
+              <Button
+                variant="secondary"
+                size="md"
+                onClick={onClose}
+                className="w-full justify-center mt-2"
+              >
+                Done / Close Modal
+              </Button>
+            </div>
+          </div>
+        ) : (
+          /* DOUBT CREATION FORM */
+          <form onSubmit={handleSubmit} className="space-y-4">
+            
+            {/* Highlighted text preview */}
+            {selectedText && (
+              <div className="space-y-1">
+                <label className="text-[10px] font-mono font-bold text-[var(--text-secondary)] uppercase tracking-wider block">
+                  HIGHLIGHTED NOTE TEXT
+                </label>
+                <div className="p-3 rounded-[6px] bg-[#FFC400]/15 border-2 border-[#FFC400] text-xs font-mono italic text-[var(--text-primary)] leading-relaxed">
+                  "{selectedText}"
+                </div>
+              </div>
+            )}
+
+            {/* CONNECT BY TEACHER CODE WITH UPWARD AUTOCOMPLETE MENU */}
+            <div className="space-y-1 relative">
+              <label className="font-bold text-[var(--text-secondary)] uppercase text-[10px] tracking-wider flex items-center justify-between">
+                <span>CONNECT TO PROFESSOR (TEACHER CODE)</span>
+                <span className="text-[#38BDF8]">Optional (e.g. KISHVERM)</span>
+              </label>
+
+              {/* Autocomplete Suggestions Menu (4+ letters) */}
+              {showSuggestions && suggestions.length > 0 && (
+                <div className="absolute top-full mt-1.5 left-0 right-0 z-[10005] bg-[var(--card-bg)] border-2 border-[var(--border-main)] shadow-2xl rounded-[6px] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                  <div className="px-3 py-1.5 bg-[#FFC400] text-[#111111] text-[10px] font-mono font-black uppercase flex items-center justify-between border-b-2 border-[var(--border-main)]">
+                    <span>FACULTY CODE SUGGESTIONS ({suggestions.length})</span>
+                    <span className="text-[9px] font-bold">CLICK TO CONNECT</span>
+                  </div>
+                  <div className="max-h-44 overflow-y-auto divide-y divide-[var(--border-main)]">
+                    {suggestions.map((item) => (
+                      <div
+                        key={item.teacherCode}
+                        onClick={() => handleSelectFaculty(item)}
+                        className="px-3 py-2.5 hover:bg-[#FFC400] hover:text-[#111111] cursor-pointer transition-colors flex items-center justify-between group text-left"
+                      >
+                        <div className="min-w-0 flex-1 pr-2">
+                          <div className="text-xs font-heading font-extrabold uppercase truncate text-[var(--text-primary)] group-hover:text-[#111111]">
+                            {item.teacherName}
+                          </div>
+                          <div className="text-[10px] font-mono truncate text-[var(--text-secondary)] group-hover:text-[#111111]/80">
+                            {item.department || item.university}
+                          </div>
+                        </div>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-black border border-[var(--border-main)] bg-[var(--input-bg)] text-[var(--text-primary)] group-hover:bg-[#111111] group-hover:text-white shrink-0">
+                          {item.teacherCode}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <input
+                type="text"
+                maxLength={8}
+                placeholder="Enter Teacher Code (e.g. KISHVERM)"
+                value={teacherCodeInput}
+                onFocus={() => {
+                  if (teacherCodeInput.trim().length >= 4) setShowSuggestions(true);
+                }}
+                onChange={(e) => handleTeacherCodeSearch(e.target.value)}
+                className="w-full p-2.5 rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--input-bg)] text-[var(--text-primary)] font-mono font-bold text-xs uppercase tracking-widest outline-none shadow-paper-sm focus:border-[#38BDF8]"
+              />
+              {codeSearchResult && (
+                <div className={`text-[11px] font-mono font-bold mt-1 ${
+                  matchedTeacher ? 'text-[#19B56B]' : 'text-[var(--text-secondary)]'
+                }`}>
+                  {codeSearchResult}
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+              <div className="space-y-1">
+                <label className="font-bold text-[var(--text-secondary)] uppercase text-[10px] tracking-wider block">SUBJECT</label>
+                <select
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  className="w-full p-2.5 rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--input-bg)] text-[var(--text-primary)] font-bold outline-none shadow-paper-sm"
+                >
+                  <option value="Operating Systems">Operating Systems</option>
+                  <option value="Data Structures & Algorithms">Data Structures</option>
+                  <option value="Computer Networks">Computer Networks</option>
+                  <option value="Database Management">Database Management</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-[var(--text-secondary)] uppercase text-[10px] tracking-wider block">TOPIC / MODULE</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Deadlock Prevention"
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  className="w-full p-2.5 rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--input-bg)] text-[var(--text-primary)] font-bold outline-none shadow-paper-sm"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="font-bold text-[var(--text-secondary)] uppercase text-[10px] tracking-wider block">YOUR QUESTION / EXPLANATION NEEDED</label>
+              <textarea
+                rows={3}
+                required={!selectedText}
+                placeholder="Explain what specific part you found confusing..."
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                className="w-full p-3 rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--input-bg)] text-xs font-mono text-[var(--text-primary)] font-bold outline-none shadow-paper-sm resize-none focus:border-[#FFC400]"
+              />
+            </div>
+
+            {/* FILE ATTACHMENT WITH VALIDATION (SAFEGUARD #6 & PHASE 9) */}
+            <div className="space-y-1">
+              <label className="font-bold text-[var(--text-secondary)] uppercase text-[10px] tracking-wider block">
+                ATTACHMENT (Max 10MB - PDF, Images, Docs)
+              </label>
+              <div className="relative">
+                <input
+                  type="file"
+                  onChange={handleFileChange}
+                  accept="image/*,.pdf,.doc,.docx,.txt"
+                  className="w-full p-2 rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--input-bg)] text-xs font-mono text-[var(--text-primary)] outline-none shadow-paper-sm file:mr-3 file:py-1 file:px-3 file:rounded-[4px] file:border-2 file:border-[var(--border-main)] file:bg-[#FFC400] file:text-[#111111] file:font-mono file:font-bold file:text-xs"
+                />
+              </div>
+              {fileError && <p className="text-[10px] font-mono text-[#FF4D4D] font-bold">{fileError}</p>}
+              {file && <p className="text-[10px] font-mono text-[#19B56B] font-bold">✓ Attached: {file.name} ({(file.size / 1024).toFixed(0)} KB)</p>}
+            </div>
+
+            <Button
+              variant="primary"
+              size="md"
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full justify-center bg-[#FFC400] text-[#111111] font-extrabold border-2 border-[var(--border-main)] shadow-paper-sm"
+            >
+              {isSubmitting ? 'SUBMITTING DOUBT...' : 'SUBMIT DOUBT TO FACULTY →'}
+            </Button>
+          </form>
+        )}
+
+      </Card>
+    </div>
+  );
+}

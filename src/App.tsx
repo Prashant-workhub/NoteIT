@@ -1,0 +1,1351 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React, { useState, useEffect } from 'react';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { auth, db } from './firebaseConfig';
+import { doc, getDoc, setDoc, serverTimestamp, collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { 
+  GraduationCap, 
+  Sparkles, 
+  Compass, 
+  BookMarked, 
+  Plus, 
+  ArrowRight,
+  ShieldAlert,
+  HelpCircle,
+  TrendingUp,
+  Brain,
+  Cpu,
+  FileCode,
+  CheckCircle,
+  Star
+} from 'lucide-react';
+
+// Types and mock imports
+import { PageId, Source, Lecture, WeakTopic, Quiz, QuizQuestion, NotificationItem, UserSettings, Note, DoubtItem } from './types';
+import { useNotes } from './hooks/useNotes';
+import { useLectures } from './hooks/useLectures';
+import { 
+  INITIAL_SOURCES, 
+  INITIAL_LECTURES, 
+  INITIAL_WEAK_TOPICS, 
+  INITIAL_QUIZZES, 
+  INITIAL_NOTIFICATIONS, 
+  INITIAL_SETTINGS 
+} from './data';
+
+// Component imports
+import Sidebar from './components/Sidebar';
+import Navbar from './components/Navbar';
+import DashboardView from './components/DashboardView';
+import ResearchHubView from './components/ResearchHubView';
+import LibraryView from './components/LibraryView';
+import QuizView from './components/QuizView';
+import PreparationModeView from './components/PreparationModeView';
+import { ExamRushWorkspace } from './components/preparation/ExamRushWorkspace';
+import { ExamRushConfig } from './components/preparation/ExamRushSetup';
+import { resolveCanonicalSubject } from './utils/subjectCanonicalizer';
+import KnowledgeStudioView from './components/KnowledgeStudioView';
+import NotificationsView from './components/NotificationsView';
+import SettingsView from './components/SettingsView';
+import SupportView from './components/SupportView';
+import PricingView from './components/PricingView';
+import AuthView from './components/AuthView';
+import ProfileView from './components/ProfileView';
+import LectureCaptureView from './components/LectureCaptureView';
+import LectureProcessingView from './components/LectureProcessingView';
+import LandingView from './components/LandingView';
+import OnboardingView from './components/OnboardingView';
+import RewardsView from './components/RewardsView';
+import DailyXPClaimModal from './components/rewards/DailyXPClaimModal';
+import { useStreak } from './hooks/useStreak';
+import { isWeekend, getLocalDateString } from './config/weekendQuizConfig';
+import { XPToastNotification } from './components/bauhaus/XPToastNotification';
+import BruteLoader from './components/BruteLoader';
+import ErrorBoundary from './components/ErrorBoundary';
+import FeedbackWidget from './components/FeedbackWidget';
+import AILogo from './components/AILogo';
+import { generateAdditionalQuizQuestions } from './services/gemini';
+import FloatingRecordingWidget from './components/FloatingRecordingWidget';
+import GuidedTour from './components/GuidedTour';
+import NotificationPermissionBanner from './components/NotificationPermissionBanner';
+import { setupForegroundMessageListener, requestNotificationPermission } from './services/notificationService';
+
+// Faculty Portal & Ask Doubt Imports
+import { subscribeFacultyDoubts, generateTeacherCode } from './services/teacherDoubtService';
+import AskDoubtModal from './components/AskDoubtModal';
+import FacultyOnboardingView from './components/faculty/FacultyOnboardingView';
+import TeacherPortalApp from './teacher-portal/TeacherPortalApp';
+
+
+export default function App() {
+  
+  // Live global recording state across tabs
+  const [globalRecordingState, setGlobalRecordingState] = useState<{
+    isRecording: boolean;
+    isPaused: boolean;
+    seconds: number;
+    pauseCapture: () => void;
+    stopCapture: () => void;
+  } | null>(null);
+  
+  // Theme state defaulting to dark for premium dark blue academic vibes
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('noteit_theme') as 'light' | 'dark';
+      if (saved) return saved;
+    }
+    return 'dark';
+  });
+
+  // Sync theme attribute on <html> element & persist in localStorage
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    localStorage.setItem('noteit_theme', theme);
+  }, [theme]);
+
+  // Authenticated user session state & Role state (Student vs Faculty)
+  const [sessionUser, setSessionUser] = useState<{ uid: string; fullName: string; emailAddress: string } | null>(null);
+  const [userRole, setUserRole] = useState<'student' | 'faculty'>('student');
+  const [doubts, setDoubts] = useState<DoubtItem[]>([]);
+  const [askDoubtModal, setAskDoubtModal] = useState<{
+    isOpen: boolean;
+    selectedText?: string;
+    subject?: string;
+    lectureTitle?: string;
+    topic?: string;
+  }>({ isOpen: false });
+
+  // Onboarding checks
+  const [checkingOnboarding, setCheckingOnboarding] = useState(true);
+  const [isOnboarding, setIsOnboarding] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState(1);
+
+  // Guided Tour State & Event Listeners
+  const [isGuidedTourOpen, setIsGuidedTourOpen] = useState(false);
+
+  // Service Worker Notification Click Navigation & Foreground Push Message Listener
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('navigator' in window)) return;
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'NOTEIT_NOTIFICATION_NAVIGATE') {
+        const r = (event.data.route || '').toLowerCase().trim();
+        if (r.includes('reward')) setActivePage('rewards');
+        else if (r.includes('quiz')) setActivePage('quiz-mode');
+        else if (r.includes('library') || r.includes('academic')) setActivePage('academic-library');
+        else if (r.includes('research')) setActivePage('research-hub');
+        else if (r.includes('knowledge') || r.includes('studio')) setActivePage('knowledge-studio');
+        else if (r.includes('setting')) setActivePage('settings');
+        else if (r.includes('capture')) setActivePage('lecture-capture');
+        else setActivePage('dashboard');
+      }
+    };
+    if (navigator.serviceWorker) {
+      navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+    }
+    const unsubForeground = setupForegroundMessageListener();
+    return () => {
+      if (navigator.serviceWorker) {
+        navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+      }
+      unsubForeground();
+    };
+  }, []);
+
+  // Auto-sync real FCM token when user is authenticated & notification permission is granted
+  useEffect(() => {
+    if (sessionUser?.uid && typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      requestNotificationPermission(sessionUser.uid).catch((err) => {
+        console.warn('[App] Auto FCM token sync warning:', err);
+      });
+    }
+  }, [sessionUser?.uid]);
+
+  // Listen for manual Guided Tour start triggers
+  useEffect(() => {
+    const handleStartTour = () => setIsGuidedTourOpen(true);
+    window.addEventListener('noteit_start_guided_tour', handleStartTour);
+    return () => window.removeEventListener('noteit_start_guided_tour', handleStartTour);
+  }, []);
+
+  // Auto-trigger Guided Tour for new users upon login & onboarding completion
+  useEffect(() => {
+    if (sessionUser && userRole === 'student' && !isOnboarding) {
+      const tourCompleted = localStorage.getItem('noteit_guided_tour_completed');
+      if (tourCompleted !== 'true') {
+        const timer = setTimeout(() => {
+          setIsGuidedTourOpen(true);
+        }, 1200);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [sessionUser, userRole, isOnboarding]);
+
+  // Listen for global Ask Doubt trigger event across all views
+  useEffect(() => {
+    const handleOpenAskDoubt = (e: any) => {
+      setAskDoubtModal({
+        isOpen: true,
+        selectedText: e.detail?.selectedText || '',
+        subject: e.detail?.subject || 'Operating Systems',
+        lectureTitle: e.detail?.lectureTitle || '',
+        topic: e.detail?.topic || ''
+      });
+    };
+    window.addEventListener('noteit_open_ask_doubt', handleOpenAskDoubt);
+    return () => window.removeEventListener('noteit_open_ask_doubt', handleOpenAskDoubt);
+  }, []);
+
+  // Real-time listener for doubts collection
+  useEffect(() => {
+    if (!sessionUser) {
+      setDoubts([]);
+      return;
+    }
+    return subscribeFacultyDoubts(sessionUser.uid, (list) => {
+      setDoubts(list);
+    });
+  }, [sessionUser]);
+
+  // Hook up Firestore notes & lectures in real-time
+  const { notes, isLoading: notesLoading, error: notesError, addNote, updateNote, deleteNote } = useNotes(sessionUser?.uid);
+  const { 
+    lectures: dbLectures, 
+    isLoading: lecturesLoading, 
+    addLecture, 
+    updateLecture, 
+    deleteLecture, 
+    uploadLectureAudio,
+    uploadLectureDocument
+  } = useLectures(sessionUser?.uid);
+
+  // Use only real Firestore lectures
+  const combinedLectures = dbLectures;
+
+  // Hook up 90-Day Streak & Daily XP Claim system (Requirement 1 & 21)
+  const {
+    streakData,
+    isLoading,
+    todayClaimed,
+    projectedStreak,
+    projectedXp,
+    wasReset,
+    showClaimModal,
+    isClaiming,
+    claimSuccess,
+    claimError,
+    claimDailyXP,
+    closeClaimModal,
+    redeemReward,
+    refreshStreak
+  } = useStreak(sessionUser?.uid);
+
+  // Real-time listener for automatic XP awards across all components
+  useEffect(() => {
+    const handleXPAwarded = () => {
+      refreshStreak();
+    };
+    window.addEventListener('noteit_xp_awarded', handleXPAwarded);
+    return () => {
+      window.removeEventListener('noteit_xp_awarded', handleXPAwarded);
+    };
+  }, [refreshStreak]);
+
+  // Smart Streak Warning Notification (dispatches once per date session)
+  useEffect(() => {
+    if (sessionUser && !todayClaimed && !isLoading) {
+      const warningKey = `noteit_streak_warn_${sessionUser.uid}_${getLocalDateString()}`;
+      if (!sessionStorage.getItem(warningKey)) {
+        sessionStorage.setItem(warningKey, 'true');
+        const weekend = isWeekend();
+        const msg = weekend
+          ? "No lecture today? Complete your Weekend Challenge to keep your streak alive!"
+          : "You haven't completed today's activity yet. Record a lecture before the day ends!";
+
+        window.dispatchEvent(
+          new CustomEvent('noteit_notification', {
+            detail: {
+              type: weekend ? 'weekend_reminder' : 'streak_warning',
+              title: weekend ? 'PROTECT YOUR STREAK! 🔥' : 'YOUR STREAK IS AT RISK! 🔥',
+              message: msg,
+              actionLabel: weekend ? 'TAKE CHALLENGE' : 'CONTINUE',
+              onAction: () => setActivePage(weekend ? 'dashboard' : 'lecture-capture'),
+              mascotPose: '/mascots/broot-thinking.png',
+              autoDismissMs: 7000
+            }
+          })
+        );
+      }
+    }
+  }, [sessionUser, todayClaimed, isLoading]);
+
+
+  // Setup Firebase Auth State Listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const loggedUser = {
+          uid: user.uid,
+          fullName: user.displayName || (sessionUser?.fullName && !sessionUser.fullName.includes('@') ? sessionUser.fullName : (user.email?.split('@')[0] || 'Academic Scholar')),
+          emailAddress: user.email || ''
+        };
+        
+        try {
+          console.log("Checking onboarding status for user UID:", user.uid);
+          const userDocRef = doc(db, 'users', user.uid);
+          
+          // Race getDoc against a 5-second timeout to prevent infinite loading screens on connectivity/websocket hangs
+          const userDocSnap = await Promise.race([
+            getDoc(userDocRef),
+            new Promise<never>((_, reject) => 
+              setTimeout(() => reject(new Error('Timeout fetching user document from Firestore.')), 5000)
+            )
+          ]);
+          
+          if (userDocSnap.exists()) {
+            const data = userDocSnap.data();
+            console.log("User data loaded from Firestore:", data);
+            
+            const isCompleted = !!data.onboarding_completed;
+            const detectedRole = data.role === 'faculty' ? 'faculty' : 'student';
+            setUserRole(detectedRole);
+
+            const calculatedCode = detectedRole === 'faculty'
+              ? (data.teacherCode || generateTeacherCode(`${data.first_name || ''} ${data.last_name || ''}`.trim() || loggedUser.fullName))
+              : undefined;
+
+            setSettings(prev => ({
+              ...prev,
+              profile: {
+                ...prev.profile,
+                fullName: `${data.first_name || ''} ${data.last_name || ''}`.trim() || loggedUser.fullName,
+                firstName: data.first_name || '',
+                lastName: data.last_name || '',
+                emailAddress: data.email || loggedUser.emailAddress,
+                institution: data.school_or_university || '',
+                countryCode: data.country_code || '',
+                phoneNumber: data.phone_number || '',
+                avatarUrl: data.profile_image_url || '',
+                onboardingCompleted: isCompleted,
+                role: detectedRole,
+                teacherCode: calculatedCode
+              }
+            }));
+            setSessionUser(loggedUser);
+
+            if (detectedRole === 'faculty') {
+              if (!isCompleted || !data.teacherCode) {
+                setIsOnboarding(true);
+              } else {
+                setIsOnboarding(false);
+              }
+            } else if (!isCompleted) {
+              console.log("User onboarding incomplete. Directing to OnboardingView.");
+              setIsOnboarding(true);
+            } else {
+              setIsOnboarding(false);
+            }
+          } else {
+            console.log("User document missing in Firestore for UID:", user.uid, "- New registration detected!");
+            setSessionUser(loggedUser);
+            setIsOnboarding(true);
+          }
+        } catch (err: any) {
+          console.error("Error checking user status:", err);
+          setSessionUser(loggedUser);
+          setIsOnboarding(false);
+        } finally {
+          setCheckingOnboarding(false);
+        }
+      } else {
+        setSessionUser(null);
+        setIsOnboarding(false);
+        setCheckingOnboarding(false);
+        setActivePage('landing');
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Real-time listener for Firestore weak topics
+  useEffect(() => {
+    if (!sessionUser) {
+      setWeakTopics([]);
+      return;
+    }
+    const weakTopicsRef = collection(db, 'users', sessionUser.uid, 'weakTopics');
+    const q = query(weakTopicsRef, orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: WeakTopic[] = [];
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        list.push({
+          id: docSnap.id,
+          topicName: data.topicName || '',
+          subject: data.subject || '',
+          masteryScore: data.masteryScore || 30,
+          lastAttempt: data.lastAttempt || 'Just now',
+          aiDiagnosis: data.aiDiagnosis || '',
+          actionPlan: data.actionPlan || []
+        });
+      });
+      setWeakTopics(list);
+    }, (err) => {
+      console.error("Error fetching weak topics:", err);
+    });
+    return () => unsubscribe();
+  }, [sessionUser]);
+
+  // Aggregate quizzes dynamically from processed lectures in Firestore
+  useEffect(() => {
+    setQuizzes(prevQuizzes => {
+      const generatedQuizzes: Quiz[] = [];
+      
+      // Process INITIAL_QUIZZES first
+      INITIAL_QUIZZES.forEach(initialQuiz => {
+        const existing = prevQuizzes.find(q => q.id === initialQuiz.id);
+        if (existing) {
+          generatedQuizzes.push({
+            ...initialQuiz,
+            easyQuestions: existing.easyQuestions.length > 0 ? existing.easyQuestions : initialQuiz.easyQuestions,
+            mediumQuestions: existing.mediumQuestions.length > 0 ? existing.mediumQuestions : initialQuiz.mediumQuestions,
+            hardQuestions: existing.hardQuestions.length > 0 ? existing.hardQuestions : initialQuiz.hardQuestions,
+            score: existing.score !== undefined ? existing.score : initialQuiz.score,
+            scores: existing.scores || initialQuiz.scores,
+            status: existing.status
+          });
+        } else {
+          generatedQuizzes.push(initialQuiz);
+        }
+      });
+
+      // Process lecture quizzes
+      combinedLectures.forEach(lecture => {
+        if (lecture.quiz && lecture.quiz.length > 0) {
+          const quizId = `quiz-${lecture.id}`;
+          const existing = prevQuizzes.find(q => q.id === quizId);
+          
+          if (existing) {
+            generatedQuizzes.push(existing);
+          } else {
+            const mappedQuestions = lecture.quiz.map((q: any, idx: number) => ({
+              id: `q-${lecture.id}-${idx}`,
+              question: q.question,
+              options: q.options,
+              correctAnswerIndex: q.correctAnswer,
+              explanation: q.explanation || 'Review concepts in your study outline.',
+              sourceCitation: q.sourceCitation || `[Source: ${lecture.title}]`
+            }));
+            
+            generatedQuizzes.push({
+              id: quizId,
+              title: `${lecture.title} Review`,
+              topic: lecture.subject,
+              questionsCount: lecture.quiz.length,
+              estimatedTime: `${lecture.quiz.length * 1} mins`,
+              status: 'available',
+              questions: mappedQuestions,
+              easyQuestions: mappedQuestions,
+              mediumQuestions: [],
+              hardQuestions: [],
+              contextText: lecture.transcript || lecture.summary || ""
+            });
+          }
+        }
+      });
+      
+      return generatedQuizzes;
+    });
+  }, [combinedLectures]);
+
+  // High-level dashboard states defaulting to landing page
+  const [activePage, setActivePage] = useState<PageId>('landing');
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+  const [isOpenMobile, setIsOpenMobile] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedQuizId, setSelectedQuizId] = useState<string | null>(null);
+
+  // Core records lists managed in React state (empty by default, loaded dynamically)
+  const [sources, setSources] = useState<Source[]>([]);
+  const [lectures, setLectures] = useState<Lecture[]>([]);
+  const [weakTopics, setWeakTopics] = useState<WeakTopic[]>([]);
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [settings, setSettings] = useState<UserSettings>(INITIAL_SETTINGS);
+
+  const [processingLectureId, setProcessingLectureId] = useState<string | null>(null);
+  const [processingAudioBlob, setProcessingAudioBlob] = useState<Blob | null>(null);
+  const [processingFile, setProcessingFile] = useState<File | null>(null);
+  const [activeLectureId, setActiveLectureId] = useState<string | null>(null);
+
+
+  // Callbacks: Sources
+  const handleAddSource = (newSource: Source) => {
+    setSources(prev => [newSource, ...prev]);
+    // Send background notification automated
+    const note: NotificationItem = {
+      id: Math.random().toString(),
+      title: `Source Synced: ${newSource.name}`,
+      description: `Analyzing document headers, citation tags, and indexing semantic concepts...`,
+      timeLabel: 'Today',
+      category: 'system',
+      read: false,
+      timestamp: 'Just now'
+    };
+    setNotifications(prev => [note, ...prev]);
+  };
+
+  const handleDeleteSource = (id: string) => {
+    setSources(prev => prev.filter(s => s.id !== id));
+  };
+
+  // Callbacks: Lectures
+  const handleAddLecture = async (newLecture: Lecture) => {
+    if (sessionUser) {
+      try {
+        await addLecture({
+          title: newLecture.title,
+          subject: newLecture.subject,
+          duration: newLecture.duration,
+          pages: newLecture.pages,
+          status: newLecture.status,
+          type: newLecture.type,
+          addedAt: 'Just now'
+        });
+      } catch (err) {
+        console.error('Failed to add lecture to Firestore:', err);
+      }
+    } else {
+      setLectures(prev => [newLecture, ...prev]);
+    }
+
+    // Also add to sources list as a PDF/text simulation
+    const simulatedSrc: Source = {
+      id: newLecture.id,
+      name: newLecture.title + (newLecture.type === 'recording' ? '.wav' : '.pdf'),
+      type: newLecture.type === 'recording' ? 'recording' : 'pdf',
+      size: newLecture.type === 'recording' ? '14.5 MB' : '3.8 MB',
+      addedAt: 'Just now'
+    };
+    setSources(prev => [simulatedSrc, ...prev]);
+    
+    // Notification log
+    const note: NotificationItem = {
+      id: Math.random().toString(),
+      title: `New processing: ${newLecture.title}`,
+      description: `High-Intensity Synthesis Engine has started transcribing and generating standard markdown outlines.`,
+      timeLabel: 'Today',
+      category: 'system',
+      read: false,
+      timestamp: 'Just now'
+    };
+    setNotifications(prev => [note, ...prev]);
+  };
+
+  const handleDeleteLecture = async (id: string) => {
+    if (sessionUser && dbLectures.some(l => l.id === id)) {
+      try {
+        await deleteLecture(id);
+      } catch (err) {
+        console.error('Failed to delete lecture from Firestore:', err);
+      }
+    } else {
+      setLectures(prev => prev.filter(l => l.id !== id));
+    }
+  };
+
+  const handleStartCapture = async (title: string, subject: string) => {
+    if (!sessionUser) throw new Error('User not authenticated');
+    const finalTitle = title.trim() || 'Auto-Detecting Topic...';
+    const lectureId = await addLecture({
+      title: finalTitle,
+      subject,
+      type: 'recording',
+      status: 'recording',
+      duration: '00:00:00'
+    });
+    const userDocRef = doc(db, 'users', sessionUser.uid, 'lectures', lectureId);
+    await setDoc(userDocRef, { recordingStartedAt: serverTimestamp() }, { merge: true });
+    return lectureId;
+  };
+
+  const handleSaveCapture = async (title: string, subject: string, duration: string, audioBlob: Blob, existingLectureId?: string) => {
+    if (!sessionUser) return;
+    try {
+      let lectureId = existingLectureId;
+      const finalTitle = title.trim() || 'Auto-Detecting Topic...';
+      if (!lectureId) {
+        lectureId = await addLecture({
+          title: finalTitle,
+          subject,
+          duration,
+          type: 'recording',
+          status: 'recording'
+        });
+      } else {
+        await updateLecture(lectureId, {
+          title: finalTitle,
+          subject,
+          duration,
+          status: 'recording'
+        });
+      }
+      
+      setProcessingLectureId(lectureId);
+      setProcessingAudioBlob(audioBlob);
+      setActivePage('lecture-processing');
+    } catch (err) {
+      console.error('Failed to start saving lecture capture:', err);
+    }
+  };
+
+  const handleSaveDocument = async (title: string, subject: string, file: File) => {
+    if (!sessionUser) return;
+    try {
+      let type: 'pdf' | 'ppt' | 'text' = 'pdf';
+      if (file.name.endsWith('.pptx')) type = 'ppt';
+      else if (file.name.endsWith('.docx')) type = 'text';
+
+      const lectureId = await addLecture({
+        title,
+        subject,
+        type,
+        status: 'uploading'
+      });
+      
+      setProcessingLectureId(lectureId);
+      setProcessingFile(file);
+      setProcessingAudioBlob(null);
+      setActivePage('lecture-processing');
+    } catch (err) {
+      console.error('Failed to start saving document:', err);
+    }
+  };
+
+  // Callbacks: Quiz scoring updates
+  const handleUpdateQuizScore = (quizId: string, score: number, scores?: { easy?: number; medium?: number; hard?: number }) => {
+    setQuizzes(prev => prev.map(q => {
+      if (q.id === quizId) {
+        return { ...q, score, scores: scores || q.scores, status: 'completed' as const };
+      }
+      return q;
+    }));
+
+    // Update Weak Topic Mastery dynamically based on quiz scoring
+    setWeakTopics(prev => prev.map(wt => {
+      if (quizId === 'q3' && wt.id === 'wt1') { // Calculus III
+        return { ...wt, masteryScore: Math.max(wt.masteryScore, score), lastAttempt: 'Just now' };
+      }
+      if (quizId === 'q2' && wt.id === 'wt2') { // StereoChem
+        return { ...wt, masteryScore: Math.max(wt.masteryScore, score), lastAttempt: 'Just now' };
+      }
+      return wt;
+    }));
+
+    // Trigger congratulations notification
+    const note: NotificationItem = {
+      id: Math.random().toString(),
+      title: `Quiz Finished! Score: ${score}%`,
+      description: `We've integrated your recall telemetry into the active Knowledge Radar. Mastery scores calibrated.`,
+      timeLabel: 'Today',
+      category: 'ai-insights',
+      read: false,
+      timestamp: 'Just now',
+      actionLabel: 'View Progress',
+      actionPage: 'dashboard'
+    };
+    setNotifications(prev => [note, ...prev]);
+  };
+
+  const handleAddQuestions = (quizId: string, difficulty: 'easy' | 'medium' | 'hard', newQuestions: QuizQuestion[]) => {
+    setQuizzes(prev => prev.map(q => {
+      if (q.id === quizId) {
+        const easy = difficulty === 'easy' ? [...(q.easyQuestions || []), ...newQuestions] : (q.easyQuestions || []);
+        const medium = difficulty === 'medium' ? [...(q.mediumQuestions || []), ...newQuestions] : (q.mediumQuestions || []);
+        const hard = difficulty === 'hard' ? [...(q.hardQuestions || []), ...newQuestions] : (q.hardQuestions || []);
+        const totalCount = easy.length + medium.length + hard.length;
+        
+        return {
+          ...q,
+          easyQuestions: easy,
+          mediumQuestions: medium,
+          hardQuestions: hard,
+          questionsCount: totalCount,
+          estimatedTime: `${totalCount * 1} mins`
+        };
+      }
+      return q;
+    }));
+  };
+
+  // Callbacks: Notifications actions
+  const handleMarkRead = (id: string) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  };
+
+  const handleMarkAllRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  };
+
+  const handleClearNotifications = () => {
+    setNotifications([]);
+  };
+
+
+  // Callbacks: Settings & Upgrading Tiers
+  const handleUpdateSettings = async (newSettings: UserSettings) => {
+    setSettings(newSettings);
+    if (sessionUser) {
+      const profileData = {
+        first_name: newSettings.profile.firstName || '',
+        last_name: newSettings.profile.lastName || '',
+        school_or_university: newSettings.profile.institution || '',
+        email: newSettings.profile.emailAddress || '',
+        country_code: newSettings.profile.countryCode || '',
+        phone_number: newSettings.profile.phoneNumber || '',
+        profile_image_url: newSettings.profile.avatarUrl || '',
+        onboarding_completed: true,
+        updated_at: serverTimestamp()
+      };
+      
+      console.log("Save settings attempt:", {
+        currentUserUID: sessionUser.uid,
+        authenticatedState: !!sessionUser.uid,
+        firestoreDocumentPath: `users/${sessionUser.uid}`,
+        writeRequestPayload: profileData
+      });
+
+      try {
+        const userDocRef = doc(db, 'users', sessionUser.uid);
+        await setDoc(userDocRef, profileData, { merge: true });
+        console.log("Updated root user settings successfully in users/" + sessionUser.uid);
+      } catch (err: any) {
+        console.error("Save settings failed:", {
+          currentUserUID: sessionUser.uid,
+          authenticatedState: !!sessionUser.uid,
+          firestoreDocumentPath: `users/${sessionUser.uid}`,
+          writeRequestPayload: profileData,
+          exactFirestoreError: err
+        });
+      }
+    }
+  };
+
+  const handleUpgradePlan = (planName: 'BYOK' | 'Premium' | 'Institution', price: string, billingCycle: 'monthly' | 'yearly') => {
+    const upgradedFeatures = [
+      'Direct API access (We provide keys)',
+      'Unlimited managed AI runs',
+      '100 GB High-Speed Storage',
+      'Instant OCR & Math Formula Parsing',
+      'Weak Topic Tracker Radar',
+      'Priority Email & Chat Support'
+    ];
+
+    setSettings(prev => ({
+      ...prev,
+      subscription: {
+        planName,
+        price,
+        billingCycle,
+        nextBillDate: billingCycle === 'yearly' ? 'Dec 15, 2027' : 'Jan 15, 2027',
+        features: planName === 'BYOK' 
+          ? [
+              'Bring Your Own Key (BYOK)',
+              'Unlimited AI Synthesis & Chats',
+              '100 GB High-Speed Storage',
+              'Academic Library & Quiz Workspace'
+            ] 
+          : upgradedFeatures
+      }
+    }));
+  };
+
+  // Sync click shortcut helper
+  const handleNewAnalysisShortcut = () => {
+    setActivePage('academic-library');
+  };
+
+  const handleLogOut = async () => {
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+      await signOut(auth);
+      setSessionUser(null);
+      setLectures([]);
+      setSources([]);
+      setWeakTopics([]);
+      setNotifications([]);
+      setQuizzes([]);
+      setActivePage('landing');
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
+  };
+
+  const handleLoginSuccess = (user: { fullName: string; emailAddress: string; role?: string }) => {
+    console.log("Login success callback triggered for:", user);
+    if (user.role === 'faculty') {
+      setUserRole('faculty');
+      setActivePage('faculty-dashboard');
+    } else {
+      setUserRole('student');
+      setActivePage('dashboard');
+    }
+    if (user.fullName) {
+      setSessionUser(prev => prev ? { ...prev, fullName: user.fullName } : { uid: auth.currentUser?.uid || '', fullName: user.fullName, emailAddress: user.emailAddress });
+    }
+  };
+
+  // Layout router switch
+  const renderActiveView = () => {
+    switch (activePage) {
+      case 'dashboard':
+        return (
+          <DashboardView
+            setActivePage={setActivePage}
+            setSelectedQuizId={setSelectedQuizId}
+            lectures={combinedLectures}
+            weakTopics={weakTopics}
+            onNewAnalysis={handleNewAnalysisShortcut}
+            onOpenLecture={(id) => {
+              // Clicked lecture card shortcut transitions to workspace
+              setActivePage('research-hub');
+            }}
+            theme={theme}
+            notes={notes}
+            totalXp={streakData.totalXp}
+            currentStreak={streakData.currentStreak}
+          />
+        );
+      case 'lecture-capture':
+        return null;
+      case 'lecture-processing':
+        return (
+          <LectureProcessingView
+            userId={sessionUser?.uid}
+            lectureId={processingLectureId}
+            audioBlob={processingAudioBlob}
+            documentFile={processingFile}
+            uploadLectureAudio={uploadLectureAudio}
+            uploadLectureDocument={uploadLectureDocument}
+            updateLecture={updateLecture}
+            setActivePage={setActivePage}
+            theme={theme}
+            setActiveLectureId={setActiveLectureId}
+          />
+        );
+      case 'profile':
+        return (
+          <ProfileView
+            settings={settings}
+            onUpdateSettings={handleUpdateSettings}
+            setActivePage={setActivePage}
+            theme={theme}
+          />
+        );
+      case 'research-hub':
+        return (
+          <ResearchHubView
+            sources={sources}
+            onAddSource={handleAddSource}
+            onDeleteSource={handleDeleteSource}
+            searchQuery={searchQuery}
+            notes={notes}
+            notesLoading={notesLoading}
+            addNote={addNote}
+            updateNote={updateNote}
+            deleteNote={deleteNote}
+            lectures={combinedLectures}
+            updateLecture={updateLecture}
+            deleteLecture={handleDeleteLecture}
+            setActivePage={setActivePage}
+            theme={theme}
+          />
+        );
+      case 'academic-library':
+        return (
+          <LibraryView
+            lectures={combinedLectures}
+            onAddLecture={handleAddLecture}
+            onDeleteLecture={handleDeleteLecture}
+            onSaveDocument={handleSaveDocument}
+            setActivePage={setActivePage}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            theme={theme}
+            onUpdateLecture={updateLecture}
+            setActiveLectureId={setActiveLectureId}
+          />
+        );
+      case 'quiz-mode':
+        return (
+          <PreparationModeView
+            quizzes={quizzes}
+            selectedQuizId={selectedQuizId}
+            setSelectedQuizId={setSelectedQuizId}
+            onUpdateQuizScore={handleUpdateQuizScore}
+            onAddQuestions={handleAddQuestions}
+            theme={theme}
+            lectures={combinedLectures}
+            notes={notes}
+            currentStreak={streakData.currentStreak}
+          />
+        );
+      case 'knowledge-studio':
+        return (
+          <KnowledgeStudioView
+            userId={sessionUser?.uid}
+            theme={theme}
+            setActivePage={setActivePage}
+          />
+        );
+      case 'notifications':
+        return (
+          <NotificationsView
+            notifications={notifications}
+            onMarkRead={handleMarkRead}
+            onMarkAllRead={handleMarkAllRead}
+            onClearNotifications={handleClearNotifications}
+            setActivePage={setActivePage}
+          />
+        );
+      case 'settings':
+        return (
+          <SettingsView
+            settings={settings}
+            onUpdateSettings={handleUpdateSettings}
+            setActivePage={setActivePage}
+            theme={theme}
+            onLogOut={handleLogOut}
+          />
+        );
+      case 'rewards':
+        return (
+          <RewardsView
+            setActivePage={setActivePage}
+            theme={theme}
+            currentStreak={streakData.currentStreak}
+            longestStreak={streakData.longestStreak}
+            todayClaimed={todayClaimed}
+            onOpenClaimModal={() => {}}
+            onRedeemReward={redeemReward}
+            userRewards={{
+              xp: streakData.totalXp,
+              level: Math.min(10, Math.floor(streakData.totalXp / 1000) + 1),
+              levelTitle: streakData.currentStreak >= 90 ? 'CELESTIAL STREAK TITAN' : 'KNOWLEDGE SEEKER',
+              nextLevelXp: (Math.floor(streakData.totalXp / 1000) + 1) * 1000,
+              lifetimeXp: streakData.totalXp,
+              redeemedRewards: []
+            }}
+          />
+        );
+      case 'landing':
+        return (
+          <LandingView
+            onEnterApp={() => setActivePage('dashboard')}
+            onLoginSuccess={handleLoginSuccess}
+            onNavigateToPricing={() => setActivePage('pricing')}
+            onGetStarted={() => {
+              if (sessionUser) {
+                setActivePage('dashboard');
+              } else {
+                setAuthMode('signup');
+                setActivePage('auth');
+              }
+            }}
+            onSignIn={() => {
+              if (sessionUser) {
+                setActivePage('dashboard');
+              } else {
+                setAuthMode('login');
+                setActivePage('auth');
+              }
+            }}
+          />
+        );
+      case 'help-support':
+        return <SupportView />;
+      case 'pricing':
+        return (
+          <PricingView
+            settings={settings}
+            onUpgradePlan={handleUpgradePlan}
+            setActivePage={setActivePage}
+          />
+        );
+      default:
+        return (
+          <DashboardView
+            setActivePage={setActivePage}
+            setSelectedQuizId={setSelectedQuizId}
+            lectures={combinedLectures}
+            weakTopics={weakTopics}
+            onNewAnalysis={handleNewAnalysisShortcut}
+            onOpenLecture={(id) => {
+              setActivePage('research-hub');
+            }}
+            theme={theme}
+            notes={notes}
+            totalXp={streakData.totalXp}
+            currentStreak={streakData.currentStreak}
+          />
+        );
+    }
+  };
+
+  const isLanding = activePage === 'landing';
+
+  if (checkingOnboarding) {
+    return (
+      <ErrorBoundary theme={theme}>
+        <div className={`min-h-screen flex items-center justify-center ${
+          theme === 'dark' ? 'bg-[#0a0a0c]' : 'bg-[#FAF9F5]'
+        }`}>
+          <BruteLoader size="lg" message="Loading Note-IT AI Interface..." />
+        </div>
+        <FeedbackWidget theme={theme} />
+      </ErrorBoundary>
+    );
+  }
+
+  // Standalone Fullscreen Exam Rush Environment (No Sidebar, No Navbar)
+  if (window.location.search.includes('mode=exam-rush-fullscreen')) {
+    const savedConfigStr = sessionStorage.getItem('noteit_exam_rush_active_config');
+    let examConfig: ExamRushConfig | null = null;
+    if (savedConfigStr) {
+      try {
+        examConfig = JSON.parse(savedConfigStr);
+      } catch (e) {}
+    }
+    if (!examConfig) {
+      examConfig = {
+        subject: resolveCanonicalSubject('Operating Systems'),
+        timeRemainingMinutes: 120,
+        timeLabel: '2 Hours',
+        teacherTopics: [],
+        intensity: 'balanced'
+      };
+    }
+
+    return (
+      <ErrorBoundary theme={theme}>
+        <div className="fixed inset-0 z-[999999] h-screen w-screen overflow-y-auto bg-[#FAF9F6] dark:bg-[#0B0F17]">
+          <ExamRushWorkspace
+            config={examConfig}
+            lectures={combinedLectures}
+            notes={notes}
+            onExit={() => {
+              sessionStorage.removeItem('noteit_exam_rush_active_config');
+              if (document.fullscreenElement && document.exitFullscreen) {
+                document.exitFullscreen().catch(() => {});
+              }
+              try {
+                window.close();
+              } catch (e) {}
+              window.location.href = window.location.origin + window.location.pathname;
+            }}
+          />
+        </div>
+      </ErrorBoundary>
+    );
+  }
+
+  if (activePage === 'landing') {
+    return (
+      <ErrorBoundary theme={theme}>
+        <LandingView
+          onEnterApp={() => { 
+            if (sessionUser) {
+              setActivePage(userRole === 'faculty' ? 'faculty-dashboard' : 'dashboard');
+            } else {
+              setAuthMode('login'); 
+              setActivePage('auth'); 
+            }
+          }}
+          onLoginSuccess={handleLoginSuccess}
+          onNavigateToPricing={() => setActivePage('pricing')}
+          onGetStarted={() => { 
+            if (sessionUser) {
+              setActivePage(userRole === 'faculty' ? 'faculty-dashboard' : 'dashboard');
+            } else {
+              setAuthMode('signup'); 
+              setActivePage('auth'); 
+            }
+          }}
+          onSignIn={() => { 
+            if (sessionUser) {
+              setActivePage(userRole === 'faculty' ? 'faculty-dashboard' : 'dashboard');
+            } else {
+              setAuthMode('login'); 
+              setActivePage('auth'); 
+            }
+          }}
+        />
+        <FeedbackWidget theme={theme} />
+      </ErrorBoundary>
+    );
+  }
+
+  if (activePage === 'auth') {
+    return (
+      <ErrorBoundary theme={theme}>
+        <AuthView 
+          onLoginSuccess={handleLoginSuccess}
+          initialMode={authMode}
+          theme={theme}
+          onNavigateToLanding={() => setActivePage('landing')}
+        />
+        <FeedbackWidget theme={theme} />
+      </ErrorBoundary>
+    );
+  }
+
+  if (sessionUser === null) {
+    if (activePage === 'pricing') {
+      return (
+        <ErrorBoundary theme={theme}>
+          <div className="bg-[#FAF9F5] min-h-screen text-gray-900 overflow-x-hidden font-sans relative pb-12">
+            <header className="sticky top-0 z-50 bg-[#FAF9F5]/80 backdrop-blur-md border-b border-[#EAE3D2] transition-colors">
+              <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+                <div className="flex items-center gap-2 cursor-pointer" onClick={() => setActivePage('landing')}>
+                  <AILogo size={38} showText={true} theme="light" />
+                </div>
+                <button 
+                  onClick={() => setActivePage('landing')}
+                  className="text-xs font-bold text-gray-600 hover:text-black cursor-pointer uppercase tracking-widest focus:outline-none"
+                >
+                  ← Back to Home
+                </button>
+              </div>
+            </header>
+            <main className="p-6">
+              <PricingView
+                settings={settings}
+                onUpgradePlan={() => { setAuthMode('signup'); setActivePage('auth'); }}
+                setActivePage={setActivePage}
+              />
+            </main>
+          </div>
+          <FeedbackWidget theme={theme} />
+        </ErrorBoundary>
+      );
+    }
+    return (
+      <ErrorBoundary theme={theme}>
+        <AuthView 
+          onLoginSuccess={handleLoginSuccess}
+          initialMode={authMode}
+          theme={theme}
+          onNavigateToLanding={() => setActivePage('landing')}
+        />
+        <FeedbackWidget theme={theme} />
+      </ErrorBoundary>
+    );
+  }
+
+  if (isOnboarding) {
+    if (userRole === 'faculty') {
+      return (
+        <ErrorBoundary theme={theme}>
+          <FacultyOnboardingView
+            userId={sessionUser.uid}
+            email={sessionUser.emailAddress}
+            initialFullName={sessionUser.fullName}
+            onComplete={(facultyData) => {
+              setSettings(prev => ({
+                ...prev,
+                profile: {
+                  ...prev.profile,
+                  fullName: facultyData.fullName,
+                  emailAddress: sessionUser.emailAddress,
+                  institution: facultyData.university,
+                  phoneNumber: facultyData.phoneNumber,
+                  role: 'faculty',
+                  teacherCode: facultyData.teacherCode,
+                  onboardingCompleted: true
+                }
+              }));
+              setIsOnboarding(false);
+              setActivePage('faculty-dashboard');
+            }}
+          />
+          <FeedbackWidget theme={theme} />
+        </ErrorBoundary>
+      );
+    }
+
+    return (
+      <ErrorBoundary theme={theme}>
+        <OnboardingView
+          userId={sessionUser.uid}
+          email={sessionUser.emailAddress}
+          fullName={sessionUser.fullName}
+          theme={theme}
+          initialStep={onboardingStep}
+          onComplete={(userData) => {
+            setSettings(prev => ({
+              ...prev,
+              profile: {
+                ...prev.profile,
+                fullName: `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || sessionUser.fullName,
+                firstName: userData.first_name || '',
+                lastName: userData.last_name || '',
+                emailAddress: userData.email || sessionUser.emailAddress,
+                institution: userData.school_or_university || '',
+                countryCode: userData.country_code || '',
+                phoneNumber: userData.phone_number || '',
+                avatarUrl: userData.profile_image_url || '',
+                onboardingCompleted: true
+              }
+            }));
+            setIsOnboarding(false);
+            setActivePage('dashboard');
+          }}
+        />
+        <FeedbackWidget theme={theme} />
+      </ErrorBoundary>
+    );
+  }
+
+  if (notesLoading && lecturesLoading) {
+    return <BruteLoader message="Initializing Note-IT Cognitive Workspace..." />;
+  }
+
+  // TEACHER PORTAL WORKSPACE (Integrated from teachers-LMS-portal)
+  if (sessionUser && userRole === 'faculty') {
+    return (
+      <ErrorBoundary theme={theme}>
+        <TeacherPortalApp
+          user={{
+            uid: sessionUser.uid,
+            fullName: settings.profile.fullName || sessionUser.fullName,
+            emailAddress: sessionUser.emailAddress,
+            teacherCode: settings.profile.teacherCode,
+            institution: settings.profile.institution
+          }}
+          onSignOut={handleLogOut}
+          theme={theme}
+          setTheme={setTheme}
+        />
+        <FeedbackWidget theme={theme} />
+      </ErrorBoundary>
+    );
+  }
+
+  return (
+    <ErrorBoundary theme={theme}>
+      {!isLanding && sessionUser && <NotificationPermissionBanner />}
+      <div className="flex h-screen w-screen overflow-hidden transition-all duration-300 bg-[var(--bg-paper)] text-[var(--text-primary)]">
+        
+        {/* Sidebar - hides completely on landing page layout */}
+        {!isLanding && (
+          <Sidebar
+            activePage={activePage}
+            setActivePage={setActivePage}
+            isOpenMobile={isOpenMobile}
+            setIsOpenMobile={setIsOpenMobile}
+            settings={settings}
+            onNewAnalysis={handleNewAnalysisShortcut}
+            theme={theme}
+            onLogOut={handleLogOut}
+          />
+        )}
+
+        {/* Main core layout frame container */}
+        <div className="flex flex-1 flex-col overflow-hidden h-full bg-[var(--bg-paper)]">
+          {/* Navbar - hides on landing page layout */}
+          {!isLanding && (
+            <Navbar
+              activePage={activePage}
+              setActivePage={setActivePage}
+              setIsOpenMobile={setIsOpenMobile}
+              settings={settings}
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              onNewAnalysis={handleNewAnalysisShortcut}
+              theme={theme}
+              setTheme={setTheme}
+              onLogOut={handleLogOut}
+              totalXp={streakData.totalXp}
+              currentStreak={streakData.currentStreak}
+            />
+          )}
+
+          {/* Dynamic page contents viewer */}
+          <main className={`flex-1 overflow-y-auto bg-[var(--bg-paper)] text-[var(--text-primary)] ${
+            isLanding ? 'p-0' : 'p-2 md:p-3'
+          }`}>
+            <div style={{ display: activePage === 'lecture-capture' ? 'block' : 'none', height: '100%' }}>
+              <LectureCaptureView
+                onSaveCapture={handleSaveCapture}
+                onStartCapture={handleStartCapture}
+                setActivePage={setActivePage}
+                theme={theme}
+                lectures={combinedLectures}
+                activeLectureId={activeLectureId}
+                setActiveLectureId={setActiveLectureId}
+                notes={notes}
+                onRecordingStatusChange={setGlobalRecordingState}
+              />
+            </div>
+            {activePage !== 'lecture-capture' && renderActiveView()}
+          </main>
+        </div>
+
+      </div>
+
+      {/* Floating Resizable PiP Recording Box when tab is changed during recording */}
+      {activePage !== 'lecture-capture' && globalRecordingState?.isRecording && (
+        <FloatingRecordingWidget
+          isRecording={globalRecordingState.isRecording}
+          isPaused={globalRecordingState.isPaused}
+          seconds={globalRecordingState.seconds}
+          onPauseToggle={globalRecordingState.pauseCapture}
+          onStop={globalRecordingState.stopCapture}
+          onOpenCapture={() => setActivePage('lecture-capture')}
+        />
+      )}
+
+      {/* Ask Doubt Modal for Students (Phase 8) */}
+      {askDoubtModal.isOpen && (
+        <AskDoubtModal
+          isOpen={askDoubtModal.isOpen}
+          onClose={() => setAskDoubtModal({ isOpen: false })}
+          initialSelectedText={askDoubtModal.selectedText}
+          initialSubject={askDoubtModal.subject}
+          initialLectureTitle={askDoubtModal.lectureTitle}
+          initialTopic={askDoubtModal.topic}
+          studentUser={{
+            uid: sessionUser?.uid || 'student_demo',
+            fullName: settings.profile.fullName || sessionUser?.fullName || 'Student Scholar',
+            emailAddress: sessionUser?.emailAddress || '',
+            institution: settings.profile.institution
+          }}
+        />
+      )}
+
+      {/* Automatic Real-Time XP Toast Notification (Section 6) */}
+      <XPToastNotification />
+
+      {/* Interactive Step-by-Step Guiding Tour Popup System */}
+      <GuidedTour
+        isOpen={isGuidedTourOpen}
+        onClose={() => setIsGuidedTourOpen(false)}
+        activePage={activePage}
+        setActivePage={setActivePage}
+        theme={theme}
+      />
+
+      <FeedbackWidget theme={theme} />
+
+    </ErrorBoundary>
+  );
+}
