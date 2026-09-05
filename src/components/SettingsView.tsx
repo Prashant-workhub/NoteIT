@@ -34,7 +34,8 @@ import {
   Bell
 } from 'lucide-react';
 import { PageId, UserSettings } from '../types';
-import { auth } from '../firebaseConfig';
+import { auth, db } from '../firebaseConfig';
+import { collection, getDocs, doc, setDoc, updateDoc, deleteField } from 'firebase/firestore';
 import { API_BASE_URL } from '../config';
 import { MascotAvatarPicker } from './bauhaus/MascotAvatarPicker';
 import { validateApiKeyDirect } from '../providers/ValidationAdapters';
@@ -252,6 +253,91 @@ export default function SettingsView({
   const [showReplaceForm, setShowReplaceForm] = useState(false);
 
   const [saveSuccess, setSaveSuccess] = useState(false);
+  
+  // Migration State
+  const [isMigrating, setIsMigrating] = useState(false);
+  const [migrationStatus, setMigrationStatus] = useState<string | null>(null);
+
+  const handleMigrateStorage = async () => {
+    if (!auth.currentUser) return;
+    if (!window.confirm("This will migrate all legacy AI assets to subcollections. It may take a few minutes. Continue?")) return;
+    
+    setIsMigrating(true);
+    setMigrationStatus("Migrating Lectures...");
+    
+    try {
+      const uid = auth.currentUser.uid;
+      
+      // Migrate Lectures
+      const lecturesSnap = await getDocs(collection(db, 'users', uid, 'lectures'));
+      for (const docSnap of lecturesSnap.docs) {
+        const data = docSnap.data();
+        const lectureRef = doc(db, 'users', uid, 'lectures', docSnap.id);
+        const updates: any = {};
+        let needsUpdate = false;
+        
+        const migrateAsset = async (assetData: any, type: string) => {
+          if (!assetData) return;
+          const assetRef = doc(db, 'users', uid, 'lectures', docSnap.id, 'assets', type);
+          await setDoc(assetRef, { data: assetData, updatedAt: new Date() });
+          needsUpdate = true;
+        };
+        
+        if (data.notes) { 
+          if (data.notes.academic) await migrateAsset(data.notes.academic, 'notes_academic'); 
+          if (data.notes.executive) await migrateAsset(data.notes.executive, 'notes_executive'); 
+          if (data.notes.revision) await migrateAsset(data.notes.revision, 'notes_revision'); 
+          if (data.notes.bhailang) await migrateAsset(data.notes.bhailang, 'notes_bhailang'); 
+          updates.notes = deleteField(); 
+        }
+        if (data.summaries) { 
+          if (data.summaries.academic) await migrateAsset(data.summaries.academic, 'summaries_academic'); 
+          if (data.summaries.executive) await migrateAsset(data.summaries.executive, 'summaries_executive'); 
+          if (data.summaries.revision) await migrateAsset(data.summaries.revision, 'summaries_revision'); 
+          updates.summaries = deleteField(); 
+        }
+        if (data.flashcards) { await migrateAsset(data.flashcards, 'flashcards'); updates.flashcards = deleteField(); }
+        if (data.quiz) { await migrateAsset(data.quiz, 'quiz'); updates.quiz = deleteField(); }
+        if (data.keyConcepts) { await migrateAsset(data.keyConcepts, 'keyConcepts'); updates.keyConcepts = deleteField(); }
+        
+        if (needsUpdate) await updateDoc(lectureRef, updates);
+      }
+      
+      setMigrationStatus("Migrating Knowledge Studio sources...");
+      // Migrate Sources
+      const sourcesSnap = await getDocs(collection(db, 'users', uid, 'sources'));
+      for (const docSnap of sourcesSnap.docs) {
+        const data = docSnap.data();
+        const sourceRef = doc(db, 'users', uid, 'sources', docSnap.id);
+        const updates: any = {};
+        let needsUpdate = false;
+        
+        const migrateAsset = async (assetData: any, type: string) => {
+          if (!assetData) return;
+          const assetRef = doc(db, 'users', uid, 'sources', docSnap.id, 'assets', type);
+          await setDoc(assetRef, { data: assetData, updatedAt: new Date() });
+          needsUpdate = true;
+        };
+        
+        const fields = Object.keys(data);
+        for (const field of fields) {
+          if (field.startsWith('notes_') || field.startsWith('summary_') || field === 'flashcards' || field === 'quiz' || field === 'keyConcepts') {
+            await migrateAsset(data[field], field === 'keyConcepts' ? 'mindmap' : field);
+            updates[field] = deleteField();
+          }
+        }
+        
+        if (needsUpdate) await updateDoc(sourceRef, updates);
+      }
+      
+      setMigrationStatus("Migration complete! You can now purge local data to fetch fresh caches.");
+    } catch (err: any) {
+      console.error(err);
+      setMigrationStatus(`Error during migration: ${err.message}`);
+    } finally {
+      setIsMigrating(false);
+    }
+  };
 
   // Synchronize local state with settings prop when it loads asynchronously
   React.useEffect(() => {
@@ -1377,6 +1463,33 @@ export default function SettingsView({
                   <div className="text-[9px] uppercase text-[#666666]">Identity Provider</div>
                   <div className="mt-1 text-sm font-black text-[#19B56B]">Firebase Bearer JWT</div>
                 </div>
+              </div>
+            </div>
+
+            {/* MIGRATION ZONE */}
+            <div className="pt-6 border-t-2 border-[#111111] space-y-3">
+              <div className="flex items-center gap-2">
+                <Activity className="h-5 w-5 text-[#2F6BFF]" />
+                <h3 className="font-heading font-extrabold text-sm uppercase text-[#111111]">
+                  STORAGE OPTIMIZATION
+                </h3>
+              </div>
+              <p className="text-xs font-mono font-bold text-[#666666]">
+                Migrate legacy AI heavy assets (Notes, Quizzes, Flashcards) to the new high-performance subcollection architecture. This is a one-time operation that fixes slow loading times.
+              </p>
+              <div className="flex flex-col gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={handleMigrateStorage}
+                  disabled={isMigrating}
+                  className="px-5 py-3 rounded-[6px] bg-[#FFC400] text-[#111111] border-2 border-[#111111] font-mono text-xs font-extrabold uppercase shadow-paper-md hover:bg-[#ffe066] transition-colors cursor-pointer flex items-center gap-2 w-fit disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <RefreshCw className={`h-4 w-4 ${isMigrating ? 'animate-spin' : ''}`} />
+                  <span>{isMigrating ? 'MIGRATING...' : 'MIGRATE LEGACY STORAGE'}</span>
+                </button>
+                {migrationStatus && (
+                  <span className="text-[10px] font-mono font-bold text-[#2F6BFF] mt-1">{migrationStatus}</span>
+                )}
               </div>
             </div>
 

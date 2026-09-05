@@ -147,6 +147,72 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
   const [flashcardsFormat, setFlashcardsFormat] = useState<'basic' | 'advanced' | 'exam'>('basic');
   const [quizFormat, setQuizFormat] = useState<'mcq' | 'subjective' | 'case'>('mcq');
   const [showTranscript, setShowTranscript] = useState(true);
+
+  // Lazy Loading & Caching State
+  const [localAssets, setLocalAssets] = useState<any>({});
+  
+  const getAsset = (sourceId: string | null | undefined, type: string, mode: string = '') => {
+    if (!sourceId) return null;
+    return localAssets[`noteit_asset_${sourceId}_${type}${mode ? '_' + mode : ''}`];
+  };
+
+  const loadAsset = async (sourceId: string, assetType: string, mode: string = '') => {
+    if (!sourceId || !auth.currentUser) return;
+    const cacheKey = `noteit_asset_${sourceId}_${assetType}${mode ? '_' + mode : ''}`;
+    
+    // 1. Check local storage cache
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: JSON.parse(cached) }));
+        return;
+      } catch (e) {
+        console.warn("Failed to parse cached asset", e);
+      }
+    }
+    
+    // 2. Try fetching from Firestore subcollection
+    try {
+      const { getDoc } = await import('firebase/firestore');
+      const docRef = doc(db, 'users', auth.currentUser.uid, 'sources', sourceId, 'assets', `${assetType}${mode ? '_' + mode : ''}`);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const data = snap.data().data;
+        localStorage.setItem(cacheKey, JSON.stringify(data));
+        setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: data }));
+        return;
+      }
+    } catch (err) {
+      console.warn("Failed to load asset from subcollection", err);
+    }
+
+    // 3. Fallback to main document legacy data
+    const activeSrc = sources.find(s => s.id === sourceId);
+    if (activeSrc) {
+      let legacyData = null;
+      if (assetType === 'notes') legacyData = (activeSrc.notes as any)?.[mode];
+      if (assetType === 'summary') legacyData = (activeSrc.summaries as any)?.[mode];
+      if (assetType === 'flashcards') legacyData = activeSrc.flashcards;
+      if (assetType === 'quiz') legacyData = activeSrc.quiz;
+      if (assetType === 'mindmap') legacyData = activeSrc.keyConcepts;
+      
+      if (legacyData) {
+        localStorage.setItem(cacheKey, JSON.stringify(legacyData));
+        setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: legacyData }));
+      }
+    }
+  };
+
+  // Trigger load when tab or mode changes
+  useEffect(() => {
+    if (activeSourceId && activeOutputTab) {
+      if (activeOutputTab === 'notes') loadAsset(activeSourceId, 'notes', notesFormat);
+      else if (activeOutputTab === 'summary') loadAsset(activeSourceId, 'summary', summaryFormat);
+      else if (activeOutputTab === 'flashcards') loadAsset(activeSourceId, 'flashcards');
+      else if (activeOutputTab === 'quiz') loadAsset(activeSourceId, 'quiz');
+      else if (activeOutputTab === 'mindmap') loadAsset(activeSourceId, 'mindmap');
+    }
+  }, [activeSourceId, activeOutputTab, notesFormat, summaryFormat]);
   
   // Multi-language Output Selector
   const [outputLanguage, setOutputLanguage] = useState<string>('English');
@@ -214,6 +280,11 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
   // Helper functions to retrieve active formatted content with legacy fallback
   const getActiveNotes = () => {
     if (!activeSource) return [];
+    
+    // Check localAssets first
+    const cached = getAsset(activeSourceId, 'notes', notesFormat);
+    if (cached) return cached;
+    
     const key = `notes_${notesFormat}`;
     if (activeSource[key] && activeSource[key].length > 0) {
       return activeSource[key];
@@ -227,6 +298,11 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
 
   const getActiveSummary = () => {
     if (!activeSource) return '';
+    
+    // Check localAssets first
+    const cached = getAsset(activeSourceId, 'summary', summaryFormat);
+    if (cached) return cached;
+    
     const key = `summary_${summaryFormat}`;
     if (activeSource[key] && activeSource[key].trim().length > 0) {
       return activeSource[key];
@@ -261,11 +337,12 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
         format as any,
         apiKey
       );
-      const docRef = doc(db, 'users', userId, 'sources', activeSourceId);
-      await updateDoc(docRef, {
-        [`notes_${format}`]: notesData,
-        selectedMode: format
-      });
+      const docRef = doc(db, 'users', userId, 'sources', activeSourceId, 'assets', `notes_${format}`);
+      await setDoc(docRef, { data: notesData, updatedAt: serverTimestamp() });
+      
+      const cacheKey = `noteit_asset_${activeSourceId}_notes_${format}`;
+      localStorage.setItem(cacheKey, JSON.stringify(notesData));
+      setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: notesData }));
     } catch (err: any) {
       console.error("Failed to generate notes:", err);
       setImportError(formatUserFriendlyErrorMessage(err, "Failed to generate notes"));
@@ -298,11 +375,12 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
         serviceMode,
         apiKey
       );
-      const docRef = doc(db, 'users', userId, 'sources', activeSourceId);
-      await updateDoc(docRef, {
-        [`summary_${format}`]: summaryText,
-        selectedSummaryMode: format
-      });
+      const docRef = doc(db, 'users', userId, 'sources', activeSourceId, 'assets', `summary_${format}`);
+      await setDoc(docRef, { data: summaryText, updatedAt: serverTimestamp() });
+      
+      const cacheKey = `noteit_asset_${activeSourceId}_summary_${format}`;
+      localStorage.setItem(cacheKey, JSON.stringify(summaryText));
+      setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: summaryText }));
     } catch (err: any) {
       console.error("Failed to generate summary:", err);
       setImportError(formatUserFriendlyErrorMessage(err, "Failed to generate summary"));
@@ -327,10 +405,12 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
       const count = textLen < 3000 ? 15 : textLen < 10000 ? 30 : 50;
 
       const generated = await generateFlashcards(textContent, count, [], apiKey);
-      const docRef = doc(db, 'users', userId, 'sources', activeSourceId);
-      await updateDoc(docRef, {
-        flashcards: generated
-      });
+      const docRef = doc(db, 'users', userId, 'sources', activeSourceId, 'assets', `flashcards`);
+      await setDoc(docRef, { data: generated, updatedAt: serverTimestamp() });
+      
+      const cacheKey = `noteit_asset_${activeSourceId}_flashcards`;
+      localStorage.setItem(cacheKey, JSON.stringify(generated));
+      setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: generated }));
     } catch (err: any) {
       console.error("Failed to generate flashcards:", err);
       setImportError(formatUserFriendlyErrorMessage(err, "Failed to generate flashcards"));
@@ -352,10 +432,12 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
     try {
       const apiKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
       const generated = await generateQuiz(textContent, apiKey);
-      const docRef = doc(db, 'users', userId, 'sources', activeSourceId);
-      await updateDoc(docRef, {
-        quiz: generated
-      });
+      const docRef = doc(db, 'users', userId, 'sources', activeSourceId, 'assets', `quiz`);
+      await setDoc(docRef, { data: generated, updatedAt: serverTimestamp() });
+      
+      const cacheKey = `noteit_asset_${activeSourceId}_quiz`;
+      localStorage.setItem(cacheKey, JSON.stringify(generated));
+      setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: generated }));
     } catch (err: any) {
       console.error("Failed to generate quiz:", err);
       setImportError(formatUserFriendlyErrorMessage(err, "Failed to generate quiz"));
@@ -380,10 +462,13 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
       const questionTexts = existing.map((q: any) => q.question);
 
       const generated = await generateMoreQuestions(textContent, 'medium', questionTexts, apiKey);
-      const docRef = doc(db, 'users', userId, 'sources', activeSourceId);
-      await updateDoc(docRef, {
-        quiz: [...existing, ...generated]
-      });
+      const docRef = doc(db, 'users', userId, 'sources', activeSourceId, 'assets', `quiz`);
+      const newData = [...existing, ...generated];
+      await setDoc(docRef, { data: newData, updatedAt: serverTimestamp() });
+      
+      const cacheKey = `noteit_asset_${activeSourceId}_quiz`;
+      localStorage.setItem(cacheKey, JSON.stringify(newData));
+      setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: newData }));
     } catch (err: any) {
       console.error("Failed to generate more quiz questions:", err);
       setImportError(formatUserFriendlyErrorMessage(err, "Failed to generate more questions"));
@@ -407,10 +492,12 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
       const sections = activeSource.sections || [];
 
       const generated = await generateMindmap(textContent, sections, apiKey);
-      const docRef = doc(db, 'users', userId, 'sources', activeSourceId);
-      await updateDoc(docRef, {
-        keyConcepts: generated
-      });
+      const docRef = doc(db, 'users', userId, 'sources', activeSourceId, 'assets', `mindmap`);
+      await setDoc(docRef, { data: generated, updatedAt: serverTimestamp() });
+      
+      const cacheKey = `noteit_asset_${activeSourceId}_mindmap`;
+      localStorage.setItem(cacheKey, JSON.stringify(generated));
+      setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: generated }));
     } catch (err: any) {
       console.error("Failed to generate mind map:", err);
       setImportError(formatUserFriendlyErrorMessage(err, "Failed to generate mind map"));
@@ -475,15 +562,18 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
         triggerGenerateSummary(summaryFormat);
       }
     } else if (activeOutputTab === 'flashcards') {
-      if ((!activeSource.flashcards || activeSource.flashcards.length === 0) && !isGeneratingFlashcards) {
+      const cards = getAsset(activeSourceId, 'flashcards');
+      if ((!cards || cards.length === 0) && !isGeneratingFlashcards) {
         triggerGenerateFlashcards();
       }
     } else if (activeOutputTab === 'quiz') {
-      if ((!activeSource.quiz || activeSource.quiz.length === 0) && !isGeneratingQuiz) {
+      const qz = getAsset(activeSourceId, 'quiz');
+      if ((!qz || qz.length === 0) && !isGeneratingQuiz) {
         triggerGenerateQuiz();
       }
     } else if (activeOutputTab === 'mindmap') {
-      if ((!activeSource.keyConcepts || activeSource.keyConcepts.length === 0) && !isGeneratingMindmap) {
+      const mc = getAsset(activeSourceId, 'mindmap');
+      if ((!mc || mc.length === 0) && !isGeneratingMindmap) {
         triggerGenerateMindmap();
       }
     }
@@ -3177,10 +3267,10 @@ ${queryText}`;
                       </div>
                       <button
                         onClick={() => {
-                          setPdfExportData({ title: `${activeSource.title} - Flashcards`, data: activeSource.flashcards || [] });
+                          setPdfExportData({ title: `${activeSource.title} - Flashcards`, data: getAsset(activeSourceId, 'flashcards') || [] });
                           setShowPdfModal(true);
                         }}
-                        disabled={!activeSource.flashcards || activeSource.flashcards.length === 0}
+                        disabled={!getAsset(activeSourceId, 'flashcards') || getAsset(activeSourceId, 'flashcards').length === 0}
                         className="flex items-center gap-1 text-[10px] font-bold text-indigo-400 hover:underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Download className="h-3 w-3" />
@@ -3193,8 +3283,8 @@ ${queryText}`;
                         <div className="py-16 flex flex-col items-center justify-center border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5">
                           <BruteLoader size="md" message="Generating Flashcards..." />
                         </div>
-                      ) : activeSource.flashcards && activeSource.flashcards.length > 0 ? (
-                        activeSource.flashcards.map((f: any, i: number) => (
+                      ) : getAsset(activeSourceId, 'flashcards') && getAsset(activeSourceId, 'flashcards').length > 0 ? (
+                        getAsset(activeSourceId, 'flashcards').map((f: any, i: number) => (
                           <div key={i} className="p-5 rounded-[6px] border border-[#111111] bg-white text-[#111111] shadow-paper-sm font-sans space-y-3">
                             <div className="flex items-center justify-between text-xs font-bold font-mono border-b border-[#111111] pb-2">
                               <span className="bg-[#FFC400] text-[#111111] px-2 py-0.5 rounded-[4px] border border-[#111111]">CARD #{i + 1}</span>
@@ -3245,38 +3335,33 @@ ${queryText}`;
                       </div>
                       <button
                         onClick={() => {
-                          setPdfExportData({ title: `${activeSource.title} - Quiz`, data: activeSource.quiz || [] });
+                          setPdfExportData({ title: `${activeSource.title} - Quiz`, data: getAsset(activeSourceId, 'quiz') || [] });
                           setShowPdfModal(true);
                         }}
-                        disabled={!activeSource.quiz || activeSource.quiz.length === 0}
+                        disabled={!getAsset(activeSourceId, 'quiz') || getAsset(activeSourceId, 'quiz').length === 0}
                         className="flex items-center gap-1 text-[10px] font-bold text-indigo-400 hover:underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Download className="h-3 w-3" />
                         <span>Export PDF</span>
-                      </button>
-                    </div>
-
-                    {isGeneratingQuiz ? (
-                      <div className="py-16 flex flex-col items-center justify-center border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5">
-                        <BruteLoader size="md" message="Generating Quiz questions..." />
+                          <BruteLoader size="md" message="Generating Quiz questions..." />
                       </div>
-                    ) : activeSource.quiz && activeSource.quiz.length > 0 ? (
+                    ) : getAsset(activeSourceId, 'quiz') && getAsset(activeSourceId, 'quiz').length > 0 ? (
                       <div className="space-y-4">
                         <div className="p-5 rounded-[6px] border border-[#111111] bg-white text-[#111111] shadow-paper-sm font-sans space-y-4">
                           <div className="flex items-center justify-between text-xs font-mono font-bold border-b border-[#111111] pb-2">
                             <span className="bg-[#FFC400] text-[#111111] px-2 py-0.5 rounded-[4px] border border-[#111111]">
-                              QUESTION {activeQuizQuestionIdx + 1} OF {activeSource.quiz.length}
+                              QUESTION {activeQuizQuestionIdx + 1} OF {getAsset(activeSourceId, 'quiz').length}
                             </span>
                             <span className="text-[#666666] uppercase font-mono">{quizFormat}</span>
                           </div>
                           <h4 className="text-xs font-extrabold font-heading text-[#111111] leading-relaxed">
-                            {renderTextWithCitations(cleanMarkdownText(activeSource.quiz[activeQuizQuestionIdx].question))}
+                            {renderTextWithCitations(cleanMarkdownText(getAsset(activeSourceId, 'quiz')[activeQuizQuestionIdx].question))}
                           </h4>
                           
                           <div className="grid grid-cols-1 gap-2.5 mt-4">
-                            {activeSource.quiz[activeQuizQuestionIdx].options.map((opt: string, optIdx: number) => {
+                            {getAsset(activeSourceId, 'quiz')[activeQuizQuestionIdx].options.map((opt: string, optIdx: number) => {
                               const isSelected = selectedQuizAnswerIdx === optIdx;
-                              const isCorrect = optIdx === activeSource.quiz[activeQuizQuestionIdx].correctAnswer;
+                              const isCorrect = optIdx === getAsset(activeSourceId, 'quiz')[activeQuizQuestionIdx].correctAnswer;
                               
                               let btnClass = "";
                               if (isQuizRevealed) {
@@ -3310,10 +3395,10 @@ ${queryText}`;
                           {isQuizRevealed && (
                             <div className="mt-4 pt-3 border-t border-dashed border-[#111111] text-xs text-[#111111] bg-[#F6F2EA] p-3 rounded-[4px] border border-[#111111]">
                               <span className="font-mono text-[10px] font-extrabold text-[#111111] block mb-1 uppercase">EXPLANATION:</span>
-                              {renderTextWithCitations(cleanMarkdownText(activeSource.quiz[activeQuizQuestionIdx].explanation))}
-                              {activeSource.quiz[activeQuizQuestionIdx].sourceCitation && (
-                                <div className="mt-2 text-[10px] font-bold text-[#111111] font-mono">
-                                  Citation: {activeSource.quiz[activeQuizQuestionIdx].sourceCitation}
+                              {renderTextWithCitations(cleanMarkdownText(getAsset(activeSourceId, 'quiz')[activeQuizQuestionIdx].explanation))}
+                              {getAsset(activeSourceId, 'quiz')[activeQuizQuestionIdx].sourceCitation && (
+                                <div className="mt-2 text-[10px] font-mono text-gray-400">
+                                  Citation: {getAsset(activeSourceId, 'quiz')[activeQuizQuestionIdx].sourceCitation}
                                 </div>
                               )}
                             </div>
@@ -3333,7 +3418,7 @@ ${queryText}`;
                                 onClick={() => {
                                   setIsQuizRevealed(false);
                                   setSelectedQuizAnswerIdx(null);
-                                  setActiveQuizQuestionIdx(prev => (prev + 1) % activeSource.quiz.length);
+                                  setActiveQuizQuestionIdx(prev => (prev + 1) % getAsset(activeSourceId, 'quiz').length);
                                 }}
                                 className="px-5 py-2.5 bg-[#111111] hover:bg-[#222222] text-white rounded-[4px] border border-[#111111] text-xs font-mono font-extrabold shadow-paper-sm cursor-pointer uppercase"
                               >
@@ -3372,7 +3457,7 @@ ${queryText}`;
                 {activeOutputTab === 'mindmap' && (
                   <div className="space-y-4 text-left animate-fade-in">
                     {(() => {
-                      const mindmapNodes = getEffectiveMindmapNodes(activeSource.keyConcepts, activeSource.title);
+                      const mindmapNodes = getEffectiveMindmapNodes(getAsset(activeSourceId, 'mindmap'), activeSource.title);
 
                       return (
                         <div className="space-y-4">

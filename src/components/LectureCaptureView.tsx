@@ -145,6 +145,71 @@ export default function LectureCaptureView({
   const [aiStatus, setAiStatus] = useState<'idle' | 'recording_transcription' | 'synthesizing' | 'completed'>('idle');
   const [micError, setMicError] = useState<string | null>(null);
 
+  // Lazy Loading & Caching State
+  const [localAssets, setLocalAssets] = useState<any>({});
+  
+  const getAsset = (lectureId: string | null | undefined, type: string, mode: string = '') => {
+    if (!lectureId) return null;
+    return localAssets[`noteit_asset_${lectureId}_${type}${mode ? '_' + mode : ''}`];
+  };
+
+  const loadAsset = async (lectureId: string, assetType: string, mode: string = '') => {
+    if (!lectureId || !auth.currentUser) return;
+    const cacheKey = `noteit_asset_${lectureId}_${assetType}${mode ? '_' + mode : ''}`;
+    
+    // 1. Check local storage cache
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: JSON.parse(cached) }));
+        return;
+      } catch (e) {
+        console.warn("Failed to parse cached asset", e);
+      }
+    }
+    
+    // 2. Try fetching from Firestore subcollection
+    try {
+      const { getDoc } = await import('firebase/firestore');
+      const docRef = doc(db, 'users', auth.currentUser.uid, 'lectures', lectureId, 'assets', `${assetType}${mode ? '_' + mode : ''}`);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const data = snap.data().data;
+        localStorage.setItem(cacheKey, JSON.stringify(data));
+        setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: data }));
+        return;
+      }
+    } catch (err) {
+      console.warn("Failed to load asset from subcollection", err);
+    }
+
+    // 3. Fallback to main document legacy data
+    const activeLec = lectures.find(l => l.id === lectureId);
+    if (activeLec) {
+      let legacyData = null;
+      if (assetType === 'notes') legacyData = (activeLec.notes as any)?.[mode];
+      if (assetType === 'summaries') legacyData = (activeLec.summaries as any)?.[mode];
+      if (assetType === 'flashcards') legacyData = activeLec.flashcards;
+      if (assetType === 'quiz') legacyData = activeLec.quiz;
+      if (assetType === 'keyConcepts') legacyData = activeLec.keyConcepts;
+      
+      if (legacyData) {
+        localStorage.setItem(cacheKey, JSON.stringify(legacyData));
+        setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: legacyData }));
+      }
+    }
+  };
+
+  // Trigger load when tab or mode changes
+  useEffect(() => {
+    if (activeLectureId && activeOutputTab) {
+      if (activeOutputTab === 'notes') loadAsset(activeLectureId, 'notes', selectedNotesMode);
+      else if (activeOutputTab === 'summary') loadAsset(activeLectureId, 'summaries', selectedSummaryMode);
+      else if (activeOutputTab === 'flashcards') loadAsset(activeLectureId, 'flashcards');
+      else if (activeOutputTab === 'quiz') loadAsset(activeLectureId, 'quiz');
+      else if (activeOutputTab === 'mindmap') loadAsset(activeLectureId, 'keyConcepts');
+    }
+  }, [activeLectureId, activeOutputTab, selectedNotesMode, selectedSummaryMode]);
   // Auto-dim screen state during lecture recording when untouched
   const [isScreenDimmed, setIsScreenDimmed] = useState(false);
   const [autoDimEnabled, setAutoDimEnabled] = useState(true);
@@ -1101,10 +1166,13 @@ export default function LectureCaptureView({
       const { generateNotes: callGenerateNotes, getAIConfig } = await import('../services/gemini');
       const generated = await callGenerateNotes(textContent, mode, getAIConfig().geminiKey);
       
-      const docRef = doc(db, 'users', uid, 'lectures', activeLecture.id);
-      await updateDoc(docRef, {
-        [`notes.${mode}`]: generated
-      });
+      const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+      const docRef = doc(db, 'users', uid, 'lectures', activeLecture.id, 'assets', `notes_${mode}`);
+      await setDoc(docRef, { data: generated, updatedAt: serverTimestamp() });
+      
+      const cacheKey = `noteit_asset_${activeLecture.id}_notes_${mode}`;
+      localStorage.setItem(cacheKey, JSON.stringify(generated));
+      setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: generated }));
     } catch (err: any) {
       console.error("Notes generation failed:", err);
       alert(formatUserFriendlyErrorMessage(err, "Failed to generate notes"));
@@ -1130,10 +1198,13 @@ export default function LectureCaptureView({
       const { generateSummary: callGenerateSummary, getAIConfig } = await import('../services/gemini');
       const generated = await callGenerateSummary(textContent, mode, getAIConfig().geminiKey);
 
-      const docRef = doc(db, 'users', uid, 'lectures', activeLecture.id);
-      await updateDoc(docRef, {
-        [`summaries.${mode}`]: generated
-      });
+      const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+      const docRef = doc(db, 'users', uid, 'lectures', activeLecture.id, 'assets', `summaries_${mode}`);
+      await setDoc(docRef, { data: generated, updatedAt: serverTimestamp() });
+
+      const cacheKey = `noteit_asset_${activeLecture.id}_summaries_${mode}`;
+      localStorage.setItem(cacheKey, JSON.stringify(generated));
+      setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: generated }));
     } catch (err: any) {
       console.error("Summary generation failed:", err);
       alert(formatUserFriendlyErrorMessage(err, "Failed to generate summary"));
@@ -1164,10 +1235,13 @@ export default function LectureCaptureView({
 
       const generated = await callGenerateFlashcards(textContent, count, [], getAIConfig().geminiKey);
       
-      const docRef = doc(db, 'users', uid, 'lectures', activeLecture.id);
-      await updateDoc(docRef, {
-        flashcards: generated
-      });
+      const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+      const docRef = doc(db, 'users', uid, 'lectures', activeLecture.id, 'assets', `flashcards`);
+      await setDoc(docRef, { data: generated, updatedAt: serverTimestamp() });
+      
+      const cacheKey = `noteit_asset_${activeLecture.id}_flashcards`;
+      localStorage.setItem(cacheKey, JSON.stringify(generated));
+      setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: generated }));
     } catch (err: any) {
       console.error("Flashcards generation failed:", err);
       alert(formatUserFriendlyErrorMessage(err, "Failed to generate flashcards"));
@@ -1191,14 +1265,18 @@ export default function LectureCaptureView({
     setIsGeneratingFlashcards(true);
     try {
       const { generateFlashcards: callGenerateFlashcards, getAIConfig } = await import('../services/gemini');
-      const existing = activeLecture.flashcards || [];
+      const existing = getAsset(activeLecture.id, 'flashcards') || [];
 
       const generated = await callGenerateFlashcards(textContent, 10, existing, getAIConfig().geminiKey);
       
-      const docRef = doc(db, 'users', uid, 'lectures', activeLecture.id);
-      await updateDoc(docRef, {
-        flashcards: [...existing, ...generated]
-      });
+      const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+      const docRef = doc(db, 'users', uid, 'lectures', activeLecture.id, 'assets', `flashcards`);
+      const newData = [...existing, ...generated];
+      await setDoc(docRef, { data: newData, updatedAt: serverTimestamp() });
+      
+      const cacheKey = `noteit_asset_${activeLecture.id}_flashcards`;
+      localStorage.setItem(cacheKey, JSON.stringify(newData));
+      setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: newData }));
     } catch (err: any) {
       console.error("Generating more flashcards failed:", err);
       alert(formatUserFriendlyErrorMessage(err, "Failed to generate more flashcards"));
@@ -1225,10 +1303,13 @@ export default function LectureCaptureView({
       
       const generated = await callGenerateQuiz(textContent, getAIConfig().geminiKey);
       
-      const docRef = doc(db, 'users', uid, 'lectures', activeLecture.id);
-      await updateDoc(docRef, {
-        quiz: generated
-      });
+      const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+      const docRef = doc(db, 'users', uid, 'lectures', activeLecture.id, 'assets', `quiz`);
+      await setDoc(docRef, { data: generated, updatedAt: serverTimestamp() });
+      
+      const cacheKey = `noteit_asset_${activeLecture.id}_quiz`;
+      localStorage.setItem(cacheKey, JSON.stringify(generated));
+      setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: generated }));
     } catch (err: any) {
       console.error("Quiz generation failed:", err);
       alert(formatUserFriendlyErrorMessage(err, "Failed to generate quiz"));
@@ -1258,10 +1339,14 @@ export default function LectureCaptureView({
 
       const generated = await callGenerateMoreQuiz(textContent, selectedQuizDifficulty, questionTexts, getAIConfig().geminiKey);
       
-      const docRef = doc(db, 'users', uid, 'lectures', activeLecture.id);
-      await updateDoc(docRef, {
-        quiz: [...existing, ...generated]
-      });
+      const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+      const docRef = doc(db, 'users', uid, 'lectures', activeLecture.id, 'assets', `quiz`);
+      const newData = [...existing, ...generated];
+      await setDoc(docRef, { data: newData, updatedAt: serverTimestamp() });
+      
+      const cacheKey = `noteit_asset_${activeLecture.id}_quiz`;
+      localStorage.setItem(cacheKey, JSON.stringify(newData));
+      setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: newData }));
     } catch (err: any) {
       console.error("Generating more quiz questions failed:", err);
       alert(formatUserFriendlyErrorMessage(err, "Failed to generate more questions"));
@@ -1289,10 +1374,13 @@ export default function LectureCaptureView({
 
       const generated = await callGenerateMindmap(textContent, sections, getAIConfig().geminiKey);
       
-      const docRef = doc(db, 'users', uid, 'lectures', activeLecture.id);
-      await updateDoc(docRef, {
-        keyConcepts: generated
-      });
+      const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+      const docRef = doc(db, 'users', uid, 'lectures', activeLecture.id, 'assets', `keyConcepts`);
+      await setDoc(docRef, { data: generated, updatedAt: serverTimestamp() });
+      
+      const cacheKey = `noteit_asset_${activeLecture.id}_keyConcepts`;
+      localStorage.setItem(cacheKey, JSON.stringify(generated));
+      setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: generated }));
     } catch (err: any) {
       console.error("Mindmap generation failed:", err);
       alert(formatUserFriendlyErrorMessage(err, "Failed to generate mind map"));
@@ -1314,29 +1402,32 @@ export default function LectureCaptureView({
     if (!hasTranscript) return;
 
     if (activeOutputTab === 'notes') {
-      if (!activeLecture.notes?.[selectedNotesMode] && !isGeneratingNotes) {
+      if (!getAsset(activeLecture.id, 'notes', selectedNotesMode) && !isGeneratingNotes) {
         triggerGenerateNotes(selectedNotesMode);
       }
     } else if (activeOutputTab === 'summary') {
-      if (!activeLecture.summaries?.[selectedSummaryMode] && !isGeneratingSummary) {
+      if (!getAsset(activeLecture.id, 'summaries', selectedSummaryMode) && !isGeneratingSummary) {
         triggerGenerateSummary(selectedSummaryMode);
       }
     } else if (activeOutputTab === 'flashcards') {
-      const isLegacyCards = activeLecture.flashcards && activeLecture.flashcards.length > 0 && !activeLecture.flashcards.some((c: any) => c.category);
-      if ((!activeLecture.flashcards || activeLecture.flashcards.length === 0 || isLegacyCards) && !isGeneratingFlashcards) {
+      const cards = getAsset(activeLecture.id, 'flashcards');
+      const isLegacyCards = cards && cards.length > 0 && !cards.some((c: any) => c.category);
+      if ((!cards || cards.length === 0 || isLegacyCards) && !isGeneratingFlashcards) {
         triggerGenerateFlashcards();
       }
     } else if (activeOutputTab === 'quiz') {
-      const isLegacyQuiz = activeLecture.quiz && activeLecture.quiz.length > 0 && !activeLecture.quiz.some((q: any) => q.difficulty);
-      if ((!activeLecture.quiz || activeLecture.quiz.length === 0 || isLegacyQuiz) && !isGeneratingQuiz) {
+      const qz = getAsset(activeLecture.id, 'quiz');
+      const isLegacyQuiz = qz && qz.length > 0 && !qz.some((q: any) => q.difficulty);
+      if ((!qz || qz.length === 0 || isLegacyQuiz) && !isGeneratingQuiz) {
         triggerGenerateQuiz();
       }
     } else if (activeOutputTab === 'mindmap') {
-      if ((!activeLecture.keyConcepts || activeLecture.keyConcepts.length === 0) && !isGeneratingMindmap) {
+      const mc = getAsset(activeLecture.id, 'keyConcepts');
+      if ((!mc || mc.length === 0) && !isGeneratingMindmap) {
         triggerGenerateMindmap();
       }
     }
-  }, [activeOutputTab, activeLectureId, selectedNotesMode, selectedSummaryMode, lectures, isGeneratingNotes, isGeneratingSummary, isGeneratingFlashcards, isGeneratingQuiz, isGeneratingMindmap]);
+  }, [activeOutputTab, activeLectureId, selectedNotesMode, selectedSummaryMode, lectures, isGeneratingNotes, isGeneratingSummary, isGeneratingFlashcards, isGeneratingQuiz, isGeneratingMindmap, localAssets]);
 
   const sendMessageText = async (text: string) => {
     const activeLecture = lectures.find(l => l.id === activeLectureId);
@@ -1657,11 +1748,11 @@ export default function LectureCaptureView({
                       onClick={() => {
                         setPdfExportData({ 
                           title: `${activeLecture.title} - ${selectedNotesMode} Notes`, 
-                          data: activeLecture.notes?.[selectedNotesMode] || '' 
+                          data: getAsset(activeLecture.id, 'notes', selectedNotesMode) || ''
                         });
                         setShowPdfModal(true);
                       }}
-                      disabled={!activeLecture.notes?.[selectedNotesMode]}
+                      disabled={!getAsset(activeLecture.id, 'notes', selectedNotesMode)}
                       className="flex items-center gap-1.5 px-3 py-1 bg-[#FFC400] text-[#111111] text-xs font-mono font-extrabold uppercase rounded-[4px] border border-[#111111] shadow-paper-sm hover:bg-[#ffe066] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Download className="h-3.5 w-3.5" />
@@ -1670,9 +1761,9 @@ export default function LectureCaptureView({
                   </div>
 
                   <div className="space-y-3">
-                    {activeLecture.notes?.[selectedNotesMode] ? (
+                    {getAsset(activeLecture.id, 'notes', selectedNotesMode) ? (
                       <div className="p-5 rounded-[6px] border border-[#111111] bg-white text-[#111111] shadow-paper-sm font-sans">
-                        <AcademicNotesViewer content={activeLecture.notes[selectedNotesMode]} mode={selectedNotesMode} theme={theme} />
+                        <AcademicNotesViewer content={getAsset(activeLecture.id, 'notes', selectedNotesMode)} mode={selectedNotesMode} theme={theme} />
                       </div>
                     ) : isGeneratingNotes ? (
                       <div className="py-16 flex flex-col items-center justify-center border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5">
@@ -1721,11 +1812,11 @@ export default function LectureCaptureView({
                       onClick={() => {
                         setPdfExportData({ 
                           title: `${activeLecture.title} - Summary (${selectedSummaryMode})`, 
-                          data: activeLecture.summaries?.[selectedSummaryMode] || '' 
+                          data: getAsset(activeLecture.id, 'summaries', selectedSummaryMode) || ''
                         });
                         setShowPdfModal(true);
                       }}
-                      disabled={!activeLecture.summaries?.[selectedSummaryMode]}
+                      disabled={!getAsset(activeLecture.id, 'summaries', selectedSummaryMode)}
                       className="flex items-center gap-1.5 px-3 py-1 bg-[#FFC400] text-[#111111] text-xs font-mono font-extrabold uppercase rounded-[4px] border border-[#111111] shadow-paper-sm hover:bg-[#ffe066] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Download className="h-3.5 w-3.5" />
@@ -1734,10 +1825,10 @@ export default function LectureCaptureView({
                   </div>
 
                   <div className="space-y-4">
-                    {activeLecture.summaries?.[selectedSummaryMode] ? (
+                    {getAsset(activeLecture.id, 'summaries', selectedSummaryMode) ? (
                       <div className="space-y-4 animate-fade-in">
                         {(() => {
-                          const sections = parseSummaryIntoSections(activeLecture.summaries[selectedSummaryMode]);
+                          const sections = parseSummaryIntoSections(getAsset(activeLecture.id, 'summaries', selectedSummaryMode));
                           
                           const allSections = [
                             { key: 'overview', label: 'Overview', content: sections.overview },
@@ -1818,10 +1909,10 @@ export default function LectureCaptureView({
                     </div>
                     <button
                       onClick={() => {
-                        setPdfExportData({ title: `${activeLecture.title} - Flashcards`, data: activeLecture.flashcards || [] });
+                        setPdfExportData({ title: `${activeLecture.title} - Flashcards`, data: getAsset(activeLecture.id, 'flashcards') || [] });
                         setShowPdfModal(true);
                       }}
-                      disabled={!activeLecture.flashcards || activeLecture.flashcards.length === 0 || !activeLecture.flashcards.some((c: any) => c.category)}
+                      disabled={!getAsset(activeLecture.id, 'flashcards') || getAsset(activeLecture.id, 'flashcards').length === 0 || !getAsset(activeLecture.id, 'flashcards').some((c: any) => c.category)}
                       className="flex items-center gap-1 text-[10px] font-bold text-indigo-400 hover:underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
                     >
                       <Download className="h-3 w-3" />
@@ -1830,10 +1921,10 @@ export default function LectureCaptureView({
                   </div>
 
                   <div className="space-y-3">
-                    {activeLecture.flashcards && activeLecture.flashcards.length > 0 && activeLecture.flashcards.some((c: any) => c.category) ? (
+                    {getAsset(activeLecture.id, 'flashcards') && getAsset(activeLecture.id, 'flashcards').length > 0 && getAsset(activeLecture.id, 'flashcards').some((c: any) => c.category) ? (
                       <>
                         {(() => {
-                          const filteredCards = activeLecture.flashcards.filter(
+                          const filteredCards = getAsset(activeLecture.id, 'flashcards').filter(
                             (c: any) => selectedFlashcardCategory === 'All' || c.category === selectedFlashcardCategory
                           );
 
@@ -1928,10 +2019,10 @@ export default function LectureCaptureView({
                     </div>
                     <button
                       onClick={() => {
-                        setPdfExportData({ title: `${activeLecture.title} - Quiz`, data: activeLecture.quiz || [] });
+                        setPdfExportData({ title: `${activeLecture.title} - Quiz`, data: getAsset(activeLecture.id, 'quiz') || [] });
                         setShowPdfModal(true);
                       }}
-                      disabled={!activeLecture.quiz || activeLecture.quiz.length === 0 || !activeLecture.quiz.some((q: any) => q.difficulty)}
+                      disabled={!getAsset(activeLecture.id, 'quiz') || getAsset(activeLecture.id, 'quiz').length === 0 || !getAsset(activeLecture.id, 'quiz').some((q: any) => q.difficulty)}
                       className="flex items-center gap-1 text-[10px] font-bold text-indigo-400 hover:underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
                     >
                       <Download className="h-3 w-3" />
@@ -1939,10 +2030,10 @@ export default function LectureCaptureView({
                     </button>
                   </div>
 
-                  {activeLecture.quiz && activeLecture.quiz.length > 0 && activeLecture.quiz.some((q: any) => q.difficulty) ? (
+                  {getAsset(activeLecture.id, 'quiz') && getAsset(activeLecture.id, 'quiz').length > 0 && getAsset(activeLecture.id, 'quiz').some((q: any) => q.difficulty) ? (
                     <div className="space-y-4">
                       {(() => {
-                        const filteredQuestions = activeLecture.quiz.filter((q: any) => q.difficulty === selectedQuizDifficulty);
+                        const filteredQuestions = getAsset(activeLecture.id, 'quiz').filter((q: any) => q.difficulty === selectedQuizDifficulty);
 
                         if (filteredQuestions.length === 0) {
                           return (
@@ -2085,7 +2176,7 @@ export default function LectureCaptureView({
                 <div className="space-y-4">
                   {(() => {
                     const mindmapNodes = getEffectiveMindmapNodes(
-                      activeLecture.keyConcepts,
+                      getAsset(activeLecture.id, 'keyConcepts'),
                       activeLecture.sections,
                       activeLecture.title
                     );
