@@ -1134,14 +1134,31 @@ export default function SettingsView({
                       <div className="space-y-1.5">
                         <label className="text-[9px] font-mono font-extrabold uppercase text-[#111111] block">Active Model</label>
                         <select
-                          value={selectedModel}
-                          onChange={(e) => setSelectedModel(e.target.value)}
+                          value={PROVIDER_METADATA[aiProvider]?.models.includes(selectedModel) ? selectedModel : 'custom'}
+                          onChange={(e) => {
+                            if (e.target.value === 'custom') {
+                              setSelectedModel('');
+                            } else {
+                              setSelectedModel(e.target.value);
+                            }
+                          }}
                           className="w-full rounded-[6px] border-2 border-[#111111] bg-[#F6F2EA] p-2.5 text-xs font-mono font-bold text-[#111111] outline-none shadow-paper-sm cursor-pointer"
                         >
                           {PROVIDER_METADATA[aiProvider]?.models.map(m => (
                             <option key={m} value={m}>{m}</option>
                           ))}
+                          <option value="custom">Custom (Type below)</option>
                         </select>
+                        
+                        {!PROVIDER_METADATA[aiProvider]?.models.includes(selectedModel) && (
+                          <input
+                            type="text"
+                            placeholder={`Enter custom ${PROVIDER_METADATA[aiProvider]?.name} model ID`}
+                            value={selectedModel === 'custom' ? '' : selectedModel}
+                            onChange={(e) => setSelectedModel(e.target.value)}
+                            className="w-full mt-2 rounded-[6px] border-2 border-[#111111] bg-white p-2.5 text-xs font-mono font-bold text-[#111111] outline-none shadow-paper-sm"
+                          />
+                        )}
                       </div>
 
                       {/* API Key */}
