@@ -7,20 +7,16 @@
 importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js');
 
-// Initialize Firebase App in Service Worker
-firebase.initializeApp({
-  apiKey: "AIzaSyC4hEF45wNTjCyLiqAuD8cop7w8_bpIMdI",
-  authDomain: "noteit-ai-fd7eb.firebaseapp.com",
-  projectId: "noteit-ai-fd7eb",
-  storageBucket: "noteit-ai-fd7eb.firebasestorage.app",
-  messagingSenderId: "875264975258",
-  appId: "1:875264975258:web:51c2d690fb1dd3c510da23"
-});
-
-const messaging = firebase.messaging();
+// Firebase web configuration is public. The app passes its configured project
+// through the worker URL so this static file never contains a copied project.
+const firebaseConfig = Object.fromEntries(new URL(self.location.href).searchParams);
 
 // Handle background messages
-messaging.onBackgroundMessage((payload) => {
+if (firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.appId) {
+  firebase.initializeApp(firebaseConfig);
+  const messaging = firebase.messaging();
+
+  messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message:', payload);
   
   const title = payload.notification?.title || payload.data?.title || 'NoteIT AI';
@@ -44,8 +40,9 @@ messaging.onBackgroundMessage((payload) => {
     }
   };
 
-  return self.registration.showNotification(title, notificationOptions);
-});
+    return self.registration.showNotification(title, notificationOptions);
+  });
+}
 
 // Native push listener fallback for raw Web Push payloads
 self.addEventListener('push', (event) => {

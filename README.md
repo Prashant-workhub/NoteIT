@@ -81,8 +81,9 @@ Open `.env` and fill in the necessary keys:
 | `GEMINI_API_KEY` | Your primary Google Gemini API Key |
 | `ENCRYPTION_SECRET` | A secure 32-character key used for AES encrypting user API keys |
 | `VITE_FIREBASE_*` | Firebase project configurations (Auth, Database, Storage) |
+| `VITE_API_URL` | Public URL of the deployed Express API, used by the frontend build |
 | `AZURE_STORAGE_*` | Credentials for Azure Blob Storage (optional; fallbacks to local upload directories if missing) |
-| `FIREBASE_SERVICE_ACCOUNT_KEY_PATH` | Path to the Firebase service account JSON key file for backend administration |
+| `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` | Firebase Admin service-account credentials for backend token verification |
 
 ---
 
@@ -121,6 +122,28 @@ To run Note-IT AI, you need to spin up both the Vite client server and the Expre
    ```bash
    npm run build
    ```
+
+### Deploy with your own Firebase and Render
+
+The source no longer includes the previous team's Firebase project values. The
+React app reads only `VITE_FIREBASE_*` values supplied at build time, and the
+Express API reads `FIREBASE_*` Admin SDK credentials at runtime.
+
+1. In your Firebase project, create a Web App and copy its configuration into
+   the `VITE_FIREBASE_*` fields. Enable the sign-in providers you use, create
+   Firestore and Storage, then create a service-account key for the API.
+2. Push this repository and create a Render Blueprint from `render.yaml`. It
+   creates `noteit-api` (Node/Express) and `noteit-web` (the Vite static site).
+3. Add the Firebase Admin values to `noteit-api`. Add the Firebase Web App
+   values to `noteit-web`. Keep private keys and AI-provider keys only on the
+   API service.
+4. Once Render gives the API its `https://…onrender.com` URL, set that exact
+   URL as `VITE_API_URL` on `noteit-web`, then redeploy the static site.
+5. In Firebase Authentication, add the final `noteit-web.onrender.com` domain
+   to **Authorized domains**.
+
+`VITE_*` settings are embedded into the public web bundle, so never place a
+Firebase Admin private key or an AI-provider secret in a `VITE_*` variable.
 
 ---
 

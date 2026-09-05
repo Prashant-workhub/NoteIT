@@ -7,6 +7,7 @@ import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 import { doc, getDoc, setDoc, serverTimestamp, collection, getDocs, deleteDoc } from 'firebase/firestore';
 import { app, db, auth } from '../firebaseConfig';
 import { SCHEDULER_CONFIG } from '../config/notificationTemplates';
+import { API_BASE_URL } from '../config';
 
 export interface UserNotificationPreferences {
   masterEnabled: boolean;
@@ -66,7 +67,12 @@ export function getNotificationPermissionState(): NotificationPermission | 'unsu
 export async function registerMessagingServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (!isNotificationSupported()) return null;
   try {
-    const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+    const serviceWorkerUrl = new URL('/firebase-messaging-sw.js', window.location.origin);
+    for (const [key, value] of Object.entries(app.options)) {
+      if (typeof value === 'string') serviceWorkerUrl.searchParams.set(key, value);
+    }
+
+    const registration = await navigator.serviceWorker.register(serviceWorkerUrl, {
       scope: '/'
     });
     console.log('[NotificationService] Service Worker registered cleanly with scope:', registration.scope);
@@ -211,11 +217,7 @@ export async function sendTestPushNotificationToBackend(title?: string, body?: s
   // 1. Try Backend Server API First if available
   try {
     const idToken = await currentUser.getIdToken(true);
-    const apiBase = (import.meta.env.VITE_BACKEND_URL && import.meta.env.VITE_BACKEND_URL !== 'http://localhost:3002')
-      ? import.meta.env.VITE_BACKEND_URL
-      : (typeof window !== 'undefined' && window.location.hostname !== 'localhost' ? window.location.origin : 'http://localhost:3002');
-    
-    const response = await fetch(`${apiBase}/api/notifications/send-test`, {
+    const response = await fetch(`${API_BASE_URL}/api/notifications/send-test`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

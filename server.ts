@@ -5,11 +5,13 @@ import { ValidationAdapterFactory } from './src/providers/ValidationAdapters';
 import { ProviderValidationError } from './src/providers/AIProvider';
 import { InternalAIService, buildOptimizedContextForResource } from './src/server/internalAIService';
 import { formatUserFriendlyErrorMessage } from './src/utils/errorSanitizer';
+import { authenticateFirebaseUser } from './src/middleware/authFirebase';
+
 
 
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { initializeApp, cert } from 'firebase-admin';
+import { initializeApp, cert, getApps } from 'firebase-admin';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
@@ -1124,7 +1126,9 @@ function formatFirebasePrivateKey(key: string): string {
 
 // Initialize Firebase Admin SDK
 try {
-  if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
+  if (getApps().length) {
+    console.log('Firebase Admin was already initialized by the authentication middleware.');
+  } else if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
     console.log('Initializing Firebase Admin using environment variables...');
     initializeApp({
       credential: cert({
@@ -1138,67 +1142,23 @@ try {
     console.log(`Initializing Firebase Admin with Service Account from: ${resolvedPath}`);
     initializeApp({
       credential: cert(resolvedPath),
-      projectId: process.env.FIREBASE_PROJECT_ID || 'noteit-ai-fd7eb'
+      projectId: process.env.FIREBASE_PROJECT_ID
     });
-  } else {
+  } else if (process.env.FIREBASE_PROJECT_ID) {
     console.log('Initializing Firebase Admin with default credentials or project ID...');
     initializeApp({
-      projectId: process.env.FIREBASE_PROJECT_ID || 'noteit-ai-fd7eb'
+      projectId: process.env.FIREBASE_PROJECT_ID
     });
+  } else {
+    console.warn('Firebase Admin is running without configured credentials. Set FIREBASE_PROJECT_ID and service-account variables before using protected API routes.');
+    initializeApp();
   }
   console.log('Firebase Admin initialized successfully.');
 } catch (error) {
   console.error('Error initializing Firebase Admin SDK:', error);
 }
 
-async function authenticateFirebaseUser(
-  req: express.Request,
-  res: express.Response,
-  next: express.NextFunction
-) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'Unauthorized: Missing or invalid authorization header.' });
-    return;
-  }
-
-  const idToken = authHeader.split('Bearer ')[1];
-  if (idToken === 'test-token') {
-    req.body = req.body || {};
-    req.body.user = { uid: 'test-user-uid', email: 'test@example.com' };
-    next();
-    return;
-  }
-  try {
-    const decodedToken = await getAuth().verifyIdToken(idToken);
-    req.body = req.body || {};
-    req.body.user = decodedToken;
-    next();
-  } catch (error: any) {
-    // Fallback: decode JWT payload directly if Firebase Admin SDK lacks local ADC credentials
-    try {
-      const parts = idToken.split('.');
-      if (parts.length === 3) {
-        const payloadJson = Buffer.from(parts[1], 'base64').toString('utf-8');
-        const payload = JSON.parse(payloadJson);
-        if (payload && (payload.user_id || payload.sub)) {
-          req.body = req.body || {};
-          req.body.user = {
-            uid: payload.user_id || payload.sub,
-            email: payload.email || ''
-          };
-          next();
-          return;
-        }
-      }
-    } catch (e) {
-      // Ignore decode error
-    }
-    console.error('Firebase token verification failed:', error?.message || error);
-    res.status(403).json({ error: 'Forbidden: Invalid authentication token.' });
-    return;
-  }
-}
+// Using imported authenticateFirebaseUser middleware from ./src/middleware/authFirebase
 
 // Azure storage configuration
 const accountName = process.env.AZURE_STORAGE_ACCOUNT_NAME || '';
@@ -1260,7 +1220,7 @@ app.get('/api/storage/sas', authenticateFirebaseUser, async (req, res) => {
       const user = req.body.user;
       const uid = user.uid;
       const localFileName = `${uid}-${fileName}`;
-      const backendUrl = process.env.VITE_BACKEND_URL || `http://localhost:${PORT}`;
+      const backendUrl = process.env.APP_URL || `http://localhost:${PORT}`;
       res.json({
         uploadUrl: `${backendUrl}/api/storage/local-upload?fileName=${encodeURIComponent(localFileName)}`,
         audioUrl: `${backendUrl}/uploads/${localFileName}`,
@@ -1329,7 +1289,7 @@ app.get('/api/storage/read-sas', authenticateFirebaseUser, async (req, res) => {
   if (!blobServiceClient || !credential) {
     // If local fallback, return the public local URL directly
     try {
-      const backendUrl = process.env.VITE_BACKEND_URL || `http://localhost:${PORT}`;
+      const backendUrl = process.env.APP_URL || `http://localhost:${PORT}`;
       const fileName = blobPath.split('/').pop() || '';
       const user = req.body.user;
       const uid = user.uid;
