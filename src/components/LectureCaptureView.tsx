@@ -145,71 +145,6 @@ export default function LectureCaptureView({
   const [aiStatus, setAiStatus] = useState<'idle' | 'recording_transcription' | 'synthesizing' | 'completed'>('idle');
   const [micError, setMicError] = useState<string | null>(null);
 
-  // Lazy Loading & Caching State
-  const [localAssets, setLocalAssets] = useState<any>({});
-  
-  const getAsset = (lectureId: string | null | undefined, type: string, mode: string = '') => {
-    if (!lectureId) return null;
-    return localAssets[`noteit_asset_${lectureId}_${type}${mode ? '_' + mode : ''}`];
-  };
-
-  const loadAsset = async (lectureId: string, assetType: string, mode: string = '') => {
-    if (!lectureId || !auth.currentUser) return;
-    const cacheKey = `noteit_asset_${lectureId}_${assetType}${mode ? '_' + mode : ''}`;
-    
-    // 1. Check local storage cache
-    const cached = localStorage.getItem(cacheKey);
-    if (cached) {
-      try {
-        setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: JSON.parse(cached) }));
-        return;
-      } catch (e) {
-        console.warn("Failed to parse cached asset", e);
-      }
-    }
-    
-    // 2. Try fetching from Firestore subcollection
-    try {
-      const { getDoc } = await import('firebase/firestore');
-      const docRef = doc(db, 'users', auth.currentUser.uid, 'lectures', lectureId, 'assets', `${assetType}${mode ? '_' + mode : ''}`);
-      const snap = await getDoc(docRef);
-      if (snap.exists()) {
-        const data = snap.data().data;
-        localStorage.setItem(cacheKey, JSON.stringify(data));
-        setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: data }));
-        return;
-      }
-    } catch (err) {
-      console.warn("Failed to load asset from subcollection", err);
-    }
-
-    // 3. Fallback to main document legacy data
-    const activeLec = lectures.find(l => l.id === lectureId);
-    if (activeLec) {
-      let legacyData = null;
-      if (assetType === 'notes') legacyData = (activeLec.notes as any)?.[mode];
-      if (assetType === 'summaries') legacyData = (activeLec.summaries as any)?.[mode];
-      if (assetType === 'flashcards') legacyData = activeLec.flashcards;
-      if (assetType === 'quiz') legacyData = activeLec.quiz;
-      if (assetType === 'keyConcepts') legacyData = activeLec.keyConcepts;
-      
-      if (legacyData) {
-        localStorage.setItem(cacheKey, JSON.stringify(legacyData));
-        setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: legacyData }));
-      }
-    }
-  };
-
-  // Trigger load when tab or mode changes
-  useEffect(() => {
-    if (activeLectureId && activeOutputTab) {
-      if (activeOutputTab === 'notes') loadAsset(activeLectureId, 'notes', selectedNotesMode);
-      else if (activeOutputTab === 'summary') loadAsset(activeLectureId, 'summaries', selectedSummaryMode);
-      else if (activeOutputTab === 'flashcards') loadAsset(activeLectureId, 'flashcards');
-      else if (activeOutputTab === 'quiz') loadAsset(activeLectureId, 'quiz');
-      else if (activeOutputTab === 'mindmap') loadAsset(activeLectureId, 'keyConcepts');
-    }
-  }, [activeLectureId, activeOutputTab, selectedNotesMode, selectedSummaryMode]);
   // Auto-dim screen state during lecture recording when untouched
   const [isScreenDimmed, setIsScreenDimmed] = useState(false);
   const [autoDimEnabled, setAutoDimEnabled] = useState(true);
@@ -268,17 +203,6 @@ export default function LectureCaptureView({
       window.removeEventListener('scroll', handleUserActivity);
     };
   }, [isRecording, isPaused, autoDimEnabled]);
-
-  // Notify parent App component of recording status for PiP Floating Box when tab changes
-  useEffect(() => {
-    onRecordingStatusChange?.({
-      isRecording,
-      isPaused,
-      seconds,
-      pauseCapture: handlePauseCapture,
-      stopCapture: handleStopCapture
-    });
-  }, [isRecording, isPaused, seconds]);
 
   // Real-time live transcript state
   const [liveTranscript, setLiveTranscript] = useState<string>('');
@@ -362,6 +286,72 @@ export default function LectureCaptureView({
   const [showPdfModal, setShowPdfModal] = useState(false);
   const [pdfExportData, setPdfExportData] = useState<{ title: string; data: any } | null>(null);
   const [selectedPdfTheme, setSelectedPdfTheme] = useState<'academic' | 'modern' | 'corporate' | 'dark'>('academic');
+
+  // Lazy Loading & Caching State
+  const [localAssets, setLocalAssets] = useState<any>({});
+  
+  const getAsset = (lectureId: string | null | undefined, type: string, mode: string = '') => {
+    if (!lectureId) return null;
+    return localAssets[`noteit_asset_${lectureId}_${type}${mode ? '_' + mode : ''}`];
+  };
+
+  const loadAsset = async (lectureId: string, assetType: string, mode: string = '') => {
+    if (!lectureId || !auth.currentUser) return;
+    const cacheKey = `noteit_asset_${lectureId}_${assetType}${mode ? '_' + mode : ''}`;
+    
+    // 1. Check local storage cache
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: JSON.parse(cached) }));
+        return;
+      } catch (e) {
+        console.warn("Failed to parse cached asset", e);
+      }
+    }
+    
+    // 2. Try fetching from Firestore subcollection
+    try {
+      const { getDoc } = await import('firebase/firestore');
+      const docRef = doc(db, 'users', auth.currentUser.uid, 'lectures', lectureId, 'assets', `${assetType}${mode ? '_' + mode : ''}`);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const data = snap.data().data;
+        localStorage.setItem(cacheKey, JSON.stringify(data));
+        setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: data }));
+        return;
+      }
+    } catch (err) {
+      console.warn("Failed to load asset from subcollection", err);
+    }
+
+    // 3. Fallback to main document legacy data
+    const activeLec = lectures.find(l => l.id === lectureId);
+    if (activeLec) {
+      let legacyData = null;
+      if (assetType === 'notes') legacyData = (activeLec.notes as any)?.[mode];
+      if (assetType === 'summaries') legacyData = (activeLec.summaries as any)?.[mode];
+      if (assetType === 'flashcards') legacyData = activeLec.flashcards;
+      if (assetType === 'quiz') legacyData = activeLec.quiz;
+      if (assetType === 'keyConcepts') legacyData = activeLec.keyConcepts;
+      
+      if (legacyData) {
+        localStorage.setItem(cacheKey, JSON.stringify(legacyData));
+        setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: legacyData }));
+      }
+    }
+  };
+
+  // Trigger load when tab or mode changes
+  useEffect(() => {
+    if (activeLectureId && activeOutputTab) {
+      if (activeOutputTab === 'notes') loadAsset(activeLectureId, 'notes', selectedNotesMode);
+      else if (activeOutputTab === 'summary') loadAsset(activeLectureId, 'summaries', selectedSummaryMode);
+      else if (activeOutputTab === 'flashcards') loadAsset(activeLectureId, 'flashcards');
+      else if (activeOutputTab === 'quiz') loadAsset(activeLectureId, 'quiz');
+      else if (activeOutputTab === 'mindmap') loadAsset(activeLectureId, 'keyConcepts');
+    }
+  }, [activeLectureId, activeOutputTab, selectedNotesMode, selectedSummaryMode]);
 
   // Past captures list (sliced to the first 3 lectures from Firestore)
   const pastLectures = lectures.slice(0, 3).map((l: any) => ({
@@ -778,6 +768,17 @@ export default function LectureCaptureView({
       recognitionRef.current = null;
     }
   };
+
+  // Notify parent App component of recording status for PiP Floating Box when tab changes
+  useEffect(() => {
+    onRecordingStatusChange?.({
+      isRecording,
+      isPaused,
+      seconds,
+      pauseCapture: handlePauseCapture,
+      stopCapture: handleStopCapture
+    });
+  }, [isRecording, isPaused, seconds]);
 
   const formatTime = (totalSec: number) => {
     const hrs = Math.floor(totalSec / 3600);

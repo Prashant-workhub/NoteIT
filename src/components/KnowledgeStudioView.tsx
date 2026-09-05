@@ -46,7 +46,7 @@ import { AcademicNotesViewer } from './bauhaus/AcademicNotesViewer';
 import { HandwrittenNotesViewer } from './bauhaus/HandwrittenNotesViewer';
 import { db, auth } from '../firebaseConfig';
 import { API_BASE_URL } from '../config';
-import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, serverTimestamp, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, getDocs, deleteDoc, doc, setDoc, updateDoc, serverTimestamp, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { generateLectureContentFromText, generateFastDocumentAssets, generateStructuredNotes, generateSummary, generateFlashcards, generateQuiz, generateMoreQuestions, generateMindmap, getAIConfig } from '../services/gemini';
 import { getAzureUploadSasUrl, uploadBlobToAzure, extractTextFromDocument, extractTextFromUrl } from '../services/azure';
 import pptxgen from 'pptxgenjs';
