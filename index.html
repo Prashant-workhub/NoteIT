@@ -12,6 +12,10 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Polyfill for pptxgenjs strict mode bundling error
+      window.gObjPptxShapes = window.gObjPptxShapes || {};
+    </script>
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
