@@ -3343,7 +3343,12 @@ ${queryText}`;
                       >
                         <Download className="h-3 w-3" />
                         <span>Export PDF</span>
-                          <BruteLoader size="md" message="Generating Quiz questions..." />
+                      </button>
+                    </div>
+
+                    {isGeneratingQuiz ? (
+                      <div className="py-16 flex flex-col items-center justify-center border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5">
+                        <BruteLoader size="md" message="Generating Quiz questions..." />
                       </div>
                     ) : getAsset(activeSourceId, 'quiz') && getAsset(activeSourceId, 'quiz').length > 0 ? (
                       <div className="space-y-4">
