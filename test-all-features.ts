@@ -43,6 +43,7 @@
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
+import 'dotenv/config';
 
 import { ProviderFactory } from './src/providers/ProviderFactory';
 import { ValidationAdapterFactory } from './src/providers/ValidationAdapters';
