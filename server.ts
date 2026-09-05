@@ -6,7 +6,6 @@ import { ProviderValidationError } from './src/providers/AIProvider';
 import { InternalAIService, buildOptimizedContextForResource } from './src/server/internalAIService';
 import { formatUserFriendlyErrorMessage } from './src/utils/errorSanitizer';
 import { authenticateFirebaseUser } from './src/middleware/authFirebase';
-import { withTimeout } from './src/server/firestoreUtils';
 
 
 
@@ -370,9 +369,9 @@ app.post('/api/ai/provider-proxy', authenticateFirebaseUser, async (req, res) =>
   const uid = user.uid;
   
   const startTime = Date.now();
+  let data: any = null;
 
   try {
-    let data: any = null;
     try {
       const adminDb = getFirestore();
       const userDocRef = adminDb.collection('users').doc(uid);
@@ -735,7 +734,7 @@ app.post(['/api/lectures/:lectureId/generate-resources', '/api/lectures/generate
     userDocRef = adminDb.collection('users').doc(uid);
 
     try {
-      const lectureSnap = await withTimeout(lectureRef.get(), 5000, 'Firestore lecture read timed out');
+      const lectureSnap: any = await withTimeout(lectureRef.get(), 5000, 'Firestore lecture read timed out');
       if (lectureSnap.exists) {
         lectureData = lectureSnap.data() || {};
       }
@@ -744,7 +743,7 @@ app.post(['/api/lectures/:lectureId/generate-resources', '/api/lectures/generate
     }
 
     try {
-      const userDoc = await withTimeout(userDocRef.get(), 5000, 'Firestore user read timed out');
+      const userDoc: any = await withTimeout(userDocRef.get(), 5000, 'Firestore user read timed out');
       if (userDoc.exists) {
         userData = userDoc.data() || null;
       }
@@ -1678,7 +1677,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutErrorMess
   const timeoutPromise = new Promise<T>((_, reject) => {
     timer = setTimeout(() => reject(new Error(timeoutErrorMessage)), timeoutMs);
   });
-  return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer));
+  return Promise.race<T>([promise, timeoutPromise]).finally(() => clearTimeout(timer)) as Promise<T>;
 }
 
 // Improved YouTube Video ID extraction
