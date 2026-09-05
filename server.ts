@@ -434,6 +434,8 @@ app.post('/api/ai/provider-proxy', authenticateFirebaseUser, async (req, res) =>
         actualAction = 'generateText';
       }
     }
+    
+    console.log(`\n[provider-proxy] 🚀 Executing "${actualAction}" using Provider: ${providerName.toUpperCase()} (Model: ${selectedModel})\n`);
 
     if (actualAction === 'transcribeAudio') {
       const base64 = inlineData?.data || req.body.base64Audio;
