@@ -1,0 +1,41 @@
+type Student @table {
+  email: String!
+  name: String!
+  universityName: String
+  graduationYear: Int
+}
+
+type Course @table {
+  title: String!
+  code: String!
+  student: Student!
+}
+
+type Lecture @table {
+  date: Date!
+  topic: String!
+  audioUrl: String
+  rawTranscription: String
+  course: Course!
+}
+
+type Note @table {
+  rawContent: String!
+  summaryContent: String!
+  keyTakeaways: String
+  tags: String
+  lecture: Lecture!
+}
+
+type Flashcard @table {
+  question: String!
+  answer: String!
+  note: Note!
+}
+
+type Reminder @table {
+  dueDate: Timestamp!
+  title: String!
+  student: Student!
+  course: Course!
+}

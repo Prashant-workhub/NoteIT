@@ -330,6 +330,7 @@ async function ensureServerRunning() {
     spawnedServer.stderr.on('data', (chunk) => {
       process.stderr.write(paint('dim', `[server:err] ${chunk}`));
     });
+    
 
     const deadline = Date.now() + SERVER_BOOT_TIMEOUT_MS;
     while (Date.now() < deadline) {

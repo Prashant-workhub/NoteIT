@@ -1,0 +1,168 @@
+mutation CreateStudent @auth(level: USER) {
+  student_insert(data: {
+    id_expr: "auth.uid",
+    name: "John Doe",
+    email: "john@example.com"
+  })
+}
+
+mutation UpdateStudent($name: String) @auth(level: USER) {
+  student_update(key: {id_expr: "auth.uid"}, data: {name: $name})
+}
+
+mutation DeleteStudent @auth(level: USER) {
+  student_delete(key: {id_expr: "auth.uid"})
+}
+
+query GetMyStudent @auth(level: USER) {
+  student(key: {id_expr: "auth.uid"}) {
+    name email
+  }
+}
+
+query ListStudents @auth(level: PUBLIC, insecureReason: "Public directory of students") {
+  students {
+    name universityName
+  }
+}
+
+mutation CreateCourse($title: String!, $code: String!) @auth(level: USER) {
+  course_insert(data: {
+    title: $title,
+    code: $code,
+    studentId_expr: "auth.uid"
+  })
+}
+
+mutation UpdateCourse($id: UUID!, $title: String) @auth(level: USER) {
+  course_update(id: $id, data: {title: $title})
+}
+
+mutation DeleteCourse($id: UUID!) @auth(level: USER) {
+  course_delete(id: $id)
+}
+
+query GetCourse($id: UUID!) @auth(level: USER) {
+  course(id: $id) {
+    title code
+  }
+}
+
+query ListMyCourses @auth(level: USER) {
+  courses(where: {studentId: {eq_expr: "auth.uid"}}) {
+    title code
+  }
+}
+
+mutation CreateLecture($topic: String!, $date: Date!, $courseId: UUID!) @auth(level: USER) {
+  lecture_insert(data: {
+    topic: $topic,
+    date: $date,
+    courseId: $courseId
+  })
+}
+
+mutation UpdateLecture($id: UUID!, $topic: String) @auth(level: USER) {
+  lecture_update(id: $id, data: {topic: $topic})
+}
+
+mutation DeleteLecture($id: UUID!) @auth(level: USER) {
+  lecture_delete(id: $id)
+}
+
+query GetLecture($id: UUID!) @auth(level: USER) {
+  lecture(id: $id) {
+    topic date
+  }
+}
+
+query ListLectures($courseId: UUID!) @auth(level: USER) {
+  lectures(where: {courseId: {eq: $courseId}}) {
+    topic date
+  }
+}
+
+mutation CreateNote($rawContent: String!, $summaryContent: String!, $lectureId: UUID!) @auth(level: USER) {
+  note_insert(data: {
+    rawContent: $rawContent,
+    summaryContent: $summaryContent,
+    lectureId: $lectureId
+  })
+}
+
+mutation UpdateNote($id: UUID!, $summary: String) @auth(level: USER) {
+  note_update(id: $id, data: {summaryContent: $summary})
+}
+
+mutation DeleteNote($id: UUID!) @auth(level: USER) {
+  note_delete(id: $id)
+}
+
+query GetNote($id: UUID!) @auth(level: USER) {
+  note(id: $id) {
+    rawContent summaryContent
+  }
+}
+
+query ListNotes($lectureId: UUID!) @auth(level: USER) {
+  notes(where: {lectureId: {eq: $lectureId}}) {
+    summaryContent
+  }
+}
+
+mutation CreateFlashcard($question: String!, $answer: String!, $noteId: UUID!) @auth(level: USER) {
+  flashcard_insert(data: {
+    question: $question,
+    answer: $answer,
+    noteId: $noteId
+  })
+}
+
+mutation UpdateFlashcard($id: UUID!, $answer: String) @auth(level: USER) {
+  flashcard_update(id: $id, data: {answer: $answer})
+}
+
+mutation DeleteFlashcard($id: UUID!) @auth(level: USER) {
+  flashcard_delete(id: $id)
+}
+
+query GetFlashcard($id: UUID!) @auth(level: USER) {
+  flashcard(id: $id) {
+    question answer
+  }
+}
+
+query ListFlashcards($noteId: UUID!) @auth(level: USER) {
+  flashcards(where: {noteId: {eq: $noteId}}) {
+    question answer
+  }
+}
+
+mutation CreateReminder($title: String!, $dueDate: Timestamp!, $courseId: UUID!) @auth(level: USER) {
+  reminder_insert(data: {
+    title: $title,
+    dueDate: $dueDate,
+    courseId: $courseId,
+    studentId_expr: "auth.uid"
+  })
+}
+
+mutation UpdateReminder($id: UUID!, $title: String) @auth(level: USER) {
+  reminder_update(id: $id, data: {title: $title})
+}
+
+mutation DeleteReminder($id: UUID!) @auth(level: USER) {
+  reminder_delete(id: $id)
+}
+
+query GetReminder($id: UUID!) @auth(level: USER) {
+  reminder(id: $id) {
+    title dueDate
+  }
+}
+
+query ListMyReminders @auth(level: USER) {
+  reminders(where: {studentId: {eq_expr: "auth.uid"}}) {
+    title dueDate
+  }
+}

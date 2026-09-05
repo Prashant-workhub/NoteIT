@@ -1,0 +1,32 @@
+mutation CreateSeedData @transaction {
+  student_insertMany(data: [
+    { id: "550e8400-e29b-41d4-a716-446655440001", email: "alice@uni.edu", name: "Alice", universityName: "State University", graduationYear: 2025 },
+    { id: "550e8400-e29b-41d4-a716-446655440002", email: "bob@uni.edu", name: "Bob", universityName: "State University", graduationYear: 2026 },
+    { id: "550e8400-e29b-41d4-a716-446655440003", email: "charlie@uni.edu", name: "Charlie", universityName: "Tech Institute", graduationYear: 2025 }
+  ])
+  course_insertMany(data: [
+    { id: "660f9511-f30c-52e5-b827-557766551101", title: "Introduction to CS", code: "CS101", studentId: "550e8400-e29b-41d4-a716-446655440001" },
+    { id: "660f9511-f30c-52e5-b827-557766551102", title: "Advanced Mathematics", code: "MATH202", studentId: "550e8400-e29b-41d4-a716-446655440002" },
+    { id: "660f9511-f30c-52e5-b827-557766551103", title: "Physics I", code: "PHYS101", studentId: "550e8400-e29b-41d4-a716-446655440003" }
+  ])
+  lecture_insertMany(data: [
+    { id: "771a0622-041d-63f6-c938-668877662201", date: "2023-10-01", topic: "Variables", courseId: "660f9511-f30c-52e5-b827-557766551101" },
+    { id: "771a0622-041d-63f6-c938-668877662202", date: "2023-10-02", topic: "Calculus Limits", courseId: "660f9511-f30c-52e5-b827-557766551102" },
+    { id: "771a0622-041d-63f6-c938-668877662203", date: "2023-10-03", topic: "Kinematics", courseId: "660f9511-f30c-52e5-b827-557766551103" }
+  ])
+  note_insertMany(data: [
+    { id: "882b1733-152e-7407-da49-779988773301", rawContent: "CS notes...", summaryContent: "Summary CS", lectureId: "771a0622-041d-63f6-c938-668877662201" },
+    { id: "882b1733-152e-7407-da49-779988773302", rawContent: "Math notes...", summaryContent: "Summary Math", lectureId: "771a0622-041d-63f6-c938-668877662202" },
+    { id: "882b1733-152e-7407-da49-779988773303", rawContent: "Physics notes...", summaryContent: "Summary Physics", lectureId: "771a0622-041d-63f6-c938-668877662203" }
+  ])
+  flashcard_insertMany(data: [
+    { id: "993c2844-263f-8518-eb50-88aa99884401", question: "What is a variable?", answer: "A storage location", noteId: "882b1733-152e-7407-da49-779988773301" },
+    { id: "993c2844-263f-8518-eb50-88aa99884402", question: "What is a limit?", answer: "Calculus value", noteId: "882b1733-152e-7407-da49-779988773302" },
+    { id: "993c2844-263f-8518-eb50-88aa99884403", question: "Define Kinematics", answer: "Study of motion", noteId: "882b1733-152e-7407-da49-779988773303" }
+  ])
+  reminder_insertMany(data: [
+    { id: "004d3955-3740-9629-fc61-99bb00995501", dueDate: "2023-12-01T23:59:59Z", title: "CS Assignment", studentId: "550e8400-e29b-41d4-a716-446655440001", courseId: "660f9511-f30c-52e5-b827-557766551101" },
+    { id: "004d3955-3740-9629-fc61-99bb00995502", dueDate: "2023-12-02T23:59:59Z", title: "Math Exam", studentId: "550e8400-e29b-41d4-a716-446655440002", courseId: "660f9511-f30c-52e5-b827-557766551102" },
+    { id: "004d3955-3740-9629-fc61-99bb00995503", dueDate: "2023-12-03T23:59:59Z", title: "Physics Lab", studentId: "550e8400-e29b-41d4-a716-446655440003", courseId: "660f9511-f30c-52e5-b827-557766551103" }
+  ])
+}
