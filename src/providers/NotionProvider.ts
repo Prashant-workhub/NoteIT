@@ -23,6 +23,7 @@ export class NotionProvider extends BaseProvider {
 
   async generateText(prompt: string, model?: string): Promise<string> {
     const activeModel = model || this.defaultModel;
+    console.log('[NotionProvider] Sending prompt/transcript to Notion:', prompt);
     
     // Attempt standard Notion AI API call or OpenAI-compatible completion format fallback
     const response = await fetch('https://api.notion.com/v1/users/me', {
