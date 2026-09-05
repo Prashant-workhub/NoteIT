@@ -6,6 +6,7 @@ import { ProviderValidationError } from './src/providers/AIProvider';
 import { InternalAIService, buildOptimizedContextForResource } from './src/server/internalAIService';
 import { formatUserFriendlyErrorMessage } from './src/utils/errorSanitizer';
 import { authenticateFirebaseUser } from './src/middleware/authFirebase';
+import { withTimeout } from './src/server/firestoreUtils';
 
 
 
@@ -375,7 +376,7 @@ app.post('/api/ai/provider-proxy', authenticateFirebaseUser, async (req, res) =>
     try {
       const adminDb = getFirestore();
       const userDocRef = adminDb.collection('users').doc(uid);
-      const userDoc = await userDocRef.get();
+      const userDoc = await withTimeout(userDocRef.get(), 5000, 'Firestore read timed out (no credentials?)');
       data = userDoc.exists ? userDoc.data() : null;
 
       // Automatic legacy migration
@@ -503,11 +504,10 @@ app.post('/api/ai/provider-proxy', authenticateFirebaseUser, async (req, res) =>
     else if (status === 503) errorType = '503';
 
     try {
-      const adminDb = getFirestore();
-      const userDocRef = adminDb.collection('users').doc(uid);
-      const userDoc = await userDocRef.get();
-      if (userDoc.exists) {
-        const d = userDoc.data();
+      if (data) {
+        const adminDb = getFirestore();
+        const userDocRef = adminDb.collection('users').doc(uid);
+        const d = data;
         const currentStats = d?.usageStats || { todayRequests: 0, estimatedTokens: 0, avgResponseTime: 0, failedRequests: 0, errors429: 0, errors503: 0 };
         const updatedStats = {
           ...currentStats,
@@ -735,7 +735,7 @@ app.post(['/api/lectures/:lectureId/generate-resources', '/api/lectures/generate
     userDocRef = adminDb.collection('users').doc(uid);
 
     try {
-      const lectureSnap = await lectureRef.get();
+      const lectureSnap = await withTimeout(lectureRef.get(), 5000, 'Firestore lecture read timed out');
       if (lectureSnap.exists) {
         lectureData = lectureSnap.data() || {};
       }
@@ -744,7 +744,7 @@ app.post(['/api/lectures/:lectureId/generate-resources', '/api/lectures/generate
     }
 
     try {
-      const userDoc = await userDocRef.get();
+      const userDoc = await withTimeout(userDocRef.get(), 5000, 'Firestore user read timed out');
       if (userDoc.exists) {
         userData = userDoc.data() || null;
       }

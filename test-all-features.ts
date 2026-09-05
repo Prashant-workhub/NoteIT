@@ -56,12 +56,12 @@ import { formatUserFriendlyErrorMessage } from './src/utils/errorSanitizer';
 
 const PORT = process.env.PORT || '3002';
 const BASE_URL = process.env.TEST_BASE_URL || `http://localhost:${PORT}`;
-const REQUEST_TIMEOUT_MS = Number(process.env.TEST_TIMEOUT_MS || 15000);
+const REQUEST_TIMEOUT_MS = Number(process.env.TEST_TIMEOUT_MS || 30000);
 // Some routes (ground-source, generate-resources, notifications) read more than one
 // Firestore document before doing anything else. Without cloud credentials each read
 // eventually fails via a slow ADC lookup rather than failing instantly, so routes that
 // chain two or more of those reads need noticeably more runway than a single request.
-const FIRESTORE_HEAVY_TIMEOUT_MS = Math.max(REQUEST_TIMEOUT_MS * 2, 25000);
+const FIRESTORE_HEAVY_TIMEOUT_MS = Number(process.env.TEST_FIRESTORE_TIMEOUT_MS || 60000);
 const SERVER_BOOT_TIMEOUT_MS = Number(process.env.TEST_SERVER_BOOT_TIMEOUT_MS || 45000);
 const RUN_TYPECHECK = process.env.SKIP_TYPECHECK !== '1';
 const AUTH_HEADER = { Authorization: 'Bearer test-token' };
