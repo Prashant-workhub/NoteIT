@@ -3,9 +3,13 @@ import { GeminiAdapter } from './ValidationAdapters';
 
 function sanitizeGeminiModel(model?: string): string {
   if (model && model.trim()) {
-    return model.trim().replace(/^models\//, '');
+    const clean = model.trim().replace(/^models\//, '');
+    if (clean === 'gemini-3.6-flash' || clean === 'gemini-2.5-flash') {
+      return 'gemini-2.0-flash';
+    }
+    return clean;
   }
-  return 'gemini-3.6-flash';
+  return 'gemini-2.0-flash';
 }
 
 export async function fetchGeminiApi(apiKey: string, requestedModel: string, bodyObj: any): Promise<Response> {

@@ -1143,7 +1143,7 @@ Text snippet to explain:
 
     const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || '';
     const providerInstance = ProviderFactory.getProvider('gemini', apiKey);
-    const explanation = await providerInstance.generateText(prompt, 'gemini-3.6-flash');
+    const explanation = await providerInstance.generateText(prompt, 'gemini-2.0-flash');
 
     res.json({ explanation });
   } catch (err: any) {
