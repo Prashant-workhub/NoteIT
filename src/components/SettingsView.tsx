@@ -56,7 +56,7 @@ const PROVIDER_METADATA: Record<string, {
     defaultModel: 'gemini-3.6-flash',
     docLink: 'https://ai.google.dev/gemini-api/docs',
     getKeyLink: 'https://aistudio.google.com/apikey',
-    models: ['gemini-3.6-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'],
+    models: ['gemini-3.6-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'],
     endpoint: 'generativelanguage.googleapis.com'
   },
   notion: {

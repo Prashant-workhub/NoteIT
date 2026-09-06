@@ -419,7 +419,7 @@ export default function LectureProcessingView({
 
           const aiData = await generateLectureContent(
             base64Audio,
-            'audio/webm',
+            audioBlob?.type || 'audio/webm',
             (isBusy) => {
               if (isSubscribed) {
                 setIsGeminiBusy(isBusy);

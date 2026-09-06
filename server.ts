@@ -278,13 +278,37 @@ const transcribeWithSpeechmatics = async (
     throw new Error('Speechmatics fallback is not configured. Add SPEECHMATICS_API_KEY to the server environment.');
   }
 
-  const extension = mimeType.split('/')[1]?.split(';')[0] || 'webm';
-  const audio = Buffer.from(base64Audio, 'base64');
+  // 1. Sanitize base64 payload
+  const cleanBase64 = base64Audio.replace(/^data:[^;]+;base64,/, '').replace(/\s+/g, '');
+  const audioBuffer = Buffer.from(cleanBase64, 'base64');
+  if (audioBuffer.length === 0) {
+    throw new Error('Audio data is empty or corrupted.');
+  }
+
+  // 2. Clean MIME type and determine valid file extension
+  const cleanMimeType = (mimeType || 'audio/webm').split(';')[0].trim().toLowerCase();
+  let extension = cleanMimeType.split('/')[1] || 'webm';
+  if (extension === 'mpeg') extension = 'mp3';
+  if (extension === 'wave' || extension === 'x-wav') extension = 'wav';
+  if (extension === 'x-m4a' || extension === 'mp4a-latm') extension = 'm4a';
+
+  const filename = `lecture.${extension}`;
+
+  // 3. Construct FormData compatible with Speechmatics REST API v2
   const form = new FormData();
-  form.append('data_file', new Blob([audio], { type: mimeType }), `lecture.${extension}`);
+  
+  // Use File constructor if available in Node (v19+), otherwise Blob with explicit filename parameter
+  const audioFile = typeof File !== 'undefined'
+    ? new File([audioBuffer], filename, { type: cleanMimeType })
+    : new Blob([audioBuffer], { type: cleanMimeType });
+
+  form.append('data_file', audioFile, filename);
   form.append('config', JSON.stringify({
     type: 'transcription',
-    transcription_config: { language: 'en' }
+    transcription_config: {
+      language: 'en',
+      operating_point: 'enhanced'
+    }
   }));
 
   onProgress('Submitting the audio to Speechmatics…');
@@ -309,11 +333,12 @@ const transcribeWithSpeechmatics = async (
     if (!statusResponse.ok) {
       throw new Error(`Speechmatics status check failed (${await getErrorText(statusResponse)}).`);
     }
-    const status = await statusResponse.json() as { status?: string };
+    const status = await statusResponse.json() as { status?: string; job?: { errors?: Array<{ message?: string }> } };
     const jobStatus = (status.status || '').toLowerCase();
     if (jobStatus === 'done') break;
     if (jobStatus === 'rejected' || jobStatus === 'failed') {
-      throw new Error('Speechmatics could not transcribe this recording.');
+      const detail = status.job?.errors?.[0]?.message || 'Speechmatics could not transcribe this recording.';
+      throw new Error(`Speechmatics job ${jobStatus}: ${detail}`);
     }
     if (!announcedPolling) {
       onProgress('Speechmatics is transcribing the lecture; this can take a moment…');
@@ -368,19 +393,38 @@ app.post('/api/ai/transcribe-with-fallback', authenticateFirebaseUser, async (re
 
     const effectiveGeminiKey = (geminiApiKey || storedGeminiKey || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || '').trim();
     
-    // If user explicitly chose Speechmatics, skip Gemini
+    // If user explicitly chose Speechmatics, try Speechmatics first with Gemini fallback if available
     if (preferredProvider === 'speechmatics') {
       sendTranscriptionEvent(res, 'progress', {
         provider: 'speechmatics',
         fallback: false,
         message: 'Using built-in Speechmatics enterprise transcriber…'
       });
-      const transcript = await transcribeWithSpeechmatics(base64Audio, mimeType, message => {
-        sendTranscriptionEvent(res, 'progress', { provider: 'speechmatics', fallback: false, message });
-      });
-      sendTranscriptionEvent(res, 'result', { transcript, provider: 'speechmatics', fallback: false });
-      res.end();
-      return;
+      try {
+        const transcript = await transcribeWithSpeechmatics(base64Audio, mimeType, message => {
+          sendTranscriptionEvent(res, 'progress', { provider: 'speechmatics', fallback: false, message });
+        });
+        sendTranscriptionEvent(res, 'result', { transcript, provider: 'speechmatics', fallback: false });
+        res.end();
+        return;
+      } catch (smError: any) {
+        if (effectiveGeminiKey) {
+          console.warn('[transcribe-with-fallback] Speechmatics failed; falling back to Gemini AI:', smError?.message || smError);
+          sendTranscriptionEvent(res, 'progress', {
+            provider: 'gemini',
+            fallback: true,
+            message: 'Speechmatics unavailable for this audio format. Falling back to Gemini AI…'
+          });
+          const gemini = ProviderFactory.getProvider('gemini', effectiveGeminiKey);
+          const transcript = (await gemini.transcribeAudio(base64Audio, mimeType, 'gemini-3.6-flash')).trim();
+          if (transcript) {
+            sendTranscriptionEvent(res, 'result', { transcript, provider: 'gemini', fallback: true });
+            res.end();
+            return;
+          }
+        }
+        throw smError;
+      }
     }
 
     if (effectiveGeminiKey && preferredProvider !== 'speechmatics') {
@@ -1143,7 +1187,7 @@ Text snippet to explain:
 
     const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || '';
     const providerInstance = ProviderFactory.getProvider('gemini', apiKey);
-    const explanation = await providerInstance.generateText(prompt, 'gemini-2.0-flash');
+    const explanation = await providerInstance.generateText(prompt, 'gemini-3.6-flash');
 
     res.json({ explanation });
   } catch (err: any) {

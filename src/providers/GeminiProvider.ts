@@ -4,12 +4,12 @@ import { GeminiAdapter } from './ValidationAdapters';
 function sanitizeGeminiModel(model?: string): string {
   if (model && model.trim()) {
     const clean = model.trim().replace(/^models\//, '');
-    if (clean === 'gemini-3.6-flash' || clean === 'gemini-2.5-flash') {
-      return 'gemini-2.0-flash';
+    if (clean === 'gemini-2.0-flash' || clean === 'gemini-2.5-flash') {
+      return 'gemini-3.6-flash';
     }
     return clean;
   }
-  return 'gemini-2.0-flash';
+  return 'gemini-3.6-flash';
 }
 
 export async function fetchGeminiApi(apiKey: string, requestedModel: string, bodyObj: any): Promise<Response> {
@@ -67,7 +67,7 @@ export class GeminiProvider extends BaseProvider {
   }
 
   getAvailableModels(): string[] {
-    return ['gemini-3.6-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+    return ['gemini-3.6-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
   }
 
   async validateKey(): Promise<boolean> {
