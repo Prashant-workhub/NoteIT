@@ -2599,7 +2599,7 @@ export default function LectureCaptureView({
                 <HandwrittenNotesViewer 
                   lectureData={activeLecture} 
                   theme={theme} 
-                  isCompiling={isGeneratingNotes || isGeneratingSummary || activeLecture?.resourceGenerationStatus === 'processing' || activeLecture?.status === 'transcribing'}
+                  isCompiling={isGeneratingNotes || activeLecture?.status === 'transcribing'}
                 />
               )}
 

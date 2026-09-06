@@ -317,8 +317,11 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
     return pagesResult;
   }, [sections, overview, keyPoints, formulas, keyTerms, hasNotesContent, parsedMarkdown]);
 
-  // RENDERING GATES: No preview until loaded properly
-  if (isCompilingState) {
+  // RENDERING GATES: If notes content is ALREADY available, display handwritten notes INSTANTLY!
+  // Only display the compilation spinner if notes content is missing and notes generation is actively running.
+  const showLoading = !hasNotesContent && isCompilingState;
+
+  if (showLoading) {
     return (
       <div className="handwritten-workspace space-y-6 select-none p-6">
         <div className="p-8 rounded-[8px] border-2 border-[#111111] bg-[#F6F2EA] shadow-paper-md text-center space-y-6 max-w-2xl mx-auto my-8">
