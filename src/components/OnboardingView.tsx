@@ -36,10 +36,10 @@ const PROVIDER_METADATA: Record<string, {
   gemini: {
     name: 'Google Gemini',
     description: 'Highly capable multimodal model for fast note synthesis, quizzes, and mind maps.',
-    defaultModel: 'gemini-2.5-flash',
+    defaultModel: 'gemini-3.6-flash',
     docLink: 'https://ai.google.dev/gemini-api/docs',
     getKeyLink: 'https://aistudio.google.com/apikey',
-    models: ['gemini-2.5-flash']
+    models: ['gemini-3.6-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro']
   },
   notion: {
     name: 'Notion AI / Notion API',
@@ -163,7 +163,7 @@ export default function OnboardingView({
   const [selectedProvider, setSelectedProvider] = useState('gemini');
   const [apiKey, setApiKey] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
+  const [selectedModel, setSelectedModel] = useState('gemini-3.6-flash');
   const [searchQuery, setSearchQuery] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectedGuideImage, setSelectedGuideImage] = useState<string | null>(null);

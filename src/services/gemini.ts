@@ -42,6 +42,7 @@ export const getAIConfig = () => {
   const customGeminiKey = isBrowser ? (localStorage.getItem('noteit_gemini_api_key') || '') : '';
   const customOpenAiKey = isBrowser ? (localStorage.getItem('noteit_openai_api_key') || '') : '';
   const customNotionKey = isBrowser ? (localStorage.getItem('noteit_notion_api_key') || '') : '';
+  const model = isBrowser ? (localStorage.getItem('noteit_active_gemini_model') || localStorage.getItem('noteit_gemini_model') || 'gemini-3.6-flash') : 'gemini-3.6-flash';
   
   const envGeminiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
   const envOpenAiKey = import.meta.env.VITE_OPENAI_API_KEY || '';
@@ -49,6 +50,7 @@ export const getAIConfig = () => {
   
   return {
     provider,
+    model,
     geminiKey: customGeminiKey || envGeminiKey,
     openaiKey: customOpenAiKey || envOpenAiKey,
     notionKey: customNotionKey || envNotionKey
@@ -956,7 +958,8 @@ export const generateIngestedAssetsFromText = async (
 export const generateInitialLectureAssets = async (
   rawText: string,
   apiKey: string,
-  onBusy?: (isBusy: boolean) => void
+  onBusy?: (isBusy: boolean) => void,
+  mode: string = 'academic'
 ): Promise<any> => {
   // Pre-sanitize rawText to remove syllabus noise lines
   const lines = rawText.split('\n');
@@ -1147,7 +1150,6 @@ export const generateInitialLectureAssets = async (
 
   return executeGeminiCall(prompt, apiKey, undefined, schema, onBusy);
 };
-export const generateFastDocumentAssets = generateInitialLectureAssets;
 
 export const generateLectureContent = async (
   base64Audio: string, 
@@ -1325,6 +1327,8 @@ export const parseFallbackRawTranscriptToAssets = (
     }
   };
 };
+
+export const generateFastDocumentAssets = (text: string, title?: string) => parseFallbackRawTranscriptToAssets(text, title);
 
 export const generateLectureContentFromText = async (
   extractedText: string,

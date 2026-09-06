@@ -53,10 +53,10 @@ const PROVIDER_METADATA: Record<string, {
   gemini: {
     name: 'Google Gemini',
     description: 'Highly capable multimodal model for fast note synthesis, quizzes, and mind maps.',
-    defaultModel: 'gemini-2.5-flash',
+    defaultModel: 'gemini-3.6-flash',
     docLink: 'https://ai.google.dev/gemini-api/docs',
     getKeyLink: 'https://aistudio.google.com/apikey',
-    models: ['gemini-2.5-flash'],
+    models: ['gemini-3.6-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'],
     endpoint: 'generativelanguage.googleapis.com'
   },
   notion: {
@@ -214,7 +214,7 @@ export default function SettingsView({
 
   // AI Provider & API Keys state
   const [aiProvider, setAiProvider] = useState<string>('gemini');
-  const [selectedModel, setSelectedModel] = useState<string>('gemini-2.5-flash');
+  const [selectedModel, setSelectedModel] = useState<string>('gemini-3.6-flash');
   const [showNewKeyPassword, setShowNewKeyPassword] = useState(false);
   
   // Search & custom dropdowns
@@ -522,6 +522,11 @@ export default function SettingsView({
         })
       });
       if (res.ok) {
+        localStorage.setItem('noteit_active_ai_provider', aiProvider);
+        localStorage.setItem(`noteit_${aiProvider}_api_key`, newKey.trim());
+        const activeModel = selectedModel.trim() || PROVIDER_METADATA[aiProvider]?.defaultModel || 'gemini-3.6-flash';
+        localStorage.setItem('noteit_active_ai_model', activeModel);
+        localStorage.setItem('noteit_selected_model', activeModel);
         setNewKey('');
         setShowReplaceForm(false);
         triggerSaveNotification();
@@ -1043,7 +1048,7 @@ export default function SettingsView({
                     <div>
                       <div className="text-[9px] uppercase text-[#666666]">Active Model</div>
                       <div className="mt-1 font-extrabold text-[#2F6BFF]">
-                        {configStatus?.selectedModel || 'gemini-2.5-flash'}
+                        {configStatus?.selectedModel || 'gemini-3.6-flash'}
                       </div>
                     </div>
                     <div>
@@ -1222,10 +1227,13 @@ export default function SettingsView({
                         <select
                           value={PROVIDER_METADATA[aiProvider]?.models.includes(selectedModel) ? selectedModel : 'custom'}
                           onChange={(e) => {
-                            if (e.target.value === 'custom') {
+                            const val = e.target.value;
+                            if (val === 'custom') {
                               setSelectedModel('');
                             } else {
-                              setSelectedModel(e.target.value);
+                              setSelectedModel(val);
+                              localStorage.setItem('noteit_active_ai_model', val);
+                              localStorage.setItem('noteit_selected_model', val);
                             }
                           }}
                           className="w-full rounded-[6px] border-2 border-[#111111] bg-[#F6F2EA] p-2.5 text-xs font-mono font-bold text-[#111111] outline-none shadow-paper-sm cursor-pointer"
@@ -1239,9 +1247,16 @@ export default function SettingsView({
                         {!PROVIDER_METADATA[aiProvider]?.models.includes(selectedModel) && (
                           <input
                             type="text"
-                            placeholder={`Enter custom ${PROVIDER_METADATA[aiProvider]?.name} model ID`}
+                            placeholder={`Enter custom ${PROVIDER_METADATA[aiProvider]?.name} model ID (e.g. gemini-2.0-flash)`}
                             value={selectedModel === 'custom' ? '' : selectedModel}
-                            onChange={(e) => setSelectedModel(e.target.value)}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setSelectedModel(val);
+                              if (val.trim()) {
+                                localStorage.setItem('noteit_active_ai_model', val.trim());
+                                localStorage.setItem('noteit_selected_model', val.trim());
+                              }
+                            }}
                             className="w-full mt-2 rounded-[6px] border-2 border-[#111111] bg-white p-2.5 text-xs font-mono font-bold text-[#111111] outline-none shadow-paper-sm"
                           />
                         )}

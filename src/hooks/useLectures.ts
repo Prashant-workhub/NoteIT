@@ -83,6 +83,8 @@ export function useLectures(userId: string | undefined) {
     duration?: string;
     type: 'recording' | 'pdf' | 'ppt' | 'text';
     status: Lecture['status'];
+    transcriptionEngine?: string;
+    browserLiveTranscript?: string;
     pages?: number;
     addedAt?: string;
   }) => {

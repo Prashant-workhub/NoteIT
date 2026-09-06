@@ -1,7 +1,7 @@
 import pptxgen from 'pptxgenjs';
 import { SlideBlueprint } from '../types';
 import { auth } from '../firebaseConfig';
-import { executeGeminiCall } from './gemini';
+import { executeGeminiCall, getAIConfig } from './gemini';
 
 export interface QualityReport {
   score: number;
@@ -123,7 +123,7 @@ const executeLlmCall = async (
   apiKey: string,
   responseSchema?: any
 ): Promise<any> => {
-  return executeGeminiCall(prompt, apiKey, undefined, responseSchema, undefined, 'gemini-2.5-flash');
+  return executeGeminiCall(prompt, apiKey, undefined, responseSchema, undefined, model || getAIConfig().model || 'gemini-3.6-flash');
 };
 
 // Stage 1 & 2 & 11 presentation blueprint planner with AI Critic pass
@@ -135,7 +135,7 @@ export const generatePresentationBlueprint = async (
   level: 'quick' | 'balanced' | 'premium',
   apiKey: string
 ): Promise<SlideBlueprint[]> => {
-  const model = 'gemini-2.5-flash';
+  const model = getAIConfig().model || 'gemini-3.6-flash';
 
   const schema = {
     type: 'OBJECT',

@@ -218,9 +218,10 @@ app.post('/api/ai/validate-key', authenticateFirebaseUser, async (req, res) => {
 });
 
 function sanitizeModelName(model?: string): string {
-  if (!model || model.startsWith('gemini-') || model.startsWith('google/gemini-')) return 'gemini-3.6-flash';
-  if (model === 'gemini-3.6-flash') return 'gemini-3.6-flash';
-  return model;
+  if (!model || !model.trim()) return 'gemini-3.6-flash';
+  const trimmed = model.trim().replace(/^models\//, '');
+  if (trimmed === 'gemini-2.5-flash') return 'gemini-3.6-flash';
+  return trimmed;
 }
 
 const sendTranscriptionEvent = (res: express.Response, event: string, payload: Record<string, unknown>) => {

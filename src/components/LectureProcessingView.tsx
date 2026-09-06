@@ -11,7 +11,7 @@ import {
   FileText
 } from 'lucide-react';
 import { PageId } from '../types';
-import { blobToBase64, generateLectureContent, generateResourcesFromTranscript } from '../services/gemini';
+import { blobToBase64, generateLectureContent, generateResourcesFromTranscript, getAIConfig } from '../services/gemini';
 import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../firebaseConfig';
 import { API_BASE_URL } from '../config';
@@ -288,7 +288,7 @@ export default function LectureProcessingView({
             timeline: aiData.timeline || [],
             sourceIntelligence: aiData.sourceIntelligence || null,
             keyConcepts: [],
-            geminiModel: 'gemini-2.5-flash',
+            geminiModel: getAIConfig().model || 'gemini-3.6-flash',
             processingTimeMs,
             transcriptionFinishedAt: serverTimestamp()
           });
@@ -473,7 +473,7 @@ export default function LectureProcessingView({
             timeline: aiData.timeline || [],
             sourceIntelligence: aiData.sourceIntelligence || null,
             keyConcepts: [],
-            geminiModel: 'gemini-2.5-flash',
+            geminiModel: getAIConfig().model || 'gemini-3.6-flash',
             transcriptionProvider: aiData.transcriptionProvider || 'gemini',
             processingTimeMs,
             transcriptionFinishedAt: serverTimestamp()

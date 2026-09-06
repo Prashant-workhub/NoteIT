@@ -47,7 +47,8 @@ export async function explainInBhaiLang(text: string, subjectName?: string): Pro
       const body = {
         contents: [{ parts: [{ text: prompt }] }]
       };
-      const response = await fetchGeminiApi(apiKey, 'gemini-2.5-flash', body);
+      const { getAIConfig } = await import('./gemini');
+      const response = await fetchGeminiApi(apiKey, getAIConfig().model || 'gemini-3.6-flash', body);
       if (response && response.ok) {
         const json = await response.json();
         const outputText = json?.candidates?.[0]?.content?.parts?.[0]?.text;

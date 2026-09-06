@@ -132,6 +132,8 @@ export interface Lecture {
   storageVersion?: number;
   geminiModel?: string;
   transcriptionProvider?: 'gemini' | 'speechmatics';
+  transcriptionEngine?: string;
+  browserLiveTranscript?: string;
   processingTimeMs?: number;
   createdAt?: any;
   uploadedAt?: any;

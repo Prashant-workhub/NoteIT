@@ -1735,7 +1735,7 @@ export default function LectureCaptureView({
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <button
-                onClick={() => onNavigate?.('settings' as any)}
+                onClick={() => setActivePage?.('settings' as any)}
                 className="px-3 py-1.5 bg-[#111111] text-white text-[11px] font-mono font-extrabold uppercase rounded-[4px] shadow-paper-sm hover:bg-neutral-800 transition-all cursor-pointer"
               >
                 Settings

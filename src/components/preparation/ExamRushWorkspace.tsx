@@ -416,12 +416,13 @@ export function ExamRushWorkspace({ config, lectures = [], notes = [], onExit }:
     setIsAskAiLoading(true);
     try {
       const { fetchGeminiApi } = await import('../../providers/GeminiProvider');
+      const { getAIConfig } = await import('../../services/gemini');
       const apiKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
       if (apiKey) {
         const body = {
           contents: [{ parts: [{ text: `You are an expert exam preparation AI assistant for ${config.subject.canonicalName}. Answer the following student question strictly based on the subject topics:\n\n${query}` }] }]
         };
-        const res = await fetchGeminiApi(apiKey, 'gemini-2.5-flash', body);
+        const res = await fetchGeminiApi(apiKey, getAIConfig().model || 'gemini-3.6-flash', body);
         if (res && res.ok) {
           const json = await res.json();
           const ans = json?.candidates?.[0]?.content?.parts?.[0]?.text;
