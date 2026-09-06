@@ -539,7 +539,7 @@ app.post('/api/ai/provider-proxy', authenticateFirebaseUser, async (req, res) =>
     const responseString = typeof result === 'string' ? result : JSON.stringify(result);
     const tokenUsage = providerInstance.estimateTokenUsage(prompt || '', responseString);
 
-    const currentStats = data.usageStats || { todayRequests: 0, estimatedTokens: 0, avgResponseTime: 0, failedRequests: 0, errors429: 0, errors503: 0 };
+    const currentStats = (data && data.usageStats) ? data.usageStats : { todayRequests: 0, estimatedTokens: 0, avgResponseTime: 0, failedRequests: 0, errors429: 0, errors503: 0 };
     const newRequests = (currentStats.todayRequests || 0) + 1;
     const newTotalTokens = (currentStats.estimatedTokens || 0) + tokenUsage.totalTokens;
     const newAvgTime = (((currentStats.avgResponseTime || 0) * (newRequests - 1)) + (latency / 1000)) / newRequests;

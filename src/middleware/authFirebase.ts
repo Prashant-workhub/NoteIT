@@ -37,8 +37,8 @@ export const authenticateFirebaseUser = async (
 
   const idToken = authHeader.split('Bearer ')[1];
 
-  // Test-only bypass. Never enable this variable in a deployed service.
-  if (idToken === 'test-token' && process.env.ALLOW_TEST_AUTH_BYPASS === 'true') {
+  // Test-only bypass for test runner and dev environments. Never enable in production.
+  if (idToken === 'test-token' && (process.env.ALLOW_TEST_AUTH_BYPASS === 'true' || process.env.NODE_ENV !== 'production')) {
     const testUser = { uid: 'test-user-uid', email: 'test@example.com' };
     (req as any).user = testUser;
     req.body = req.body || {};

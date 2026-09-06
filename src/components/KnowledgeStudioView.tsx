@@ -151,7 +151,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
   // Lazy Loading & Caching State
   const [localAssets, setLocalAssets] = useState<any>({});
   const [isAssetLoading, setIsAssetLoading] = useState<boolean>(false);
-  
+
   const getAsset = (sourceId: string | null | undefined, type: string, mode: string = '') => {
     if (!sourceId) return null;
     const cacheKey = `noteit_asset_${sourceId}_${type}${mode ? '_' + mode : ''}`;
@@ -174,7 +174,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
   const loadAsset = async (sourceId: string, assetType: string, mode: string = '') => {
     if (!sourceId || !auth.currentUser) return;
     const cacheKey = `noteit_asset_${sourceId}_${assetType}${mode ? '_' + mode : ''}`;
-    
+
     // 1. Check local & session storage cache
     const cached = sessionStorage.getItem(cacheKey) || localStorage.getItem(cacheKey);
     if (cached) {
@@ -186,7 +186,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
         console.warn("Failed to parse cached asset", e);
       }
     }
-    
+
     setIsAssetLoading(true);
 
     // 2. Try fetching from Firestore subcollection
@@ -215,7 +215,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
       if (assetType === 'flashcards') legacyData = activeSrc.flashcards;
       if (assetType === 'quiz') legacyData = activeSrc.quiz;
       if (assetType === 'mindmap') legacyData = activeSrc.keyConcepts;
-      
+
       if (legacyData) {
         sessionStorage.setItem(cacheKey, JSON.stringify(legacyData));
         localStorage.setItem(cacheKey, JSON.stringify(legacyData));
@@ -235,7 +235,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
       else if (activeOutputTab === 'mindmap') loadAsset(activeSourceId, 'mindmap');
     }
   }, [activeSourceId, activeOutputTab, notesFormat, summaryFormat]);
-  
+
   // Multi-language Output Selector
   const [outputLanguage, setOutputLanguage] = useState<string>('English');
 
@@ -294,7 +294,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
 
   // Mindmap Interactive Drawer
   const [selectedMindmapNode, setSelectedMindmapNode] = useState<any | null>(null);
-  
+
   const [isGeneratingMindmap, setIsGeneratingMindmap] = useState(false);
 
   const activeSource = sources.find(s => s.id === activeSourceId);
@@ -302,11 +302,11 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
   // Helper functions to retrieve active formatted content with legacy fallback
   const getActiveNotes = () => {
     if (!activeSource) return [];
-    
+
     // Check localAssets first
     const cached = getAsset(activeSourceId, 'notes', notesFormat);
     if (cached) return cached;
-    
+
     const key = `notes_${notesFormat}`;
     if (activeSource[key] && activeSource[key].length > 0) {
       return activeSource[key];
@@ -320,22 +320,22 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
 
   const getActiveSummary = () => {
     if (!activeSource) return '';
-    
+
     // Check localAssets first
     const cached = getAsset(activeSourceId, 'summary', summaryFormat);
     if (cached) return cached;
-    
+
     const key = `summary_${summaryFormat}`;
     if (activeSource[key] && activeSource[key].trim().length > 0) {
       return activeSource[key];
     }
     // Fallback to legacy summary field if the mode matches selectedSummaryMode
     const activeSummaryMode = activeSource.selectedSummaryMode || 'academic';
-    const isMatch = (summaryFormat === 'academic' && activeSummaryMode === 'academic') || 
-                    (summaryFormat === 'revision' && activeSummaryMode === 'revision') ||
-                    (summaryFormat === 'executive' && activeSummaryMode === 'executive') ||
-                    (summaryFormat === 'beginner' && activeSummaryMode === 'beginner') ||
-                    (summaryFormat === 'bhailang' && activeSummaryMode === 'bhailang');
+    const isMatch = (summaryFormat === 'academic' && activeSummaryMode === 'academic') ||
+      (summaryFormat === 'revision' && activeSummaryMode === 'revision') ||
+      (summaryFormat === 'executive' && activeSummaryMode === 'executive') ||
+      (summaryFormat === 'beginner' && activeSummaryMode === 'beginner') ||
+      (summaryFormat === 'bhailang' && activeSummaryMode === 'bhailang');
     if (isMatch && activeSource.summary && activeSource.summary.trim().length > 0) {
       return activeSource.summary;
     }
@@ -343,7 +343,11 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
   };
 
   const triggerGenerateNotes = async (format: 'academic' | 'executive' | 'revision' | 'bhailang' | 'bhailang_normal' | 'bhailang_savage' | 'bhailang_pro') => {
-    if (!activeSourceId || !userId || !activeSource || isGeneratingNotes) return;
+    if (!activeSourceId || !activeSource || isGeneratingNotes) return;
+    if (!userId) {
+      setImportError("Session expired or unauthenticated. Please log in to continue.");
+      return;
+    }
 
     const textContent = activeSource.transcript || activeSource.cleanTranscript || activeSource.content || activeSource.text || '';
     if (!textContent.trim()) {
@@ -361,7 +365,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
       );
       const docRef = doc(db, 'users', userId, 'sources', activeSourceId, 'assets', `notes_${format}`);
       await setDoc(docRef, { data: notesData, updatedAt: serverTimestamp() });
-      
+
       const cacheKey = `noteit_asset_${activeSourceId}_notes_${format}`;
       localStorage.setItem(cacheKey, JSON.stringify(notesData));
       setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: notesData }));
@@ -399,7 +403,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
       );
       const docRef = doc(db, 'users', userId, 'sources', activeSourceId, 'assets', `summary_${format}`);
       await setDoc(docRef, { data: summaryText, updatedAt: serverTimestamp() });
-      
+
       const cacheKey = `noteit_asset_${activeSourceId}_summary_${format}`;
       localStorage.setItem(cacheKey, JSON.stringify(summaryText));
       setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: summaryText }));
@@ -429,7 +433,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
       const generated = await generateFlashcards(textContent, count, [], apiKey);
       const docRef = doc(db, 'users', userId, 'sources', activeSourceId, 'assets', `flashcards`);
       await setDoc(docRef, { data: generated, updatedAt: serverTimestamp() });
-      
+
       const cacheKey = `noteit_asset_${activeSourceId}_flashcards`;
       localStorage.setItem(cacheKey, JSON.stringify(generated));
       setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: generated }));
@@ -456,7 +460,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
       const generated = await generateQuiz(textContent, apiKey);
       const docRef = doc(db, 'users', userId, 'sources', activeSourceId, 'assets', `quiz`);
       await setDoc(docRef, { data: generated, updatedAt: serverTimestamp() });
-      
+
       const cacheKey = `noteit_asset_${activeSourceId}_quiz`;
       localStorage.setItem(cacheKey, JSON.stringify(generated));
       setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: generated }));
@@ -487,7 +491,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
       const docRef = doc(db, 'users', userId, 'sources', activeSourceId, 'assets', `quiz`);
       const newData = [...existing, ...generated];
       await setDoc(docRef, { data: newData, updatedAt: serverTimestamp() });
-      
+
       const cacheKey = `noteit_asset_${activeSourceId}_quiz`;
       localStorage.setItem(cacheKey, JSON.stringify(newData));
       setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: newData }));
@@ -516,7 +520,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
       const generated = await generateMindmap(textContent, sections, apiKey);
       const docRef = doc(db, 'users', userId, 'sources', activeSourceId, 'assets', `mindmap`);
       await setDoc(docRef, { data: generated, updatedAt: serverTimestamp() });
-      
+
       const cacheKey = `noteit_asset_${activeSourceId}_mindmap`;
       localStorage.setItem(cacheKey, JSON.stringify(generated));
       setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: generated }));
@@ -611,7 +615,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
   const [showUrlModal, setShowUrlModal] = useState(false);
   const [urlInput, setUrlInput] = useState('');
   const [urlType, setUrlType] = useState<'youtube' | 'website'>('website');
-  
+
   const [showDriveModal, setShowDriveModal] = useState(false);
   const [isDriveConnected, setIsDriveConnected] = useState(false);
   const [isDriveConnecting, setIsDriveConnecting] = useState(false);
@@ -654,7 +658,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
           }
         });
       }
-      
+
       // Auto-activate the first source if none is active
       setActiveSourceId(prev => {
         if (!prev && list.length > 0) {
@@ -796,7 +800,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
       // Start background storage upload promise
       const sasPromise = getAzureUploadSasUrl(name).then(async (sasRes) => {
         await updateDoc(docRef, { blobPath: sasRes.blobPath });
-        await uploadBlobToAzure(sasRes.uploadUrl, file, () => {});
+        await uploadBlobToAzure(sasRes.uploadUrl, file, () => { });
         return sasRes;
       }).catch(err => {
         console.warn('Background blob storage upload skipped or failed:', err);
@@ -942,7 +946,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
     try {
       const extractedText = await extractTextFromDocument(blobPath);
       const fastData = generateFastDocumentAssets(extractedText, title);
-      
+
       setUploadProgress(90);
       setProcessingStatus('Structuring content...');
 
@@ -1016,7 +1020,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
 
   const handleRetryUrlImport = async (docId: string, url: string, type: 'youtube' | 'website') => {
     const docRef = doc(db, 'users', userId, 'sources', docId);
-    
+
     setImportError(null);
     setIsUploading(true);
     setUploadProgress(20);
@@ -1168,7 +1172,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
   const handleUrlImport = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!urlInput || !userId) return;
-    
+
     setImportError(null);
     setShowUrlModal(false);
     setIsUploading(true);
@@ -1326,7 +1330,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
         updatedList.push({ id: docSnap.id, ...docSnap.data() });
       });
       setSources(updatedList);
-      
+
       const updatedSource = updatedList.find(s => s.id === activeSourceId);
       if (updatedSource) {
         setActiveSourceId(activeSourceId);
@@ -1488,7 +1492,7 @@ ${queryText}`;
       if (!res.ok) throw new Error("API request failed");
       const data = await res.json();
       const answer = data.candidates?.[0]?.content?.parts?.[0]?.text || "I was unable to synthesize a response. Please check details.";
-      
+
       setChatMessages(prev => [...prev, { sender: 'ai', text: answer }]);
     } catch (err) {
       console.error("Chat failed:", err);
@@ -1516,8 +1520,8 @@ ${queryText}`;
     return parts.map((part, index) => {
       if (regex.test(part)) {
         return (
-          <span 
-            key={index} 
+          <span
+            key={index}
             className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/15"
           >
             {part}
@@ -1646,12 +1650,12 @@ ${queryText}`;
         
         JSON to translate:
         ${JSON.stringify({
-          summary: activeSource.summary || '',
-          notes: activeSource.notes || [],
-          flashcards: activeSource.flashcards || [],
-          quiz: activeSource.quiz || [],
-          keyConcepts: activeSource.keyConcepts || []
-        })}
+        summary: activeSource.summary || '',
+        notes: activeSource.notes || [],
+        flashcards: activeSource.flashcards || [],
+        quiz: activeSource.quiz || [],
+        keyConcepts: activeSource.keyConcepts || []
+      })}
       `;
 
       const apiKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
@@ -1717,7 +1721,7 @@ ${queryText}`;
 
       setUploadProgress(70);
       if (!res.ok) throw new Error(`Translation API error: ${res.status}`);
-      
+
       const data = await res.json();
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
       const cleanedText = extractJsonObject(text);
@@ -1744,7 +1748,7 @@ ${queryText}`;
   // PDF Export
   const exportPDFFile = (title: string, rawData: any, pdfTheme: 'academic' | 'modern' | 'corporate' | 'dark' = 'academic') => {
     let contentHtml = '';
-    
+
     if (typeof rawData === 'string') {
       const sections = parseSummaryIntoSections(rawData);
       contentHtml = `
@@ -1921,7 +1925,7 @@ ${queryText}`;
       const s2 = (t2 || "").toLowerCase().trim().replace(/[^a-z0-9]/g, '');
       if (s1 === s2) return 1.0;
       if (s1.length === 0 || s2.length === 0) return 0.0;
-      
+
       const track = Array(s2.length + 1).fill(null).map(() => Array(s1.length + 1).fill(null));
       for (let i = 0; i <= s1.length; i += 1) track[0][i] = i;
       for (let j = 0; j <= s2.length; j += 1) track[j][0] = j;
@@ -1969,12 +1973,12 @@ ${queryText}`;
       const titleWords = (slide.title || "").split(/\s+/).filter(Boolean).length;
       const contentWords = slideContent.reduce((acc: number, bp: string) => acc + bp.split(/\s+/).filter(Boolean).length, 0);
       const totalWords = titleWords + contentWords;
-      
+
       if (!isDetailed && totalWords > 40 && slideContent.length > 1) {
         const halfIndex = Math.ceil(slideContent.length / 2);
         const contentPart1 = slideContent.slice(0, halfIndex);
         const contentPart2 = slideContent.slice(halfIndex);
-        
+
         processedSlides.push({
           ...slide,
           title: `${slide.title} (Part 1)`,
@@ -2029,10 +2033,10 @@ ${queryText}`;
       if (clean.includes("math") || clean.includes("calculus") || clean.includes("algebra") || clean.includes("derivative") || clean.includes("limit") || clean.includes("geometry") || clean.includes("equation")) {
         return "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=800&auto=format&fit=crop&q=80";
       }
-      
+
       const keywords = clean.split(/\s+/).filter(Boolean);
       const queryParam = keywords.length > 0 ? keywords.slice(0, 2).join(",") : "abstract,academia";
-      return `https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&auto=format&fit=crop&q=80&sig=${Math.abs(queryParam.split('').reduce((a,b)=>(((a<<5)-a)+b.charCodeAt(0))|0,0))%100}`;
+      return `https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&auto=format&fit=crop&q=80&sig=${Math.abs(queryParam.split('').reduce((a, b) => (((a << 5) - a) + b.charCodeAt(0)) | 0, 0)) % 100}`;
     };
 
     processedSlides.forEach((s, idx) => {
@@ -2125,7 +2129,7 @@ ${queryText}`;
           const split = m.split(':');
           const numberText = split[0] ? split[0].trim() : `0${mIdx + 1}`;
           const labelText = split[1] ? split.slice(1).join(':').trim() : m;
-          
+
           slide.addText(numberText, {
             x: xPos + 0.2, y: 1.5, w: cardWidth - 0.4, h: 1.0,
             fontSize: 40, color: colors.accent, bold: true, align: "center"
@@ -2208,14 +2212,14 @@ ${queryText}`;
         const nodeMap: { [key: string]: { x: number, y: number, w: number, h: number } } = {};
         const nodeWidth = 2.0;
         const nodeHeight = 1.0;
-        
+
         diag.nodes.forEach((node: any, nIdx: number) => {
           const spacing = 8.0 / Math.max(1, diag.nodes.length - 1);
-          const x = 1.0 + (nIdx * (diag.nodes.length > 1 ? spacing : 0)) + (spacing/2 - nodeWidth/2);
+          const x = 1.0 + (nIdx * (diag.nodes.length > 1 ? spacing : 0)) + (spacing / 2 - nodeWidth / 2);
           const y = 2.4;
-          
+
           nodeMap[node.id] = { x, y, w: nodeWidth, h: nodeHeight };
-          
+
           // Draw node box
           slide.addShape(pptx.ShapeType.roundRect, {
             x, y, w: nodeWidth, h: nodeHeight,
@@ -2237,7 +2241,7 @@ ${queryText}`;
             const startY = fromNode.y + (fromNode.h / 2);
             const endX = toNode.x;
             const endY = toNode.y + (toNode.h / 2);
-            
+
             slide.addShape(pptx.ShapeType.line, {
               x: startX, y: startY, w: endX - startX, h: endY - startY,
               line: { color: colors.accent, width: 2.5, endArrowType: 'arrow' }
@@ -2253,11 +2257,11 @@ ${queryText}`;
 
         const tableData = s.tableData || {
           headers: ["Aspect", "Parameter A", "Parameter B"],
-          rows: s.content.map((c: string, cidx: number) => [`Metric ${cidx+1}`, c.substring(0, 25), c.substring(25, 55) || "Aligned Outline"])
+          rows: s.content.map((c: string, cidx: number) => [`Metric ${cidx + 1}`, c.substring(0, 25), c.substring(25, 55) || "Aligned Outline"])
         };
 
         const formattedRows: any[] = [];
-        
+
         // Header Row
         const headerCells = tableData.headers.map((h: string) => ({
           text: h,
@@ -2305,9 +2309,9 @@ ${queryText}`;
         const cardHeight = 1.4;
         const totalCards = steps.length;
         const spacing = 8.0 / Math.max(1, totalCards);
-        
+
         steps.forEach((stepText: string, stepIdx: number) => {
-          const xPos = 1.0 + (stepIdx * spacing) + (spacing/2 - cardWidth/2);
+          const xPos = 1.0 + (stepIdx * spacing) + (spacing / 2 - cardWidth / 2);
           const yPos = 2.0;
 
           // Draw block
@@ -2315,7 +2319,7 @@ ${queryText}`;
             x: xPos, y: yPos, w: cardWidth, h: cardHeight,
             fill: { color: colors.cardBg }, line: { color: colors.accent, width: 2 }
           });
-          
+
           slide.addText(`Stage 0${stepIdx + 1}`, {
             x: xPos + 0.1, y: yPos + 0.1, w: cardWidth - 0.2, h: 0.3,
             fontSize: 10, color: colors.accent, bold: true, align: "center"
@@ -2410,52 +2414,52 @@ ${queryText}`;
                   type: 'OBJECT',
                   properties: {
                     title: { type: 'STRING' },
-                      layout: { type: 'STRING' },
-                      content: { type: 'ARRAY', items: { type: 'STRING' } },
-                      imageSearchQuery: { type: 'STRING' },
-                      imagePrompt: { type: 'STRING' },
-                      keyTakeaway: { type: 'STRING' },
-                      diagramData: {
-                        type: 'OBJECT',
-                        properties: {
-                          nodes: {
-                            type: 'ARRAY',
-                            items: {
-                              type: 'OBJECT',
-                              properties: {
-                                id: { type: 'STRING' },
-                                label: { type: 'STRING' }
-                              },
-                              required: ['id', 'label']
-                            }
-                          },
-                          connections: {
-                            type: 'ARRAY',
-                            items: {
-                              type: 'OBJECT',
-                              properties: {
-                                from: { type: 'STRING' },
-                                to: { type: 'STRING' }
-                              },
-                              required: ['from', 'to']
-                            }
+                    layout: { type: 'STRING' },
+                    content: { type: 'ARRAY', items: { type: 'STRING' } },
+                    imageSearchQuery: { type: 'STRING' },
+                    imagePrompt: { type: 'STRING' },
+                    keyTakeaway: { type: 'STRING' },
+                    diagramData: {
+                      type: 'OBJECT',
+                      properties: {
+                        nodes: {
+                          type: 'ARRAY',
+                          items: {
+                            type: 'OBJECT',
+                            properties: {
+                              id: { type: 'STRING' },
+                              label: { type: 'STRING' }
+                            },
+                            required: ['id', 'label']
+                          }
+                        },
+                        connections: {
+                          type: 'ARRAY',
+                          items: {
+                            type: 'OBJECT',
+                            properties: {
+                              from: { type: 'STRING' },
+                              to: { type: 'STRING' }
+                            },
+                            required: ['from', 'to']
                           }
                         }
-                      },
-                      tableData: {
-                        type: 'OBJECT',
-                        properties: {
-                          headers: { type: 'ARRAY', items: { type: 'STRING' } },
-                          rows: { type: 'ARRAY', items: { type: 'ARRAY', items: { type: 'STRING' } } }
-                        }
-                      },
-                      processSteps: { type: 'ARRAY', items: { type: 'STRING' } }
+                      }
                     },
-                    required: ['title', 'layout', 'content', 'imageSearchQuery', 'imagePrompt', 'keyTakeaway']
-                  }
+                    tableData: {
+                      type: 'OBJECT',
+                      properties: {
+                        headers: { type: 'ARRAY', items: { type: 'STRING' } },
+                        rows: { type: 'ARRAY', items: { type: 'ARRAY', items: { type: 'STRING' } } }
+                      }
+                    },
+                    processSteps: { type: 'ARRAY', items: { type: 'STRING' } }
+                  },
+                  required: ['title', 'layout', 'content', 'imageSearchQuery', 'imagePrompt', 'keyTakeaway']
                 }
-              },
-              required: ['slides']
+              }
+            },
+            required: ['slides']
           }
         }
       };
@@ -2618,7 +2622,7 @@ ${queryText}`;
 
   return (
     <div className="flex flex-col h-full bg-grid-paper rounded-[6px] border-2 border-[#111111] shadow-paper-lg overflow-hidden select-none">
-      
+
       {/* HEADER BANNER */}
       <div className="p-4 border-b-2 border-[var(--border-main)] bg-[var(--card-bg)] flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -2650,11 +2654,10 @@ ${queryText}`;
               <button
                 key={tab}
                 onClick={() => setMobilePanelTab(tab)}
-                className={`flex-1 py-2 text-center text-xs font-black rounded-xl transition-all cursor-pointer ${
-                  isActive
-                    ? 'bg-[#FFC400] text-[#111111] shadow-md font-extrabold'
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--card-bg)]'
-                }`}
+                className={`flex-1 py-2 text-center text-xs font-black rounded-xl transition-all cursor-pointer ${isActive
+                  ? 'bg-[#FFC400] text-[#111111] shadow-md font-extrabold'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--card-bg)]'
+                  }`}
               >
                 {label}
               </button>
@@ -2665,11 +2668,10 @@ ${queryText}`;
 
       {/* 3 PANEL WORKSPACE */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-        
+
         {/* PANEL 1: LEFT - SOURCE HUB (Knowledge Sources) */}
-        <div className={`w-full md:w-80 shrink-0 flex-col border-r-2 border-[var(--border-main)] overflow-y-auto p-4 space-y-4 bg-[var(--card-bg)] text-[var(--text-primary)] ${
-          isMobile && mobilePanelTab !== 'sources' ? 'hidden' : 'flex'
-        }`}>
+        <div className={`w-full md:w-80 shrink-0 flex-col border-r-2 border-[var(--border-main)] overflow-y-auto p-4 space-y-4 bg-[var(--card-bg)] text-[var(--text-primary)] ${isMobile && mobilePanelTab !== 'sources' ? 'hidden' : 'flex'
+          }`}>
           <div>
             <h2 className="section-label text-xs font-bold text-[var(--text-primary)] uppercase tracking-[3px]">Knowledge Sources</h2>
             <p className="text-[11px] text-[var(--text-secondary)] font-mono mt-0.5">Attach documents, URLs, or Drive files to start.</p>
@@ -2678,9 +2680,9 @@ ${queryText}`;
           {importError && (
             <div className="rounded-[4px] bg-[#FF4D4D]/10 border-2 border-[#FF4D4D] p-3 flex items-start gap-2">
               <div className="text-xs text-[#FF4D4D] font-mono font-bold flex-1">{importError}</div>
-              <button 
+              <button
                 type="button"
-                onClick={() => setImportError(null)} 
+                onClick={() => setImportError(null)}
                 className="text-[#FF4D4D] font-bold text-sm"
               >
                 &times;
@@ -2773,19 +2775,18 @@ ${queryText}`;
               sources.map((src) => {
                 const isSelected = selectedSourceIds.includes(src.id);
                 const isActive = activeSourceId === src.id;
-                
+
                 return (
                   <div
                     key={src.id}
-                    className={`rounded-xl border p-3.5 flex flex-col justify-between transition-all group ${
-                      isActive 
-                        ? theme === 'dark' 
-                          ? 'border-indigo-500 bg-indigo-500/5' 
-                          : 'border-black bg-gray-50' 
-                        : theme === 'dark' 
-                          ? 'border-neutral-900 bg-neutral-950/40 hover:border-neutral-800' 
-                          : 'border-gray-200 bg-white hover:border-gray-300'
-                    }`}
+                    className={`rounded-xl border p-3.5 flex flex-col justify-between transition-all group ${isActive
+                      ? theme === 'dark'
+                        ? 'border-indigo-500 bg-indigo-500/5'
+                        : 'border-black bg-gray-50'
+                      : theme === 'dark'
+                        ? 'border-neutral-900 bg-neutral-950/40 hover:border-neutral-800'
+                        : 'border-gray-200 bg-white hover:border-gray-300'
+                      }`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-start gap-2.5 min-w-0 flex-1">
@@ -2837,8 +2838,8 @@ ${queryText}`;
                                 <span>{uploadPct}%</span>
                               </div>
                               <div className="h-1.5 w-full rounded-full bg-neutral-900 overflow-hidden border border-neutral-800">
-                                <div 
-                                  style={{ width: `${uploadPct}%` }} 
+                                <div
+                                  style={{ width: `${uploadPct}%` }}
                                   className="h-full bg-gradient-to-r from-amber-500 to-amber-300 rounded-full transition-all duration-300"
                                 />
                               </div>
@@ -2865,7 +2866,7 @@ ${queryText}`;
                                 <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
                                 <span>Failed ❌</span>
                               </div>
-                              
+
                               {/* Auto Retry Buttons based on type */}
                               <div className="flex gap-2.5">
                                 {src.type === 'document' && uploadingFiles[src.id] && (
@@ -2925,10 +2926,9 @@ ${queryText}`;
           </div>
         </div>
 
-          {/* PANEL 2: CENTER - AI WORKSPACE */}
-        <div className={`flex-1 flex flex-col overflow-hidden p-4 space-y-4 bg-[var(--panel-bg)] text-[var(--text-primary)] ${
-          isMobile && mobilePanelTab !== 'chat' ? 'hidden' : 'flex'
-        }`}>
+        {/* PANEL 2: CENTER - AI WORKSPACE */}
+        <div className={`flex-1 flex flex-col overflow-hidden p-4 space-y-4 bg-[var(--panel-bg)] text-[var(--text-primary)] ${isMobile && mobilePanelTab !== 'chat' ? 'hidden' : 'flex'
+          }`}>
           <div>
             <h2 className="section-label text-xs font-bold text-[var(--text-primary)] uppercase tracking-[3px]">AI Workspace</h2>
             <p className="text-[11px] text-[var(--text-secondary)] font-mono mt-0.5">Synthesize outlines, check contradictions, or query sources.</p>
@@ -2967,11 +2967,10 @@ ${queryText}`;
             ) : (
               chatMessages.map((msg, i) => (
                 <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] rounded-[6px] border-2 border-[var(--border-main)] p-3 text-xs leading-relaxed select-text font-mono ${
-                    msg.sender === 'user'
-                      ? 'bg-[#FFC400] text-[#111111] shadow-paper-sm font-bold'
-                      : 'bg-[var(--panel-bg)] text-[var(--text-primary)]'
-                  }`}>
+                  <div className={`max-w-[85%] rounded-[6px] border-2 border-[var(--border-main)] p-3 text-xs leading-relaxed select-text font-mono ${msg.sender === 'user'
+                    ? 'bg-[#FFC400] text-[#111111] shadow-paper-sm font-bold'
+                    : 'bg-[var(--panel-bg)] text-[var(--text-primary)]'
+                    }`}>
                     <span className="text-[9px] font-bold uppercase tracking-wider block text-[var(--text-secondary)] mb-1">
                       {msg.sender === 'user' ? 'STUDENT QUERY' : 'NOTEIT INTELLIGENCE'}
                     </span>
@@ -3046,13 +3045,11 @@ ${queryText}`;
         )}
 
         {/* PANEL 3: RIGHT - OUTPUT STUDIO */}
-        <div 
+        <div
           style={activeSourceId && !isMobile ? { width: `${outputStudioWidth}px` } : undefined}
-          className={`flex-col overflow-y-auto p-4 space-y-4 bg-[var(--card-bg)] border-l-2 border-[var(--border-main)] text-[var(--text-primary)] ${
-            isMobile && mobilePanelTab !== 'outputs' ? 'hidden' : 'flex'
-          } ${
-            activeSourceId ? '' : 'w-full md:w-[420px] shrink-0'
-          }`}
+          className={`flex-col overflow-y-auto p-4 space-y-4 bg-[var(--card-bg)] border-l-2 border-[var(--border-main)] text-[var(--text-primary)] ${isMobile && mobilePanelTab !== 'outputs' ? 'hidden' : 'flex'
+            } ${activeSourceId ? '' : 'w-full md:w-[420px] shrink-0'
+            }`}
         >
           <div className="flex items-center justify-between gap-2">
             <div>
@@ -3132,7 +3129,7 @@ ${queryText}`;
               </div>
             ) : (
               <div className="space-y-4">
-                
+
                 {/* 1. NOTES TAB */}
                 {activeOutputTab === 'notes' && (
                   <div className="space-y-3 animate-fade-in">
@@ -3280,9 +3277,8 @@ ${queryText}`;
                           <button
                             key={f}
                             onClick={() => setFlashcardsFormat(f)}
-                            className={`px-2.5 py-1 rounded-lg text-[9px] font-extrabold uppercase ${
-                              flashcardsFormat === f ? 'bg-indigo-500/10 text-indigo-400' : 'text-neutral-400'
-                            }`}
+                            className={`px-2.5 py-1 rounded-lg text-[9px] font-extrabold uppercase ${flashcardsFormat === f ? 'bg-indigo-500/10 text-indigo-400' : 'text-neutral-400'
+                              }`}
                           >
                             {f}
                           </button>
@@ -3348,9 +3344,8 @@ ${queryText}`;
                           <button
                             key={f}
                             onClick={() => setQuizFormat(f)}
-                            className={`px-2.5 py-1 rounded-lg text-[9px] font-extrabold uppercase ${
-                              quizFormat === f ? 'bg-indigo-500/10 text-indigo-400' : 'text-neutral-400'
-                            }`}
+                            className={`px-2.5 py-1 rounded-lg text-[9px] font-extrabold uppercase ${quizFormat === f ? 'bg-indigo-500/10 text-indigo-400' : 'text-neutral-400'
+                              }`}
                           >
                             {f}
                           </button>
@@ -3385,27 +3380,27 @@ ${queryText}`;
                           <h4 className="text-xs font-extrabold font-heading text-[#111111] leading-relaxed">
                             {renderTextWithCitations(cleanMarkdownText(getAsset(activeSourceId, 'quiz')[activeQuizQuestionIdx].question))}
                           </h4>
-                          
+
                           <div className="grid grid-cols-1 gap-2.5 mt-4">
                             {getAsset(activeSourceId, 'quiz')[activeQuizQuestionIdx].options.map((opt: string, optIdx: number) => {
                               const isSelected = selectedQuizAnswerIdx === optIdx;
                               const isCorrect = optIdx === getAsset(activeSourceId, 'quiz')[activeQuizQuestionIdx].correctAnswer;
-                              
+
                               let btnClass = "";
                               if (isQuizRevealed) {
-                                  if (isCorrect) {
-                                    btnClass = "border-[#111111] bg-[#19B56B] text-white shadow-paper-sm font-bold";
-                                  } else if (isSelected) {
-                                    btnClass = "border-[#111111] bg-[#FF4D4D] text-white shadow-paper-sm font-bold";
-                                  } else {
-                                    btnClass = "border-[#111111] bg-[#F6F2EA] text-[#888888] opacity-60";
-                                  }
+                                if (isCorrect) {
+                                  btnClass = "border-[#111111] bg-[#19B56B] text-white shadow-paper-sm font-bold";
+                                } else if (isSelected) {
+                                  btnClass = "border-[#111111] bg-[#FF4D4D] text-white shadow-paper-sm font-bold";
+                                } else {
+                                  btnClass = "border-[#111111] bg-[#F6F2EA] text-[#888888] opacity-60";
+                                }
                               } else {
-                                  if (isSelected) {
-                                    btnClass = "border-[#111111] bg-[#FFC400] text-[#111111] shadow-paper-sm font-bold";
-                                  } else {
-                                    btnClass = "border-[#111111] bg-white text-[#111111] hover:bg-[#FFF8D6] shadow-paper-sm";
-                                  }
+                                if (isSelected) {
+                                  btnClass = "border-[#111111] bg-[#FFC400] text-[#111111] shadow-paper-sm font-bold";
+                                } else {
+                                  btnClass = "border-[#111111] bg-white text-[#111111] hover:bg-[#FFF8D6] shadow-paper-sm";
+                                }
                               }
 
                               return (
@@ -3470,7 +3465,7 @@ ${queryText}`;
                       <div className="text-center py-16 border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5 p-6 space-y-4">
                         <HelpCircle className="h-10 w-10 text-neutral-600 mx-auto animate-pulse" />
                         <h4 className="text-xs font-bold text-neutral-400">Quiz has not been generated yet.</h4>
-                      <button
+                        <button
                           onClick={triggerGenerateQuiz}
                           className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all shadow-md cursor-pointer"
                         >
@@ -3599,28 +3594,26 @@ ${queryText}`;
 
                     {/* Expandable Mind Map Details Panel */}
                     {selectedMindmapNode && (
-                      <div className={`p-4 rounded-xl border text-left space-y-3.5 animate-fade-in ${
-                        theme === 'dark' ? 'bg-[#121318] border-neutral-900' : 'bg-white border-gray-200'
-                      }`}>
+                      <div className={`p-4 rounded-xl border text-left space-y-3.5 animate-fade-in ${theme === 'dark' ? 'bg-[#121318] border-neutral-900' : 'bg-white border-gray-200'
+                        }`}>
                         <div className="flex items-center justify-between border-b border-neutral-800 pb-2">
                           <h4 className="text-xs font-black text-indigo-400 uppercase tracking-widest font-mono">
                             {selectedMindmapNode.label}
                           </h4>
-                          <button 
+                          <button
                             onClick={() => setSelectedMindmapNode(null)}
-                            className={`text-xs font-bold cursor-pointer ${
-                              theme === 'dark' ? 'text-neutral-500 hover:text-white' : 'text-neutral-400 hover:text-neutral-900'
-                            }`}
+                            className={`text-xs font-bold cursor-pointer ${theme === 'dark' ? 'text-neutral-500 hover:text-white' : 'text-neutral-400 hover:text-neutral-900'
+                              }`}
                           >
                             &times;
                           </button>
                         </div>
-                        
+
                         <div className={`text-[11.5px] leading-relaxed ${theme === 'dark' ? 'text-neutral-300' : 'text-neutral-600'}`}>
                           <strong className="text-indigo-400 block text-[9.5px] uppercase font-mono tracking-wider">Definition & Explanation</strong>
                           {renderTextWithCitations(cleanMarkdownText(selectedMindmapNode.desc || selectedMindmapNode.explanation || 'Provides logical synthesis for this section.'))}
                         </div>
-                        
+
                         {selectedMindmapNode.examples && (
                           <div className={`text-[11.5px] leading-relaxed ${theme === 'dark' ? 'text-neutral-300' : 'text-neutral-600'}`}>
                             <strong className="text-indigo-400 block text-[9.5px] uppercase font-mono tracking-wider">Examples & Analogies</strong>
@@ -3631,9 +3624,8 @@ ${queryText}`;
                         {selectedMindmapNode.formula && (
                           <div className={`text-[11.5px] leading-relaxed ${theme === 'dark' ? 'text-neutral-300' : 'text-neutral-600'}`}>
                             <strong className="text-indigo-400 block text-[9.5px] uppercase font-mono tracking-wider">Equations or Theories</strong>
-                            <code className={`block p-2 rounded text-[10px] font-mono mt-1 text-orange-400 border ${
-                              theme === 'dark' ? 'bg-neutral-950/50 border-neutral-900' : 'bg-gray-50 border-gray-200'
-                            }`}>
+                            <code className={`block p-2 rounded text-[10px] font-mono mt-1 text-orange-400 border ${theme === 'dark' ? 'bg-neutral-950/50 border-neutral-900' : 'bg-gray-50 border-gray-200'
+                              }`}>
                               {selectedMindmapNode.formula}
                             </code>
                           </div>
@@ -3666,7 +3658,7 @@ ${queryText}`;
                       if (!userId || !activeSource.id) return;
                       const docRef = doc(db, 'users', userId, 'sources', activeSource.id);
                       await updateDoc(docRef, { presentationBlueprint: updatedBlueprint });
-                      
+
                       // Refresh local sources state list
                       setSources(prev => prev.map(s => s.id === activeSource.id ? { ...s, presentationBlueprint: updatedBlueprint } : s));
                     }}
@@ -3689,7 +3681,7 @@ ${queryText}`;
                           <h4 className="text-[11.5px] font-black">Synthesize Study Podcast</h4>
                           <p className="text-[9.5px] text-neutral-400 mt-0.5">Professor & Student dynamic audio conversation</p>
                         </div>
-                        
+
                         {!isPodcastPlaying ? (
                           <button
                             onClick={startPodcastAudio}
@@ -3766,9 +3758,9 @@ ${queryText}`;
 
                 {/* 9. HANDWRITTEN NOTES TAB */}
                 {activeOutputTab === 'handwritten' && (
-                  <HandwrittenNotesViewer 
-                    lectureData={activeSource} 
-                    theme={theme} 
+                  <HandwrittenNotesViewer
+                    lectureData={activeSource}
+                    theme={theme}
                     isCompiling={isGeneratingNotes || activeSource?.resourceGenerationStatus === 'processing' || activeSource?.status === 'transcribing'}
                   />
                 )}
@@ -3783,15 +3775,14 @@ ${queryText}`;
       {/* URL IMPORT MODAL */}
       {showUrlModal && (
         <div className="fixed inset-0 bg-neutral-950/65 backdrop-blur-xs flex items-center justify-center z-50 p-4 select-none animate-fade-in">
-          <div className={`rounded-2xl max-w-md w-full border p-6 space-y-4 shadow-2xl relative ${
-            theme === 'dark' ? 'bg-[#0d0e12] border-neutral-800 text-white' : 'bg-white border-gray-200 text-gray-900'
-          }`}>
+          <div className={`rounded-2xl max-w-md w-full border p-6 space-y-4 shadow-2xl relative ${theme === 'dark' ? 'bg-[#0d0e12] border-neutral-800 text-white' : 'bg-white border-gray-200 text-gray-900'
+            }`}>
             <div className="flex items-center justify-between pb-3 border-b border-neutral-900/40">
               <h3 className="font-sans font-black text-sm flex items-center gap-1.5">
                 <Globe className="h-4 w-4 text-indigo-400" />
                 <span>Import Online Resource</span>
               </h3>
-              <button 
+              <button
                 onClick={() => setShowUrlModal(false)}
                 className="text-neutral-500 hover:text-white text-xs font-bold cursor-pointer"
               >
@@ -3806,18 +3797,16 @@ ${queryText}`;
                   <button
                     type="button"
                     onClick={() => setUrlType('website')}
-                    className={`flex-1 py-2 px-3 text-xs font-bold border rounded-lg cursor-pointer ${
-                      urlType === 'website' ? 'bg-indigo-600 border-indigo-500 text-white' : 'border-neutral-800 text-neutral-400'
-                    }`}
+                    className={`flex-1 py-2 px-3 text-xs font-bold border rounded-lg cursor-pointer ${urlType === 'website' ? 'bg-indigo-600 border-indigo-500 text-white' : 'border-neutral-800 text-neutral-400'
+                      }`}
                   >
                     Website URL
                   </button>
                   <button
                     type="button"
                     onClick={() => setUrlType('youtube')}
-                    className={`flex-1 py-2 px-3 text-xs font-bold border rounded-lg cursor-pointer ${
-                      urlType === 'youtube' ? 'bg-indigo-600 border-indigo-500 text-white' : 'border-neutral-800 text-neutral-400'
-                    }`}
+                    className={`flex-1 py-2 px-3 text-xs font-bold border rounded-lg cursor-pointer ${urlType === 'youtube' ? 'bg-indigo-600 border-indigo-500 text-white' : 'border-neutral-800 text-neutral-400'
+                      }`}
                   >
                     YouTube Link
                   </button>
@@ -3832,9 +3821,8 @@ ${queryText}`;
                   value={urlInput}
                   onChange={(e) => setUrlInput(e.target.value)}
                   placeholder="https://example.com/article"
-                  className={`w-full rounded-xl text-xs font-semibold outline-none p-3 mt-1.5 ${
-                    theme === 'dark' ? 'bg-neutral-950 border border-neutral-800 text-white' : 'bg-gray-100 border border-gray-300 text-black'
-                  }`}
+                  className={`w-full rounded-xl text-xs font-semibold outline-none p-3 mt-1.5 ${theme === 'dark' ? 'bg-neutral-950 border border-neutral-800 text-white' : 'bg-gray-100 border border-gray-300 text-black'
+                    }`}
                 />
               </div>
 
@@ -3861,15 +3849,14 @@ ${queryText}`;
       {/* GOOGLE DRIVE MOCK MODAL */}
       {showDriveModal && (
         <div className="fixed inset-0 bg-neutral-950/65 backdrop-blur-xs flex items-center justify-center z-50 p-4 select-none animate-fade-in">
-          <div className={`rounded-2xl max-w-lg w-full border p-6 space-y-4 shadow-2xl relative ${
-            theme === 'dark' ? 'bg-[#0d0e12] border-neutral-800 text-white' : 'bg-white border-gray-200 text-gray-900'
-          }`}>
+          <div className={`rounded-2xl max-w-lg w-full border p-6 space-y-4 shadow-2xl relative ${theme === 'dark' ? 'bg-[#0d0e12] border-neutral-800 text-white' : 'bg-white border-gray-200 text-gray-900'
+            }`}>
             <div className="flex items-center justify-between pb-3 border-b border-neutral-900/40">
               <h3 className="font-sans font-black text-sm flex items-center gap-1.5">
                 <HardDrive className="h-4 w-4 text-blue-400" />
                 <span>Import Google Drive Materials</span>
               </h3>
-              <button 
+              <button
                 onClick={() => setShowDriveModal(false)}
                 className="text-neutral-500 hover:text-white text-xs font-bold cursor-pointer"
               >
@@ -3909,8 +3896,8 @@ ${queryText}`;
               <div className="space-y-3">
                 <div className="flex justify-between items-center bg-green-500/10 border border-green-500/20 px-3.5 py-2 rounded-xl">
                   <span className="text-[10.5px] text-green-400 font-bold">✓ Connected: scholar.session@google.edu</span>
-                  <button 
-                    onClick={() => setIsDriveConnected(false)} 
+                  <button
+                    onClick={() => setIsDriveConnected(false)}
                     className="text-[9.5px] text-neutral-400 hover:text-white hover:underline cursor-pointer"
                   >
                     Disconnect
@@ -3922,9 +3909,8 @@ ${queryText}`;
                     <div
                       key={fIdx}
                       onClick={() => handleImportDriveFile(file)}
-                      className={`rounded-xl border p-3 flex justify-between items-center transition-all hover:border-blue-500 cursor-pointer ${
-                        theme === 'dark' ? 'border-neutral-900 bg-neutral-950/40' : 'border-gray-200 bg-white'
-                      }`}
+                      className={`rounded-xl border p-3 flex justify-between items-center transition-all hover:border-blue-500 cursor-pointer ${theme === 'dark' ? 'border-neutral-900 bg-neutral-950/40' : 'border-gray-200 bg-white'
+                        }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         {getSourceIcon(file.type)}
@@ -3948,15 +3934,14 @@ ${queryText}`;
       {/* PDF CUSTOMIZATION MODAL */}
       {showPdfModal && pdfExportData && (
         <div className="fixed inset-0 bg-neutral-950/65 backdrop-blur-xs flex items-center justify-center z-50 p-4 select-none animate-fade-in">
-          <div className={`rounded-2xl max-w-md w-full border p-6 space-y-4 shadow-2xl relative ${
-            theme === 'dark' ? 'bg-[#0d0e12] border-neutral-800 text-white' : 'bg-white border-gray-200 text-gray-900'
-          }`}>
+          <div className={`rounded-2xl max-w-md w-full border p-6 space-y-4 shadow-2xl relative ${theme === 'dark' ? 'bg-[#0d0e12] border-neutral-800 text-white' : 'bg-white border-gray-200 text-gray-900'
+            }`}>
             <div className="flex items-center justify-between pb-3 border-b border-neutral-900/40">
               <h3 className="font-sans font-black text-sm flex items-center gap-1.5">
                 <FileText className="h-4 w-4 text-indigo-400" />
                 <span>Configure PDF Document Theme</span>
               </h3>
-              <button 
+              <button
                 onClick={() => { setShowPdfModal(false); setPdfExportData(null); }}
                 className="text-neutral-500 hover:text-white text-xs font-bold cursor-pointer"
               >
@@ -3973,11 +3958,10 @@ ${queryText}`;
                       key={t}
                       type="button"
                       onClick={() => setSelectedPdfTheme(t)}
-                      className={`py-2 px-3 text-xs font-bold border rounded-lg cursor-pointer capitalize transition-all ${
-                        selectedPdfTheme === t 
-                          ? 'bg-indigo-600 border-indigo-500 text-white' 
-                          : theme === 'dark' ? 'border-neutral-800 text-neutral-400 hover:border-neutral-700' : 'border-gray-200 text-gray-700 hover:border-gray-300'
-                      }`}
+                      className={`py-2 px-3 text-xs font-bold border rounded-lg cursor-pointer capitalize transition-all ${selectedPdfTheme === t
+                        ? 'bg-indigo-600 border-indigo-500 text-white'
+                        : theme === 'dark' ? 'border-neutral-800 text-neutral-400 hover:border-neutral-700' : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                        }`}
                     >
                       {t} Style
                     </button>
@@ -4013,15 +3997,14 @@ ${queryText}`;
       {/* PPT PRESENTATION CUSTOMIZATION MODAL */}
       {showPptModal && (
         <div className="fixed inset-0 bg-neutral-950/65 backdrop-blur-xs flex items-center justify-center z-50 p-4 select-none animate-fade-in">
-          <div className={`rounded-2xl max-w-md w-full border p-6 space-y-4 shadow-2xl relative ${
-            theme === 'dark' ? 'bg-[#0d0e12] border-neutral-800 text-white' : 'bg-white border-gray-200 text-gray-900'
-          }`}>
+          <div className={`rounded-2xl max-w-md w-full border p-6 space-y-4 shadow-2xl relative ${theme === 'dark' ? 'bg-[#0d0e12] border-neutral-800 text-white' : 'bg-white border-gray-200 text-gray-900'
+            }`}>
             <div className="flex items-center justify-between pb-3 border-b border-neutral-900/40">
               <h3 className="font-sans font-black text-sm flex items-center gap-1.5">
                 <Sparkles className="h-4 w-4 text-indigo-400" />
                 <span>AI PowerPoint Presentation Settings</span>
               </h3>
-              <button 
+              <button
                 onClick={() => setShowPptModal(false)}
                 className="text-neutral-500 hover:text-white text-xs font-bold cursor-pointer"
               >
@@ -4038,11 +4021,10 @@ ${queryText}`;
                       key={t}
                       type="button"
                       onClick={() => setPptTheme(t)}
-                      className={`py-2 px-1 text-[10px] font-bold border rounded-lg cursor-pointer capitalize transition-all ${
-                        pptTheme === t 
-                          ? 'bg-indigo-600 border-indigo-500 text-white' 
-                          : theme === 'dark' ? 'border-neutral-800 text-neutral-400 hover:border-neutral-700' : 'border-gray-200 text-gray-700 hover:border-gray-300'
-                      }`}
+                      className={`py-2 px-1 text-[10px] font-bold border rounded-lg cursor-pointer capitalize transition-all ${pptTheme === t
+                        ? 'bg-indigo-600 border-indigo-500 text-white'
+                        : theme === 'dark' ? 'border-neutral-800 text-neutral-400 hover:border-neutral-700' : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                        }`}
                     >
                       {t === 'startup' ? 'Startup' : t === 'cyber' ? 'Cyber Neon' : t === 'glass' ? 'Dark Glass' : t}
                     </button>
@@ -4058,11 +4040,10 @@ ${queryText}`;
                       key={l}
                       type="button"
                       onClick={() => setPptLength(l)}
-                      className={`flex-1 py-2 text-xs font-bold border rounded-lg cursor-pointer transition-all ${
-                        pptLength === l 
-                          ? 'bg-indigo-600 border-indigo-500 text-white' 
-                          : theme === 'dark' ? 'border-neutral-800 text-neutral-400' : 'border-gray-200 text-gray-700'
-                      }`}
+                      className={`flex-1 py-2 text-xs font-bold border rounded-lg cursor-pointer transition-all ${pptLength === l
+                        ? 'bg-indigo-600 border-indigo-500 text-white'
+                        : theme === 'dark' ? 'border-neutral-800 text-neutral-400' : 'border-gray-200 text-gray-700'
+                        }`}
                     >
                       {l} Slides
                     </button>

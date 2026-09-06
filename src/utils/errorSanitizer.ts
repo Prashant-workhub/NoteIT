@@ -21,8 +21,42 @@ export function formatUserFriendlyErrorMessage(error: any, actionPrefix?: string
   const msgLower = rawMessage.toLowerCase();
   let friendlyMessage = '';
 
-  // 1. OpenRouter Credit Limit / HTTP 402 Payment Required
+  // 3. User Unauthenticated / Session Expired / Unauthorized Access
   if (
+    msgLower.includes('user not authenticated') ||
+    msgLower.includes('not authenticated') ||
+    msgLower.includes('unauthenticated') ||
+    msgLower.includes('session expired') ||
+    msgLower.includes('auth/session-expired') ||
+    msgLower.includes('permission-denied') ||
+    msgLower.includes('requires-auth')
+  ) {
+    friendlyMessage = "Session expired or unauthenticated. Please log in to your account to continue.";
+  }
+  // 3b. Firebase Auth Credentials & Sign-In Errors
+  else if (msgLower.includes('auth/invalid-credential') || msgLower.includes('auth/wrong-password') || msgLower.includes('auth/user-not-found')) {
+    friendlyMessage = "Invalid email or password. Please check your credentials and try again.";
+  } else if (msgLower.includes('auth/email-already-in-use')) {
+    friendlyMessage = "An account with this email address already exists. Please sign in instead.";
+  } else if (msgLower.includes('auth/popup-closed-by-user')) {
+    friendlyMessage = "Sign-in popup was closed before completing authentication.";
+  }
+  // 3c. Invalid API Key / Provider Unauthorized
+  else if (
+    msgLower.includes('401') ||
+    msgLower.includes('403') ||
+    msgLower.includes('invalid_key') ||
+    msgLower.includes('invalid api key') ||
+    msgLower.includes('api_key_invalid') ||
+    msgLower.includes('unauthorized') ||
+    msgLower.includes('permission denied') ||
+    msgLower.includes('authentication failed') ||
+    msgLower.includes('bad_api_key')
+  ) {
+    friendlyMessage = "Your API key is invalid or unauthorized. Please verify your API key in Settings.";
+  }
+  // 1. OpenRouter Credit Limit / HTTP 402 Payment Required
+  else if (
     msgLower.includes('402') ||
     msgLower.includes('more credits') ||
     msgLower.includes('can only afford') ||
@@ -58,20 +92,6 @@ export function formatUserFriendlyErrorMessage(error: any, actionPrefix?: string
     msgLower.includes('timed out')
   ) {
     friendlyMessage = "Unable to reach the server. Please check your internet connection or try again shortly.";
-  }
-  // 3. Invalid API Key / Unauthorized / Authentication Failures
-  else if (
-    msgLower.includes('401') ||
-    msgLower.includes('403') ||
-    msgLower.includes('invalid_key') ||
-    msgLower.includes('invalid api key') ||
-    msgLower.includes('api_key_invalid') ||
-    msgLower.includes('unauthorized') ||
-    msgLower.includes('permission denied') ||
-    msgLower.includes('authentication failed') ||
-    msgLower.includes('bad_api_key')
-  ) {
-    friendlyMessage = "Your API key is invalid or unauthorized. Please verify your API key in Settings.";
   }
   // 4. Service Overloaded / Temporarily Unavailable
   else if (
@@ -111,19 +131,21 @@ export function formatUserFriendlyErrorMessage(error: any, actionPrefix?: string
   ) {
     friendlyMessage = "Transcript is missing or empty. Please record or transcribe the lecture first.";
   }
-  // 7. Generic technical / stack trace / raw JSON strings
+  // 7. Technical stack traces or raw developer errors
   else if (
     msgLower.includes('json') ||
     msgLower.includes('syntaxerror') ||
     msgLower.includes('typeerror') ||
     msgLower.includes('[object object]') ||
-    msgLower.includes('unexpected token')
+    msgLower.includes('unexpected token') ||
+    msgLower.includes('at ') ||
+    msgLower.includes('index-')
   ) {
-    friendlyMessage = "An unexpected issue occurred while processing request. Please try again.";
+    friendlyMessage = "An unexpected issue occurred while processing the request. Please try again.";
   }
   // 8. Clean readable prose fallback
   else {
-    friendlyMessage = rawMessage;
+    friendlyMessage = rawMessage.replace(/at\s+[\s\S]+/g, '').replace(/https?:\/\/[^\s]+/g, '').trim();
   }
 
   if (actionPrefix) {

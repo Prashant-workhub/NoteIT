@@ -1272,7 +1272,10 @@ export default function LectureCaptureView({
     const activeLecture = lectures.find(l => l.id === activeLectureId);
     if (!activeLecture || isGeneratingNotes) return;
     const uid = auth.currentUser?.uid;
-    if (!uid) return;
+    if (!uid) {
+      setUiError("Session expired or unauthenticated. Please log in to continue.");
+      return;
+    }
 
     const textContent = activeLecture.transcript || activeLecture.cleanTranscript || '';
     if (!textContent.trim()) {
