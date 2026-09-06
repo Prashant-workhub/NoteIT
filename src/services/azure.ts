@@ -26,6 +26,20 @@ export interface AzureSasResponse {
 }
 
 /**
+ * Sanitizes any storage URL returned by the backend.
+ * If API_BASE_URL is pointing to a remote production backend (e.g. Render),
+ * automatically rewrites any localhost/127.0.0.1 origins in the URL to use API_BASE_URL.
+ */
+export const sanitizeStorageUrl = (url: string): string => {
+  if (!url) return url;
+  if (API_BASE_URL && !API_BASE_URL.includes('localhost') && !API_BASE_URL.includes('127.0.0.1')) {
+    const cleanApiBase = API_BASE_URL.replace(/\/$/, '');
+    return url.replace(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i, cleanApiBase);
+  }
+  return url;
+};
+
+/**
  * Request an Azure SAS upload URL from the local backend
  */
 export const getAzureUploadSasUrl = async (fileName: string): Promise<AzureSasResponse> => {
@@ -56,8 +70,14 @@ export const getAzureUploadSasUrl = async (fileName: string): Promise<AzureSasRe
   }
 
   const responseBody = await response.json();
-  logDiagnostic('GET', requestUrl, !!idToken, response.status, responseBody);
-  return responseBody;
+  const sanitizedResponseBody: AzureSasResponse = {
+    ...responseBody,
+    uploadUrl: sanitizeStorageUrl(responseBody.uploadUrl),
+    audioUrl: sanitizeStorageUrl(responseBody.audioUrl)
+  };
+
+  logDiagnostic('GET', requestUrl, !!idToken, response.status, sanitizedResponseBody);
+  return sanitizedResponseBody;
 };
 
 /**
@@ -68,10 +88,11 @@ export const uploadBlobToAzure = (
   blob: Blob,
   onProgress: (progress: number) => void
 ): Promise<void> => {
+  const sanitizedUrl = sanitizeStorageUrl(uploadUrl);
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
 
-    xhr.open('PUT', uploadUrl, true);
+    xhr.open('PUT', sanitizedUrl, true);
 
     // Required headers for Azure Block Blob storage uploads
     xhr.setRequestHeader('x-ms-blob-type', 'BlockBlob');
@@ -134,8 +155,9 @@ export const getAzureReadSasUrl = async (blobPath: string): Promise<string> => {
   }
 
   const responseBody = await response.json();
-  logDiagnostic('GET', requestUrl, !!idToken, response.status, responseBody);
-  return responseBody.readUrl;
+  const readUrl = sanitizeStorageUrl(responseBody.readUrl);
+  logDiagnostic('GET', requestUrl, !!idToken, response.status, { readUrl });
+  return readUrl;
 };
 
 /**
