@@ -9,7 +9,7 @@ import { OpenRouterAdapter } from './ValidationAdapters';
 export async function postOpenRouterWithCreditFallback(
   apiKey: string,
   payload: any,
-  requestedMaxTokens: number = 2048
+  requestedMaxTokens?: number
 ): Promise<any> {
   const attemptRequest = async (modelName: string, tokens?: number): Promise<Response> => {
     const body: any = { ...payload, model: modelName };
@@ -135,7 +135,7 @@ export class OpenRouterProvider extends BaseProvider {
       messages: [{ role: 'user', content: prompt }]
     };
 
-    const data = await postOpenRouterWithCreditFallback(this.apiKey, payload, 4096);
+    const data = await postOpenRouterWithCreditFallback(this.apiKey, payload, undefined);
     return data.choices?.[0]?.message?.content || '';
   }
 
@@ -147,7 +147,7 @@ export class OpenRouterProvider extends BaseProvider {
       response_format: { type: 'json_object' }
     };
 
-    const data = await postOpenRouterWithCreditFallback(this.apiKey, payload, 4096);
+    const data = await postOpenRouterWithCreditFallback(this.apiKey, payload, undefined);
     const text = data.choices?.[0]?.message?.content || '';
     return safeJsonParse(text);
   }

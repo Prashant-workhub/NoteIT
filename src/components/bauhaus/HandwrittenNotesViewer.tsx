@@ -12,6 +12,139 @@ interface HandwrittenNotesViewerProps {
   isCompiling?: boolean;
 }
 
+function cleanMarkdownText(str: string): string {
+  if (!str) return '';
+  return str
+    .replace(/^#{1,6}\s+/, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/`(.*?)`/g, '$1')
+    .replace(/\[Source:\s*[^\]]+\]/g, '')
+    .trim();
+}
+
+function parseMarkdownToHandwrittenSections(rawMarkdown: string) {
+  if (!rawMarkdown || typeof rawMarkdown !== 'string') {
+    return { title: '', overview: '', keyPoints: [], sections: [], remember: '', examFocus: '' };
+  }
+
+  const lines = rawMarkdown.split('\n');
+  let title = '';
+  let overview = '';
+  const keyPoints: string[] = [];
+  const sections: Array<{
+    title: string;
+    content: string[];
+    table?: Array<{ col1: string; col2: string }>;
+  }> = [];
+  let remember = '';
+  let examFocus = '';
+
+  let currentTitle = '';
+  let currentContentLines: string[] = [];
+  let currentTable: Array<{ col1: string; col2: string }> = [];
+
+  const flushSection = () => {
+    if (currentTitle || currentContentLines.length > 0 || currentTable.length > 0) {
+      sections.push({
+        title: cleanMarkdownText(currentTitle) || 'Key Concepts',
+        content: currentContentLines.map(l => cleanMarkdownText(l)).filter(Boolean),
+        table: currentTable.length > 0 ? [...currentTable] : undefined
+      });
+      currentTitle = '';
+      currentContentLines = [];
+      currentTable = [];
+    }
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const rawLine = lines[i];
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    if (line.startsWith('# ') && !title) {
+      title = cleanMarkdownText(line);
+      continue;
+    }
+
+    if (line.startsWith('## ')) {
+      const h2Text = line.replace(/^##\s+/, '').trim();
+
+      if (/brief overview|overview|introduction/i.test(h2Text)) {
+        flushSection();
+        let j = i + 1;
+        let ovText = '';
+        while (j < lines.length && !lines[j].trim().startsWith('#')) {
+          ovText += lines[j].trim() + ' ';
+          j++;
+        }
+        overview = cleanMarkdownText(ovText);
+        i = j - 1;
+        continue;
+      }
+
+      if (/remember/i.test(h2Text)) {
+        flushSection();
+        let j = i + 1;
+        let remText = '';
+        while (j < lines.length && !lines[j].trim().startsWith('#')) {
+          remText += lines[j].trim() + ' ';
+          j++;
+        }
+        remember = cleanMarkdownText(remText);
+        i = j - 1;
+        continue;
+      }
+
+      if (/exam focus|exam/i.test(h2Text)) {
+        flushSection();
+        let j = i + 1;
+        let efText = '';
+        while (j < lines.length && !lines[j].trim().startsWith('#')) {
+          efText += lines[j].trim() + ' ';
+          j++;
+        }
+        examFocus = cleanMarkdownText(efText);
+        i = j - 1;
+        continue;
+      }
+
+      if (/key points/i.test(h2Text)) {
+        flushSection();
+        let j = i + 1;
+        while (j < lines.length && !lines[j].trim().startsWith('#')) {
+          const kpLine = lines[j].trim();
+          if (kpLine.startsWith('- ') || kpLine.startsWith('* ')) {
+            keyPoints.push(cleanMarkdownText(kpLine.replace(/^[-*]\s+/, '')));
+          }
+          j++;
+        }
+        i = j - 1;
+        continue;
+      }
+
+      flushSection();
+      currentTitle = h2Text;
+      continue;
+    }
+
+    if (line.startsWith('|') && line.endsWith('|')) {
+      if (line.includes('---')) continue;
+      const cells = line.split('|').map(c => cleanMarkdownText(c)).filter(Boolean);
+      if (cells.length >= 2) {
+        currentTable.push({ col1: cells[0], col2: cells[1] });
+      }
+      continue;
+    }
+
+    currentContentLines.push(line);
+  }
+
+  flushSection();
+
+  return { title, overview, keyPoints, sections, remember, examFocus };
+}
+
 export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
   lectureData,
   theme = 'light',
@@ -36,39 +169,45 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
     lectureData?.status === 'generating' ||
     lectureData?.status === 'processing';
 
-  // Extract structured notes knowledge from lecture data
-  const title = lectureData?.title || 'Lecture Study Notes';
-  const overview = lectureData?.summary || lectureData?.notes?.overview || (typeof lectureData?.notes === 'string' ? lectureData.notes : '') || '';
+  // Extract raw text sources
+  const rawNotesString = 
+    (typeof lectureData?.notes === 'string' ? lectureData.notes : '') ||
+    lectureData?.notes?.academic ||
+    lectureData?.notes?.detailed ||
+    (typeof lectureData?.content === 'string' ? lectureData.content : '') ||
+    '';
 
-  // Extract all sections/topics dynamically
-  let sections: Array<{ title: string; content: string }> = [];
-  if (Array.isArray(lectureData?.sections) && lectureData.sections.length > 0) {
+  const parsedMarkdown = React.useMemo(() => {
+    return parseMarkdownToHandwrittenSections(rawNotesString);
+  }, [rawNotesString]);
+
+  const title = cleanMarkdownText(parsedMarkdown.title || lectureData?.title || 'Lecture Study Notes');
+  const overview = cleanMarkdownText(parsedMarkdown.overview || lectureData?.summary || lectureData?.notes?.overview || '');
+
+  // Build sections list dynamically
+  let sections: Array<{ title: string; content: string | string[]; table?: Array<{ col1: string; col2: string }> }> = [];
+
+  if (parsedMarkdown.sections.length > 0) {
+    sections = parsedMarkdown.sections;
+  } else if (Array.isArray(lectureData?.sections) && lectureData.sections.length > 0) {
     sections = lectureData.sections.map((s: any) => ({
-      title: s.title || s.heading || 'Topic Section',
-      content: s.content || s.explanation || s.summary || ''
+      title: cleanMarkdownText(s.title || s.heading || 'Topic Section'),
+      content: cleanMarkdownText(s.content || s.explanation || s.summary || '')
     }));
   } else if (Array.isArray(lectureData?.notes) && lectureData.notes.length > 0) {
     sections = lectureData.notes.map((n: any) => ({
-      title: n.title || n.heading || 'Topic Section',
-      content: typeof n.content === 'string' ? n.content : (Array.isArray(n.details) ? n.details.join('. ') : JSON.stringify(n.content))
+      title: cleanMarkdownText(n.title || n.heading || 'Topic Section'),
+      content: typeof n.content === 'string' ? cleanMarkdownText(n.content) : (Array.isArray(n.details) ? n.details.map(cleanMarkdownText).join('. ') : JSON.stringify(n.content))
     }));
-  } else if (typeof lectureData?.content === 'string' && lectureData.content.trim().length > 0) {
-    const paragraphs = lectureData.content.split(/\n\s*\n/).map((p: string) => p.trim()).filter((p: string) => p.length > 20);
-    sections = paragraphs.map((p: string, idx: number) => {
-      const lines = p.split('\n');
-      const firstLine = lines[0].replace(/^#{1,4}\s+/, '').trim();
-      const body = lines.length > 1 ? lines.slice(1).join(' ') : p;
-      return {
-        title: firstLine.length > 0 && firstLine.length < 70 ? firstLine : `Topic Section ${idx + 1}`,
-        content: body
-      };
-    });
+  } else if (overview) {
+    sections = [{ title: 'Overview & Foundations', content: overview }];
   }
 
   // Key terms & formulas
   const sourceIntel = lectureData?.sourceIntelligence || {};
-  const keyTerms: string[] = sourceIntel.keyTerms || [];
-  const formulas: string[] = sourceIntel.formulas || [];
+  const keyTerms: string[] = (sourceIntel.keyTerms || []).map(cleanMarkdownText);
+  const formulas: string[] = (sourceIntel.formulas || []).map(cleanMarkdownText);
+  const keyPoints: string[] = (parsedMarkdown.keyPoints || []).map(cleanMarkdownText);
 
   const hasNotesContent = sections.length > 0 || (overview && overview.trim().length > 0);
 
@@ -81,14 +220,14 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
       header: string;
       items: Array<{
         title: string;
-        type: 'text' | 'concept' | 'diagram' | 'formula' | 'terms' | 'bullets';
+        type: 'text' | 'concept' | 'diagram' | 'formula' | 'terms' | 'bullets' | 'table' | 'remember' | 'examFocus';
         content: any;
       }>;
     }> = [];
 
     // STRICT ADMINISTRATIVE NOISE FILTER
     const noiseRegex = /co-po|course outcome|program outcome|\bco[1-6]\b|\bpo[1-6]\b|table of content|\bindex\b|syllabus|faculty|office hour|grading|prerequisites|unit details/i;
-    const cleanSections = sections.filter(s => !noiseRegex.test(s.title || '') && !noiseRegex.test(s.content || ''));
+    const cleanSections = sections.filter(s => !noiseRegex.test(s.title || '') && !noiseRegex.test(Array.isArray(s.content) ? s.content.join(' ') : s.content || ''));
 
     const allSections = cleanSections.length > 0 ? cleanSections : [
       { title: 'Core Concepts & Overview', content: overview || 'High-yield revision sheet compiled from source material.' }
@@ -107,7 +246,16 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
         pageItems.push({
           title: 'CORE TOPIC SYNTHESIS',
           type: 'text',
-          content: overview.replace(/\[Source:\s*[^\]]+\]/g, '').trim()
+          content: overview
+        });
+      }
+
+      // Include Key Points if available
+      if (p === 0 && keyPoints.length > 0) {
+        pageItems.push({
+          title: 'KEY REVISION POINTS',
+          type: 'bullets',
+          content: keyPoints
         });
       }
 
@@ -116,11 +264,30 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
         pageItems.push({
           title: sec.title.toUpperCase(),
           type: 'concept',
-          content: sec.content
+          content: sec.content,
+          table: sec.table
         });
       });
 
-      // Include Formulas ONLY ONCE on the final page if present
+      // Include Remember Sticky Note on final page if present
+      if (p === pageCount - 1 && parsedMarkdown.remember) {
+        pageItems.push({
+          title: 'REMEMBER FOR EXAMS',
+          type: 'remember',
+          content: parsedMarkdown.remember
+        });
+      }
+
+      // Include Exam Focus Card on final page if present
+      if (p === pageCount - 1 && parsedMarkdown.examFocus) {
+        pageItems.push({
+          title: 'EXAM FOCUS & TIP',
+          type: 'examFocus',
+          content: parsedMarkdown.examFocus
+        });
+      }
+
+      // Include Formulas ONLY ONCE on final page if present
       if (p === pageCount - 1 && formulas.length > 0) {
         pageItems.push({
           title: 'KEY FORMULAS & EQUATIONS',
@@ -129,7 +296,7 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
         });
       }
 
-      // Include Key Terminology ONLY ONCE on the final page if present
+      // Include Key Terminology ONLY ONCE on final page if present
       if (p === pageCount - 1 && keyTerms.length > 0) {
         pageItems.push({
           title: 'KEY TERMINOLOGY',
@@ -147,7 +314,7 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
     }
 
     return pagesResult;
-  }, [sections, overview, formulas, keyTerms, hasNotesContent]);
+  }, [sections, overview, keyPoints, formulas, keyTerms, hasNotesContent, parsedMarkdown]);
 
   // RENDERING GATES: No preview until loaded properly
   if (isCompilingState) {
@@ -318,15 +485,61 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
                   </div>
 
                   {/* ITEM CONTENT BASED ON TYPE */}
-                  {item.type === 'text' && (
-                    <div className="pl-2 text-lg font-bold leading-snug text-[#0F294A]">
-                      <p className="whitespace-pre-line">{item.content}</p>
+                  {(item.type === 'text' || item.type === 'concept') && (
+                    <div className="pl-2 space-y-2 text-lg font-bold leading-snug text-[#0F294A]">
+                      {Array.isArray(item.content) ? (
+                        item.content.map((pLine: string, pIdx: number) => (
+                          <p key={pIdx} className="leading-snug">
+                            {pLine.startsWith('- ') || pLine.startsWith('* ') ? (
+                              <span className="flex items-start gap-2">
+                                <span className="text-amber-500 font-extrabold">•</span>
+                                <span>{pLine.replace(/^[-*]\s+/, '')}</span>
+                              </span>
+                            ) : (
+                              pLine
+                            )}
+                          </p>
+                        ))
+                      ) : (
+                        <p className="whitespace-pre-line">{item.content}</p>
+                      )}
+
+                      {/* RENDER HANDWRITTEN TABLE IF PRESENT */}
+                      {item.table && item.table.length > 0 && (
+                        <div className="my-4 overflow-hidden rounded-[6px] border-2 border-[#2563EB] bg-[#FAF8F5] p-3 shadow-sm">
+                          <div className="text-xs font-mono font-bold uppercase text-[#2563EB] mb-2">Structured Reference Table</div>
+                          <table className="w-full text-left border-collapse text-base font-extrabold">
+                            <thead>
+                              <tr className="border-b-2 border-[#2563EB] bg-[#E2E8F0] text-[#0F294A]">
+                                <th className="p-2 border-r border-[#CBD5E1] font-black">{item.table[0]?.col1 || 'Field'}</th>
+                                <th className="p-2 font-black">{item.table[0]?.col2 || 'Value'}</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {item.table.slice(1).map((row: any, rIdx: number) => (
+                                <tr key={rIdx} className="border-b border-[#CBD5E1] last:border-b-0 hover:bg-[#F1F5F9]">
+                                  <td className="p-2 border-r border-[#CBD5E1] font-bold text-[#1E293B]">{row.col1}</td>
+                                  <td className="p-2 font-bold text-[#0F294A]">{row.col2}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                     </div>
                   )}
 
-                  {item.type === 'concept' && (
-                    <div className="pl-2 space-y-1 text-lg font-bold leading-snug text-[#0F294A]">
-                      <p className="whitespace-pre-line">{item.content}</p>
+                  {item.type === 'remember' && (
+                    <div className="my-3 p-4 rounded-[6px] border-2 border-amber-400 bg-[#FEF3C7] text-[#78350F] shadow-sm space-y-1">
+                      <div className="text-xs font-mono font-black uppercase text-amber-800 tracking-wider">🧠 REMEMBER FOR EXAMS</div>
+                      <p className="text-lg font-extrabold leading-snug">{item.content}</p>
+                    </div>
+                  )}
+
+                  {item.type === 'examFocus' && (
+                    <div className="my-3 p-4 rounded-[6px] border-2 border-blue-400 bg-[#EFF6FF] text-[#1E3A8A] shadow-sm space-y-1">
+                      <div className="text-xs font-mono font-black uppercase text-blue-800 tracking-wider">🎯 EXAM FOCUS & HIGHLIGHT</div>
+                      <p className="text-lg font-extrabold leading-snug">{item.content}</p>
                     </div>
                   )}
 
@@ -378,7 +591,7 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
                     <ul className="space-y-1.5 pl-2 text-lg">
                       {Array.isArray(item.content) && item.content.map((bullet: string, bIdx: number) => (
                         <li key={bIdx} className="flex items-start gap-2">
-                          <span className="text-amber-500 font-extrabold">★</span>
+                          <span className="text-amber-500 font-extrabold">•</span>
                           <span className="font-bold text-[#0F294A] leading-snug">{bullet}</span>
                         </li>
                       ))}

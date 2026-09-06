@@ -163,7 +163,7 @@ ${transcriptText}`;
     response_format: { type: 'json_object' }
   };
 
-  const data = await postOpenRouterWithCreditFallback(apiKey, payload, 4096);
+  const data = await postOpenRouterWithCreditFallback(apiKey, payload, undefined);
   const textContent = data.choices?.[0]?.message?.content || '';
   const cleaned = extractJsonObject(textContent);
   const parsed = JSON.parse(cleaned);
