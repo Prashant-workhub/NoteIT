@@ -9,13 +9,32 @@ import { Download, Printer, ArrowRight } from 'lucide-react';
 interface HandwrittenNotesViewerProps {
   lectureData: any;
   theme?: 'light' | 'dark';
+  isCompiling?: boolean;
 }
 
 export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
   lectureData,
-  theme = 'light'
+  theme = 'light',
+  isCompiling = false
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Check compiling / processing status
+  const isCompilingState = 
+    isCompiling ||
+    lectureData?.isGeneratingNotes ||
+    lectureData?.isGeneratingSummary ||
+    lectureData?.isGenerating ||
+    lectureData?.isCompiling ||
+    lectureData?.isProcessing ||
+    lectureData?.resourceGenerationStatus === 'processing' ||
+    lectureData?.resourceGenerationStatus === 'generating' ||
+    lectureData?.resourceGenerationStatus === 'transcribing' ||
+    lectureData?.resourceGenerationStatus === 'queued' ||
+    lectureData?.status === 'transcribing' ||
+    lectureData?.status === 'analyzing' ||
+    lectureData?.status === 'generating' ||
+    lectureData?.status === 'processing';
 
   // Extract structured notes knowledge from lecture data
   const title = lectureData?.title || 'Lecture Study Notes';
@@ -51,9 +70,13 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
   const keyTerms: string[] = sourceIntel.keyTerms || [];
   const formulas: string[] = sourceIntel.formulas || [];
 
+  const hasNotesContent = sections.length > 0 || (overview && overview.trim().length > 0);
+
   // Build handwritten notes pages dynamically covering ALL real academic topics
-  const generateHandwrittenPages = () => {
-    const pages: Array<{
+  const pages = React.useMemo(() => {
+    if (!hasNotesContent) return [];
+
+    const pagesResult: Array<{
       pageNumber: number;
       header: string;
       items: Array<{
@@ -65,20 +88,18 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
 
     // STRICT ADMINISTRATIVE NOISE FILTER
     const noiseRegex = /co-po|course outcome|program outcome|\bco[1-6]\b|\bpo[1-6]\b|table of content|\bindex\b|syllabus|faculty|office hour|grading|prerequisites|unit details/i;
-    const cleanSections = (sections.length > 0 ? sections : [
-      { title: 'Core Concepts & Overview', content: overview || 'High-yield revision sheet compiled from source material.' }
-    ]).filter(s => !noiseRegex.test(s.title || '') && !noiseRegex.test(s.content || ''));
+    const cleanSections = sections.filter(s => !noiseRegex.test(s.title || '') && !noiseRegex.test(s.content || ''));
 
     const allSections = cleanSections.length > 0 ? cleanSections : [
       { title: 'Core Concepts & Overview', content: overview || 'High-yield revision sheet compiled from source material.' }
     ];
 
-    // Pack 2-3 real concept sections per A4 sheet
-    const sectionsPerPage = Math.max(2, Math.min(4, Math.ceil(allSections.length / Math.max(1, Math.ceil(allSections.length / 3)))));
-    const pageCount = Math.max(1, Math.ceil(allSections.length / sectionsPerPage));
+    // DETERMINISTIC PACKING: Exactly 2 concept sections per A4 sheet
+    const SECTIONS_PER_PAGE = 2;
+    const pageCount = Math.ceil(allSections.length / SECTIONS_PER_PAGE);
 
     for (let p = 0; p < pageCount; p++) {
-      const pageSections = allSections.slice(p * sectionsPerPage, (p + 1) * sectionsPerPage);
+      const pageSections = allSections.slice(p * SECTIONS_PER_PAGE, (p + 1) * SECTIONS_PER_PAGE);
       const pageItems: any[] = [];
 
       // Include Overview synthesis on page 1 if available
@@ -118,17 +139,64 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
       }
 
       const sectionNum = String(p + 1).padStart(2, '0');
-      pages.push({
+      pagesResult.push({
         pageNumber: p + 1,
         header: `SECTION ${sectionNum} — ${p === 0 ? 'CONCEPTUAL FOUNDATIONS' : p === 1 ? 'ADVANCED TOPICS & ARCHITECTURE' : 'REVISION & EXAM CHEAT SHEET'}`,
         items: pageItems
       });
     }
 
-    return pages;
-  };
+    return pagesResult;
+  }, [sections, overview, formulas, keyTerms, hasNotesContent]);
 
-  const pages = generateHandwrittenPages();
+  // RENDERING GATES: No preview until loaded properly
+  if (isCompilingState) {
+    return (
+      <div className="handwritten-workspace space-y-6 select-none p-6">
+        <div className="p-8 rounded-[8px] border-2 border-[#111111] bg-[#F6F2EA] shadow-paper-md text-center space-y-6 max-w-2xl mx-auto my-8">
+          <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
+            <div className="absolute inset-0 rounded-full border-4 border-[#FFC400] border-t-transparent animate-spin" />
+            <span className="text-2xl">📝</span>
+          </div>
+          <div className="space-y-2">
+            <span className="px-3 py-1 rounded-[4px] bg-[#1E3A8A] text-white text-[10px] font-mono font-extrabold uppercase tracking-wider border border-[#111111] shadow-paper-sm">
+              COMPILING REVISION SHEET
+            </span>
+            <h3 className="text-lg font-heading font-extrabold text-[#111111] uppercase tracking-tight">
+              AI IS COMPILING HANDWRITTEN REVISION NOTES...
+            </h3>
+            <p className="text-xs font-mono font-bold text-[#475569] max-w-md mx-auto leading-relaxed">
+              Synthesizing A4 handwritten study sheets, concept boxes, formulas & terminology. 
+              Preview will automatically display when note compilation is 100% complete.
+            </p>
+          </div>
+          <div className="w-full bg-[#E2E8F0] h-2.5 rounded-full overflow-hidden border border-[#111111]">
+            <div className="bg-[#2563EB] h-full animate-pulse w-3/4 rounded-full" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!hasNotesContent || pages.length === 0) {
+    return (
+      <div className="handwritten-workspace space-y-6 select-none p-6">
+        <div className="p-8 rounded-[8px] border-2 border-dashed border-[#CBD5E1] bg-[#F8FAFC] text-center space-y-3 max-w-lg mx-auto my-8">
+          <div className="w-12 h-12 rounded-full bg-[#E2E8F0] text-[#64748B] mx-auto flex items-center justify-center text-xl font-bold">
+            📝
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-sm font-mono font-extrabold text-[#334155] uppercase">
+              No Handwritten Notes Available Yet
+            </h3>
+            <p className="text-xs font-mono font-medium text-[#64748B]">
+              Handwritten A4 notes have not been compiled for this lecture yet.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handlePrint = () => {
     window.print();

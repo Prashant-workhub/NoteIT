@@ -35,7 +35,7 @@ import {
 import BruteLoader from './BruteLoader';
 import { PageId, Lecture } from '../types';
 import { blobToBase64, generateLectureContent, generateResourcesFromTranscript } from '../services/gemini';
-import { formatUserFriendlyErrorMessage } from '../utils/errorSanitizer';
+import { formatUserFriendlyErrorMessage, showDeduplicatedAlert } from '../utils/errorSanitizer';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import PresentationWorkspace from './PresentationWorkspace';
 import { db, auth } from '../firebaseConfig';
@@ -1254,7 +1254,7 @@ export default function LectureCaptureView({
       setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: generated }));
     } catch (err: any) {
       console.error("Notes generation failed:", err);
-      alert(formatUserFriendlyErrorMessage(err, "Failed to generate notes"));
+      showDeduplicatedAlert(formatUserFriendlyErrorMessage(err, "Failed to generate notes"));
     } finally {
       setIsGeneratingNotes(false);
     }
@@ -1286,7 +1286,7 @@ export default function LectureCaptureView({
       setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: generated }));
     } catch (err: any) {
       console.error("Summary generation failed:", err);
-      alert(formatUserFriendlyErrorMessage(err, "Failed to generate summary"));
+      showDeduplicatedAlert(formatUserFriendlyErrorMessage(err, "Failed to generate summary"));
     } finally {
       setIsGeneratingSummary(false);
     }
@@ -1323,7 +1323,7 @@ export default function LectureCaptureView({
       setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: generated }));
     } catch (err: any) {
       console.error("Flashcards generation failed:", err);
-      alert(formatUserFriendlyErrorMessage(err, "Failed to generate flashcards"));
+      showDeduplicatedAlert(formatUserFriendlyErrorMessage(err, "Failed to generate flashcards"));
     } finally {
       setIsGeneratingFlashcards(false);
     }
@@ -1358,7 +1358,7 @@ export default function LectureCaptureView({
       setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: newData }));
     } catch (err: any) {
       console.error("Generating more flashcards failed:", err);
-      alert(formatUserFriendlyErrorMessage(err, "Failed to generate more flashcards"));
+      showDeduplicatedAlert(formatUserFriendlyErrorMessage(err, "Failed to generate more flashcards"));
     } finally {
       setIsGeneratingFlashcards(false);
     }
@@ -1391,7 +1391,7 @@ export default function LectureCaptureView({
       setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: generated }));
     } catch (err: any) {
       console.error("Quiz generation failed:", err);
-      alert(formatUserFriendlyErrorMessage(err, "Failed to generate quiz"));
+      showDeduplicatedAlert(formatUserFriendlyErrorMessage(err, "Failed to generate quiz"));
     } finally {
       setIsGeneratingQuiz(false);
     }
@@ -1428,7 +1428,7 @@ export default function LectureCaptureView({
       setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: newData }));
     } catch (err: any) {
       console.error("Generating more quiz questions failed:", err);
-      alert(formatUserFriendlyErrorMessage(err, "Failed to generate more questions"));
+      showDeduplicatedAlert(formatUserFriendlyErrorMessage(err, "Failed to generate more questions"));
     } finally {
       setIsGeneratingQuiz(false);
     }
@@ -1462,7 +1462,7 @@ export default function LectureCaptureView({
       setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: generated }));
     } catch (err: any) {
       console.error("Mindmap generation failed:", err);
-      alert(formatUserFriendlyErrorMessage(err, "Failed to generate mind map"));
+      showDeduplicatedAlert(formatUserFriendlyErrorMessage(err, "Failed to generate mind map"));
     } finally {
       setIsGeneratingMindmap(false);
     }
@@ -1696,7 +1696,7 @@ export default function LectureCaptureView({
                   await generateResourcesFromTranscript(activeLecture.id, text, { mode: 'academic', modeType: 'all' });
                   alert("Notes and AI assets compiled successfully!");
                 } catch (err: any) {
-                  alert(formatUserFriendlyErrorMessage(err, "Note generation paused"));
+                  showDeduplicatedAlert(formatUserFriendlyErrorMessage(err, "Note generation paused"));
                 } finally {
                   setIsGeneratingNotes(false);
                   setIsGeneratingSummary(false);
@@ -2491,7 +2491,11 @@ export default function LectureCaptureView({
 
               {/* 8. HANDWRITTEN NOTES TAB */}
               {activeOutputTab === 'handwritten' && (
-                <HandwrittenNotesViewer lectureData={activeLecture} theme={theme} />
+                <HandwrittenNotesViewer 
+                  lectureData={activeLecture} 
+                  theme={theme} 
+                  isCompiling={isGeneratingNotes || isGeneratingSummary || activeLecture?.resourceGenerationStatus === 'processing' || activeLecture?.status === 'transcribing'}
+                />
               )}
 
               {/* 9. LECTURE CHAT TAB */}

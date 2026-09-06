@@ -9,10 +9,10 @@ import { OpenRouterAdapter } from './ValidationAdapters';
 export async function postOpenRouterWithCreditFallback(
   apiKey: string,
   payload: any,
-  requestedMaxTokens: number = 4096
+  requestedMaxTokens: number = 2048
 ): Promise<any> {
-  const attemptRequest = async (tokens?: number): Promise<Response> => {
-    const body: any = { ...payload };
+  const attemptRequest = async (modelName: string, tokens?: number): Promise<Response> => {
+    const body: any = { ...payload, model: modelName };
     if (tokens !== undefined && tokens > 0) {
       body.max_tokens = tokens;
     } else {
@@ -31,34 +31,52 @@ export async function postOpenRouterWithCreditFallback(
     });
   };
 
+  const initialModel = payload.model || 'google/gemini-3.6-flash';
+
   // 1. Initial Attempt
-  let response = await attemptRequest(requestedMaxTokens);
+  let response = await attemptRequest(initialModel, requestedMaxTokens);
 
-  // 2. Handle HTTP 402 (Insufficient Credits / max_tokens reservation failure)
-  if (!response.ok && response.status === 402) {
-    const errText = await response.text().catch(() => '');
-    console.warn(`[OpenRouter] Received status 402 with max_tokens=${requestedMaxTokens}. Attempting credit-adaptive fallback...`, errText);
+  // 2. Handle HTTP 402 (Insufficient Credits / max_tokens credit reservation failure)
+  if (!response.ok && (response.status === 402 || response.status === 403)) {
+    let errText = await response.text().catch(() => '');
+    console.warn(`[OpenRouter] Received status ${response.status} with model=${initialModel}, max_tokens=${requestedMaxTokens}. Executing credit-adaptive fallback...`, errText);
 
-    // Parse "can only afford <N> tokens" from OpenRouter's error message
+    // Try parsing affordable tokens limit from OpenRouter's 402 response
     const match = errText.match(/can only afford (\d+)/i);
     if (match && match[1]) {
-      const affordableTokens = Math.max(300, Math.floor(parseInt(match[1], 10) * 0.95));
+      const affordableTokens = Math.max(300, Math.floor(parseInt(match[1], 10) * 0.9));
       console.log(`[OpenRouter] Retrying request with affordable max_tokens: ${affordableTokens}`);
-      response = await attemptRequest(affordableTokens);
+      response = await attemptRequest(initialModel, affordableTokens);
     } else {
-      // Omit max_tokens so OpenRouter uses dynamic balance-aware generation
-      console.log(`[OpenRouter] Retrying request without explicit max_tokens constraint...`);
-      response = await attemptRequest(undefined);
+      console.log(`[OpenRouter] Retrying request with reduced max_tokens: 1000`);
+      response = await attemptRequest(initialModel, 1000);
     }
 
-    // 3. Final Fallback if still 402: retry with modest default limit (2000)
-    if (!response.ok && response.status === 402) {
-      console.log(`[OpenRouter] Secondary fallback: retrying with max_tokens: 2000`);
-      response = await attemptRequest(2000);
+    // 3. If still 402/403, AUTOMATIC FAILOVER TO OPENROUTER FREE TIER MODELS ($0 credit reservation)
+    if (!response.ok && (response.status === 402 || response.status === 403)) {
+      console.warn('[OpenRouter] Paid model credit reservation failed (402). Attempting automatic switch to OpenRouter Free tier models...');
+      const freeModels = [
+        'google/gemini-2.0-flash-exp:free',
+        'meta-llama/llama-3.3-70b-instruct:free',
+        'qwen/qwen-2.5-72b-instruct:free',
+        'deepseek/deepseek-r1:free'
+      ];
+
+      for (const freeModel of freeModels) {
+        console.log(`[OpenRouter] Trying free tier model: ${freeModel}`);
+        const freeResponse = await attemptRequest(freeModel, undefined);
+        if (freeResponse.ok) {
+          console.log(`[OpenRouter] Successfully generated response using free model: ${freeModel}`);
+          return await freeResponse.json();
+        }
+      }
+
+      throw new Error(`OpenRouter API error: 402 - Insufficient OpenRouter credits for model '${initialModel}'. Please add credits at openrouter.ai/settings/credits or switch to Google Gemini API Key in Settings.`);
     }
 
     if (!response.ok) {
-      throw new Error(`OpenRouter API error: ${response.status} - ${errText}`);
+      const retryErrText = await response.text().catch(() => errText);
+      throw new Error(`OpenRouter API error: ${response.status} - ${retryErrText}`);
     }
   } else if (!response.ok) {
     const errText = await response.text().catch(() => '');

@@ -3743,7 +3743,11 @@ ${queryText}`;
 
                 {/* 9. HANDWRITTEN NOTES TAB */}
                 {activeOutputTab === 'handwritten' && (
-                  <HandwrittenNotesViewer lectureData={activeSource} theme={theme} />
+                  <HandwrittenNotesViewer 
+                    lectureData={activeSource} 
+                    theme={theme} 
+                    isCompiling={isGeneratingNotes || activeSource?.resourceGenerationStatus === 'processing' || activeSource?.status === 'transcribing'}
+                  />
                 )}
 
               </div>

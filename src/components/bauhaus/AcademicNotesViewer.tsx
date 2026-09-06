@@ -10,6 +10,7 @@ interface AcademicNotesViewerProps {
   content: string | Record<string, string> | any[];
   mode?: string;
   theme?: 'light' | 'dark';
+  isCompiling?: boolean;
 }
 
 /**
@@ -34,8 +35,31 @@ export function cleanNotesTimestamps(text: string): string {
 export const AcademicNotesViewer: React.FC<AcademicNotesViewerProps> = ({
   content,
   mode = 'academic',
-  theme = 'light'
+  theme = 'light',
+  isCompiling = false
 }) => {
+  if (isCompiling) {
+    return (
+      <div className="p-8 rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--panel-bg)] shadow-paper-sm text-center space-y-4 my-6">
+        <div className="relative w-12 h-12 mx-auto flex items-center justify-center">
+          <div className="absolute inset-0 rounded-full border-4 border-[#FFC400] border-t-transparent animate-spin" />
+          <BookOpen className="h-6 w-6 text-[var(--text-primary)]" />
+        </div>
+        <div className="space-y-1">
+          <span className="px-2.5 py-0.5 rounded bg-[#FFC400] text-[#111111] text-[10px] font-mono font-extrabold uppercase border border-[#111111]">
+            COMPILING STUDY NOTES
+          </span>
+          <h4 className="text-sm font-heading font-extrabold text-[var(--text-primary)] uppercase">
+            Formatting Academic Notes & Structure...
+          </h4>
+          <p className="text-xs font-mono font-bold text-[var(--text-secondary)]">
+            Full textbook notes are being processed. Preview will load automatically when complete.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   // Normalize content into a single clean string
   let rawText = '';
   if (typeof content === 'string') {

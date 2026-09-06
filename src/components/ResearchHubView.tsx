@@ -871,7 +871,11 @@ export default function ResearchHubView({
 
           {activeTab === 'Handwritten' && (
             <div className="bg-[#0b0c10]/90 border border-neutral-900/80 rounded-3xl p-6 md:p-10 shadow-2xl space-y-6 select-text animate-fade-in">
-              <HandwrittenNotesViewer lectureData={selectedLecture} theme={theme} />
+              <HandwrittenNotesViewer 
+                lectureData={selectedLecture} 
+                theme={theme} 
+                isCompiling={selectedLecture?.resourceGenerationStatus === 'processing' || selectedLecture?.status === 'transcribing'}
+              />
             </div>
           )}
 

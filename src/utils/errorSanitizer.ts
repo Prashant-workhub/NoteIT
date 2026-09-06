@@ -21,8 +21,13 @@ export function formatUserFriendlyErrorMessage(error: any, actionPrefix?: string
   const msgLower = rawMessage.toLowerCase();
   let friendlyMessage = '';
 
-  // 1. API Limit / Rate Limit / Quota Exhausted
+  // 1. API Limit / Rate Limit / Quota Exhausted / HTTP 402 Credit Limit
   if (
+    msgLower.includes('402') ||
+    msgLower.includes('more credits') ||
+    msgLower.includes('can only afford') ||
+    msgLower.includes('openrouter_credits') ||
+    msgLower.includes('openrouter api error: 402') ||
     msgLower.includes('429') ||
     msgLower.includes('resource_exhausted') ||
     msgLower.includes('quota') ||
@@ -32,7 +37,7 @@ export function formatUserFriendlyErrorMessage(error: any, actionPrefix?: string
     msgLower.includes('exceeded your current quota') ||
     msgLower.includes('insufficient_quota')
   ) {
-    friendlyMessage = "Your API limit has been exhausted or rate limited. Please wait a moment or use another API key/provider in Settings.";
+    friendlyMessage = "OpenRouter / API credit limit reached. Switch your AI Provider to Google Gemini API Key in Settings or add OpenRouter credits.";
   }
   // 2. Network / Server Connection Failures
   else if (
@@ -110,4 +115,30 @@ export function formatUserFriendlyErrorMessage(error: any, actionPrefix?: string
     return `${actionPrefix}: ${friendlyMessage}`;
   }
   return friendlyMessage;
+}
+
+// Alert deduplicator memory to prevent annoying alert popups in rapid succession
+let lastAlertTimestamp = 0;
+let lastAlertMessage = '';
+
+/**
+ * Displays a browser alert only if the exact message or any alert hasn't been shown in the last 4 seconds.
+ */
+export function showDeduplicatedAlert(message: string, cooldownMs = 4000): void {
+  const now = Date.now();
+  if (now - lastAlertTimestamp < cooldownMs || lastAlertMessage === message) {
+    console.warn(`[Alert Suppressed]: "${message}"`);
+    return;
+  }
+
+  lastAlertTimestamp = now;
+  lastAlertMessage = message;
+
+  setTimeout(() => {
+    if (lastAlertMessage === message) {
+      lastAlertMessage = '';
+    }
+  }, cooldownMs);
+
+  alert(message);
 }
