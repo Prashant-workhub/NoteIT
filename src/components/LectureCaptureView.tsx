@@ -30,7 +30,8 @@ import {
   HelpCircle,
   Sliders,
   Globe,
-  HardDrive
+  HardDrive,
+  AlertTriangle
 } from 'lucide-react';
 import BruteLoader from './BruteLoader';
 import { PageId, Lecture } from '../types';
