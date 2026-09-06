@@ -123,7 +123,7 @@ const executeLlmCall = async (
   apiKey: string,
   responseSchema?: any
 ): Promise<any> => {
-  return executeGeminiCall(prompt, apiKey, undefined, responseSchema, undefined, 'gemini-3.6-flash');
+  return executeGeminiCall(prompt, apiKey, undefined, responseSchema, undefined, 'gemini-2.5-flash');
 };
 
 // Stage 1 & 2 & 11 presentation blueprint planner with AI Critic pass
@@ -135,7 +135,7 @@ export const generatePresentationBlueprint = async (
   level: 'quick' | 'balanced' | 'premium',
   apiKey: string
 ): Promise<SlideBlueprint[]> => {
-  const model = 'gemini-3.6-flash';
+  const model = 'gemini-2.5-flash';
 
   const schema = {
     type: 'OBJECT',

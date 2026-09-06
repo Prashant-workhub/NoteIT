@@ -150,27 +150,45 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
 
   // Lazy Loading & Caching State
   const [localAssets, setLocalAssets] = useState<any>({});
+  const [isAssetLoading, setIsAssetLoading] = useState<boolean>(false);
   
   const getAsset = (sourceId: string | null | undefined, type: string, mode: string = '') => {
     if (!sourceId) return null;
-    return localAssets[`noteit_asset_${sourceId}_${type}${mode ? '_' + mode : ''}`];
+    const cacheKey = `noteit_asset_${sourceId}_${type}${mode ? '_' + mode : ''}`;
+    if (localAssets[cacheKey]) return localAssets[cacheKey];
+
+    // Check sessionStorage and localStorage synchronously for instant session retrieval
+    try {
+      const cached = sessionStorage.getItem(cacheKey) || localStorage.getItem(cacheKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: parsed }));
+        return parsed;
+      }
+    } catch (e) {
+      console.warn("Failed to parse cached asset synchronously", e);
+    }
+    return null;
   };
 
   const loadAsset = async (sourceId: string, assetType: string, mode: string = '') => {
     if (!sourceId || !auth.currentUser) return;
     const cacheKey = `noteit_asset_${sourceId}_${assetType}${mode ? '_' + mode : ''}`;
     
-    // 1. Check local storage cache
-    const cached = localStorage.getItem(cacheKey);
+    // 1. Check local & session storage cache
+    const cached = sessionStorage.getItem(cacheKey) || localStorage.getItem(cacheKey);
     if (cached) {
       try {
-        setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: JSON.parse(cached) }));
+        const parsed = JSON.parse(cached);
+        setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: parsed }));
         return;
       } catch (e) {
         console.warn("Failed to parse cached asset", e);
       }
     }
     
+    setIsAssetLoading(true);
+
     // 2. Try fetching from Firestore subcollection
     try {
       const { getDoc } = await import('firebase/firestore');
@@ -178,8 +196,10 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
       const snap = await getDoc(docRef);
       if (snap.exists()) {
         const data = snap.data().data;
+        sessionStorage.setItem(cacheKey, JSON.stringify(data));
         localStorage.setItem(cacheKey, JSON.stringify(data));
         setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: data }));
+        setIsAssetLoading(false);
         return;
       }
     } catch (err) {
@@ -197,10 +217,12 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
       if (assetType === 'mindmap') legacyData = activeSrc.keyConcepts;
       
       if (legacyData) {
+        sessionStorage.setItem(cacheKey, JSON.stringify(legacyData));
         localStorage.setItem(cacheKey, JSON.stringify(legacyData));
         setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: legacyData }));
       }
     }
+    setIsAssetLoading(false);
   };
 
   // Trigger load when tab or mode changes
@@ -1461,7 +1483,7 @@ ${queryText}`;
 
       const apiKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
       const bodyObj = { contents: [{ parts: [{ text: prompt }] }] };
-      const res = await fetchGeminiApi(apiKey, 'gemini-3.6-flash', bodyObj);
+      const res = await fetchGeminiApi(apiKey, 'gemini-2.5-flash', bodyObj);
 
       if (!res.ok) throw new Error("API request failed");
       const data = await res.json();
@@ -1691,7 +1713,7 @@ ${queryText}`;
           }
         }
       };
-      const res = await fetchGeminiApi(apiKey, 'gemini-3.6-flash', bodyObj);
+      const res = await fetchGeminiApi(apiKey, 'gemini-2.5-flash', bodyObj);
 
       setUploadProgress(70);
       if (!res.ok) throw new Error(`Translation API error: ${res.status}`);
@@ -2437,7 +2459,7 @@ ${queryText}`;
           }
         }
       };
-      const res = await fetchGeminiApi(apiKey, 'gemini-3.6-flash', bodyObj);
+      const res = await fetchGeminiApi(apiKey, 'gemini-2.5-flash', bodyObj);
 
       setUploadProgress(75);
       let slides = [];
@@ -3146,9 +3168,9 @@ ${queryText}`;
                     </div>
 
                     <div className="space-y-3">
-                      {isGeneratingNotes ? (
+                      {(isGeneratingNotes || isAssetLoading) ? (
                         <div className="py-16 flex flex-col items-center justify-center border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5">
-                          <BruteLoader size="md" message={`Generating ${notesFormat} notes...`} />
+                          <BruteLoader size="md" message={`Loading / Generating ${notesFormat} notes...`} />
                         </div>
                       ) : getActiveNotes().length > 0 ? (
                         <div className="p-5 rounded-[6px] border border-[#111111] bg-white text-[#111111] shadow-paper-sm font-sans">
@@ -3204,9 +3226,9 @@ ${queryText}`;
                     </div>
 
                     <div className="space-y-4">
-                      {isGeneratingSummary ? (
+                      {(isGeneratingSummary || isAssetLoading) ? (
                         <div className="py-16 flex flex-col items-center justify-center border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5">
-                          <BruteLoader size="md" message={`Generating ${summaryFormat} summary...`} />
+                          <BruteLoader size="md" message={`Loading / Generating ${summaryFormat} summary...`} />
                         </div>
                       ) : getActiveSummary().trim().length > 0 ? (
                         (() => {
@@ -3248,7 +3270,8 @@ ${queryText}`;
                     </div>
                   </div>
                 )}
-                        {/* 3. FLASHCARDS TAB */}
+
+                {/* 3. FLASHCARDS TAB */}
                 {activeOutputTab === 'flashcards' && (
                   <div className="space-y-3 animate-fade-in">
                     <div className="flex items-center justify-between">
@@ -3279,9 +3302,9 @@ ${queryText}`;
                     </div>
 
                     <div className="space-y-3">
-                      {isGeneratingFlashcards ? (
+                      {(isGeneratingFlashcards || isAssetLoading) ? (
                         <div className="py-16 flex flex-col items-center justify-center border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5">
-                          <BruteLoader size="md" message="Generating Flashcards..." />
+                          <BruteLoader size="md" message="Loading / Generating Flashcards..." />
                         </div>
                       ) : getAsset(activeSourceId, 'flashcards') && getAsset(activeSourceId, 'flashcards').length > 0 ? (
                         getAsset(activeSourceId, 'flashcards').map((f: any, i: number) => (
@@ -3346,9 +3369,9 @@ ${queryText}`;
                       </button>
                     </div>
 
-                    {isGeneratingQuiz ? (
+                    {(isGeneratingQuiz || isAssetLoading) ? (
                       <div className="py-16 flex flex-col items-center justify-center border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5">
-                        <BruteLoader size="md" message="Generating Quiz questions..." />
+                        <BruteLoader size="md" message="Loading / Generating Quiz questions..." />
                       </div>
                     ) : getAsset(activeSourceId, 'quiz') && getAsset(activeSourceId, 'quiz').length > 0 ? (
                       <div className="space-y-4">

@@ -108,6 +108,7 @@ export default function LectureCaptureView({
   // UI Inline Notice Banners (replacing intrusive native browser alert popups)
   const [uiError, setUiError] = useState<string | null>(null);
   const [uiSuccess, setUiSuccess] = useState<string | null>(null);
+  const failedAssetKeysRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const handleUiError = (e: any) => {
@@ -374,26 +375,45 @@ export default function LectureCaptureView({
 
   // Lazy Loading & Caching State
   const [localAssets, setLocalAssets] = useState<any>({});
+  const [isAssetLoading, setIsAssetLoading] = useState<boolean>(false);
   
   const getAsset = (lectureId: string | null | undefined, type: string, mode: string = '') => {
     if (!lectureId) return null;
-    return localAssets[`noteit_asset_${lectureId}_${type}${mode ? '_' + mode : ''}`];
+    const cacheKey = `noteit_asset_${lectureId}_${type}${mode ? '_' + mode : ''}`;
+    if (localAssets[cacheKey]) return localAssets[cacheKey];
+    
+    // Check sessionStorage and localStorage synchronously for instant session retrieval
+    try {
+      const cached = sessionStorage.getItem(cacheKey) || localStorage.getItem(cacheKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        // Sync into state
+        setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: parsed }));
+        return parsed;
+      }
+    } catch (e) {
+      console.warn("Failed to parse cached asset synchronously", e);
+    }
+    return null;
   };
 
   const loadAsset = async (lectureId: string, assetType: string, mode: string = '') => {
     if (!lectureId || !auth.currentUser) return;
     const cacheKey = `noteit_asset_${lectureId}_${assetType}${mode ? '_' + mode : ''}`;
     
-    // 1. Check local storage cache
-    const cached = localStorage.getItem(cacheKey);
+    // 1. Check local & session storage cache
+    const cached = sessionStorage.getItem(cacheKey) || localStorage.getItem(cacheKey);
     if (cached) {
       try {
-        setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: JSON.parse(cached) }));
+        const parsed = JSON.parse(cached);
+        setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: parsed }));
         return;
       } catch (e) {
         console.warn("Failed to parse cached asset", e);
       }
     }
+
+    setIsAssetLoading(true);
     
     // 2. Try fetching from Firestore subcollection
     try {
@@ -402,8 +422,10 @@ export default function LectureCaptureView({
       const snap = await getDoc(docRef);
       if (snap.exists()) {
         const data = snap.data().data;
+        sessionStorage.setItem(cacheKey, JSON.stringify(data));
         localStorage.setItem(cacheKey, JSON.stringify(data));
         setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: data }));
+        setIsAssetLoading(false);
         return;
       }
     } catch (err) {
@@ -421,10 +443,12 @@ export default function LectureCaptureView({
       if (assetType === 'keyConcepts') legacyData = activeLec.keyConcepts;
       
       if (legacyData) {
+        sessionStorage.setItem(cacheKey, JSON.stringify(legacyData));
         localStorage.setItem(cacheKey, JSON.stringify(legacyData));
         setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: legacyData }));
       }
     }
+    setIsAssetLoading(false);
   };
 
   // Trigger load when tab or mode changes
@@ -1269,6 +1293,7 @@ export default function LectureCaptureView({
       setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: generated }));
     } catch (err: any) {
       console.error("Notes generation failed:", err);
+      failedAssetKeysRef.current.add(`notes_${activeLecture.id}_${mode}`);
       setUiError(formatUserFriendlyErrorMessage(err, "Failed to generate notes"));
     } finally {
       setIsGeneratingNotes(false);
@@ -1301,6 +1326,7 @@ export default function LectureCaptureView({
       setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: generated }));
     } catch (err: any) {
       console.error("Summary generation failed:", err);
+      failedAssetKeysRef.current.add(`summary_${activeLecture.id}_${mode}`);
       setUiError(formatUserFriendlyErrorMessage(err, "Failed to generate summary"));
     } finally {
       setIsGeneratingSummary(false);
@@ -1338,6 +1364,7 @@ export default function LectureCaptureView({
       setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: generated }));
     } catch (err: any) {
       console.error("Flashcards generation failed:", err);
+      failedAssetKeysRef.current.add(`flashcards_${activeLecture.id}`);
       setUiError(formatUserFriendlyErrorMessage(err, "Failed to generate flashcards"));
     } finally {
       setIsGeneratingFlashcards(false);
@@ -1406,6 +1433,7 @@ export default function LectureCaptureView({
       setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: generated }));
     } catch (err: any) {
       console.error("Quiz generation failed:", err);
+      failedAssetKeysRef.current.add(`quiz_${activeLecture.id}`);
       setUiError(formatUserFriendlyErrorMessage(err, "Failed to generate quiz"));
     } finally {
       setIsGeneratingQuiz(false);
@@ -1477,6 +1505,7 @@ export default function LectureCaptureView({
       setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: generated }));
     } catch (err: any) {
       console.error("Mindmap generation failed:", err);
+      failedAssetKeysRef.current.add(`mindmap_${activeLecture.id}`);
       setUiError(formatUserFriendlyErrorMessage(err, "Failed to generate mind map"));
     } finally {
       setIsGeneratingMindmap(false);
@@ -1496,28 +1525,33 @@ export default function LectureCaptureView({
     if (!hasTranscript) return;
 
     if (activeOutputTab === 'notes') {
-      if (!getAsset(activeLecture.id, 'notes', selectedNotesMode) && !isGeneratingNotes) {
+      const key = `notes_${activeLecture.id}_${selectedNotesMode}`;
+      if (!getAsset(activeLecture.id, 'notes', selectedNotesMode) && !isGeneratingNotes && !failedAssetKeysRef.current.has(key)) {
         triggerGenerateNotes(selectedNotesMode);
       }
     } else if (activeOutputTab === 'summary') {
-      if (!getAsset(activeLecture.id, 'summaries', selectedSummaryMode) && !isGeneratingSummary) {
+      const key = `summary_${activeLecture.id}_${selectedSummaryMode}`;
+      if (!getAsset(activeLecture.id, 'summaries', selectedSummaryMode) && !isGeneratingSummary && !failedAssetKeysRef.current.has(key)) {
         triggerGenerateSummary(selectedSummaryMode);
       }
     } else if (activeOutputTab === 'flashcards') {
+      const key = `flashcards_${activeLecture.id}`;
       const cards = getAsset(activeLecture.id, 'flashcards');
       const isLegacyCards = cards && cards.length > 0 && !cards.some((c: any) => c.category);
-      if ((!cards || cards.length === 0 || isLegacyCards) && !isGeneratingFlashcards) {
+      if ((!cards || cards.length === 0 || isLegacyCards) && !isGeneratingFlashcards && !failedAssetKeysRef.current.has(key)) {
         triggerGenerateFlashcards();
       }
     } else if (activeOutputTab === 'quiz') {
+      const key = `quiz_${activeLecture.id}`;
       const qz = getAsset(activeLecture.id, 'quiz');
       const isLegacyQuiz = qz && qz.length > 0 && !qz.some((q: any) => q.difficulty);
-      if ((!qz || qz.length === 0 || isLegacyQuiz) && !isGeneratingQuiz) {
+      if ((!qz || qz.length === 0 || isLegacyQuiz) && !isGeneratingQuiz && !failedAssetKeysRef.current.has(key)) {
         triggerGenerateQuiz();
       }
     } else if (activeOutputTab === 'mindmap') {
+      const key = `mindmap_${activeLecture.id}`;
       const mc = getAsset(activeLecture.id, 'keyConcepts');
-      if ((!mc || mc.length === 0) && !isGeneratingMindmap) {
+      if ((!mc || mc.length === 0) && !isGeneratingMindmap && !failedAssetKeysRef.current.has(key)) {
         triggerGenerateMindmap();
       }
     }
@@ -1904,9 +1938,9 @@ export default function LectureCaptureView({
                       <div className="p-5 rounded-[6px] border border-[#111111] bg-white text-[#111111] shadow-paper-sm font-sans">
                         <AcademicNotesViewer content={getAsset(activeLecture.id, 'notes', selectedNotesMode)} mode={selectedNotesMode} theme={theme} />
                       </div>
-                    ) : isGeneratingNotes ? (
+                    ) : (isGeneratingNotes || isAssetLoading) ? (
                       <div className="py-16 flex flex-col items-center justify-center border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5">
-                        <BruteLoader size="md" message={`Generating ${selectedNotesMode} notes...`} />
+                        <BruteLoader size="md" message={`Loading / Generating ${selectedNotesMode} notes...`} />
                       </div>
                     ) : (
                       <div className="text-center py-16 border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5 p-6 space-y-4">
@@ -2009,9 +2043,9 @@ export default function LectureCaptureView({
                           ));
                         })()}
                       </div>
-                    ) : isGeneratingSummary ? (
+                    ) : (isGeneratingSummary || isAssetLoading) ? (
                       <div className="py-16 flex flex-col items-center justify-center border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5">
-                        <BruteLoader size="md" message={`Generating ${selectedSummaryMode.replace('_', ' ')} summary...`} />
+                        <BruteLoader size="md" message={`Loading / Generating ${selectedSummaryMode.replace('_', ' ')} summary...`} />
                       </div>
                     ) : (
                       <div className="text-center py-16 border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5 p-6 space-y-4">
@@ -2107,9 +2141,9 @@ export default function LectureCaptureView({
                           )}
                         </div>
                       </>
-                    ) : isGeneratingFlashcards ? (
+                    ) : (isGeneratingFlashcards || isAssetLoading) ? (
                       <div className="py-16 flex flex-col items-center justify-center border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5">
-                        <BruteLoader size="md" message="Generating comprehensive flashcard deck..." />
+                        <BruteLoader size="md" message="Loading / Generating flashcard deck..." />
                       </div>
                     ) : (
                       <div className="text-center py-16 border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5 p-6 space-y-4">
@@ -2291,9 +2325,9 @@ export default function LectureCaptureView({
                         );
                       })()}
                     </div>
-                  ) : isGeneratingQuiz ? (
+                  ) : (isGeneratingQuiz || isAssetLoading) ? (
                     <div className="py-16 flex flex-col items-center justify-center border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5">
-                      <BruteLoader size="md" message="Generating comprehensive 40-question quiz..." />
+                      <BruteLoader size="md" message="Loading / Generating 40-question quiz..." />
                     </div>
                   ) : (
                     <div className="text-center py-16 border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5 p-6 space-y-4">

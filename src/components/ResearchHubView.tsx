@@ -41,6 +41,7 @@ import { Source, Note, Lecture, PageId } from '../types';
 import { generateResourcesFromTranscript, generateNotesFromTranscript } from '../services/gemini';
 import { formatUserFriendlyErrorMessage } from '../utils/errorSanitizer';
 import { auth } from '../firebaseConfig';
+import BruteLoader from './BruteLoader';
 
 import { useNoteReviewTimer } from '../hooks/useNoteReviewTimer';
 import { renderTranscriptWithDots } from './bauhaus/TimestampDot';
@@ -758,6 +759,12 @@ export default function ResearchHubView({
           </div>
 
           {/* DYNAMIC TEMPLATE DISPATCHER */}
+          {isGeneratingHubResources && (
+            <div className="py-12 bg-[#0b0c10]/90 border border-neutral-900/80 rounded-3xl p-6 flex flex-col items-center justify-center">
+              <BruteLoader size="md" message="Synthesizing lecture study resources with AI..." />
+            </div>
+          )}
+
           {activeTab === 'Summary' && (
             <div className="bg-[#0b0c10]/90 border border-neutral-900/80 rounded-3xl p-6 md:p-10 shadow-2xl space-y-6 select-text animate-fade-in">
               <div className="flex flex-col md:flex-row justify-between gap-6 border-b border-neutral-900 pb-6">

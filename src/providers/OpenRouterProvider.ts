@@ -31,7 +31,7 @@ export async function postOpenRouterWithCreditFallback(
     });
   };
 
-  const initialModel = payload.model || 'google/gemini-3.6-flash';
+  const initialModel = payload.model || 'google/gemini-2.0-flash-001';
 
   // 1. Initial Attempt
   let response = await attemptRequest(initialModel, requestedMaxTokens);
@@ -88,13 +88,14 @@ export async function postOpenRouterWithCreditFallback(
 
 export class OpenRouterProvider extends BaseProvider {
   constructor(apiKey: string) {
-    super(apiKey, 'google/gemini-3.6-flash');
+    super(apiKey, 'google/gemini-2.0-flash-001');
   }
 
   getAvailableModels(): string[] {
     return [
-      'google/gemini-3.6-flash',
-      'meta-llama/llama-3.3-70b-instruct',
+      'google/gemini-2.0-flash-001',
+      'google/gemini-2.0-flash-exp:free',
+      'meta-llama/llama-3.3-70b-instruct:free',
       'deepseek/deepseek-chat',
       'anthropic/claude-3.5-sonnet',
       'openai/gpt-4o-mini'

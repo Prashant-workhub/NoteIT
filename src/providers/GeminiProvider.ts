@@ -2,11 +2,11 @@ import { BaseProvider } from './AIProvider';
 import { GeminiAdapter } from './ValidationAdapters';
 
 function sanitizeGeminiModel(model?: string): string {
-  return 'gemini-3.6-flash';
+  return 'gemini-2.5-flash';
 }
 
 export async function fetchGeminiApi(apiKey: string, requestedModel: string, bodyObj: any): Promise<Response> {
-  const model = 'gemini-3.6-flash';
+  const model = 'gemini-2.5-flash';
   for (const ver of ['v1beta', 'v1']) {
     const url = `https://generativelanguage.googleapis.com/${ver}/models/${model}:generateContent?key=${apiKey}`;
     try {
@@ -46,11 +46,11 @@ export async function fetchGeminiApi(apiKey: string, requestedModel: string, bod
 
 export class GeminiProvider extends BaseProvider {
   constructor(apiKey: string) {
-    super(apiKey, 'gemini-3.6-flash');
+    super(apiKey, 'gemini-2.5-flash');
   }
 
   getAvailableModels(): string[] {
-    return ['gemini-3.6-flash'];
+    return ['gemini-2.5-flash'];
   }
 
   async validateKey(): Promise<boolean> {

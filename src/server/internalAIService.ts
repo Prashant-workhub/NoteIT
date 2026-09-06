@@ -314,7 +314,7 @@ export class InternalAIService {
       return null;
     }
 
-    const modelName = process.env.OPENROUTER_MODEL || 'google/gemini-3.6-flash';
+    const modelName = process.env.OPENROUTER_MODEL || 'google/gemini-2.0-flash-001';
 
     // 4. Create in-flight processing promise
     const processingPromise = (async (): Promise<StructuredLectureAnalysis | null> => {
