@@ -229,7 +229,7 @@ export default function ResearchHubView({
     const transcriptText = selectedLecture.transcript || selectedLecture.cleanTranscript || selectedLecture.text;
 
     if (!transcriptText || transcriptText.trim().length === 0) {
-      alert("A valid transcript is required to generate notes. Please record or transcribe a lecture first.");
+      setNotesError("A valid transcript is required to generate notes. Please record or transcribe a lecture first.");
       return;
     }
 

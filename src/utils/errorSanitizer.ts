@@ -122,17 +122,19 @@ let lastAlertTimestamp = 0;
 let lastAlertMessage = '';
 
 /**
- * Displays a browser alert only if the exact message or any alert hasn't been shown in the last 4 seconds.
+ * Emits a UI error event without invoking intrusive native browser alert dialogs.
  */
 export function showDeduplicatedAlert(message: string, cooldownMs = 4000): void {
   const now = Date.now();
   if (now - lastAlertTimestamp < cooldownMs || lastAlertMessage === message) {
-    console.warn(`[Alert Suppressed]: "${message}"`);
+    console.warn(`[UI Alert Suppressed]: "${message}"`);
     return;
   }
 
   lastAlertTimestamp = now;
   lastAlertMessage = message;
+
+  console.warn(`[UI Error Event]: ${message}`);
 
   setTimeout(() => {
     if (lastAlertMessage === message) {
@@ -140,5 +142,7 @@ export function showDeduplicatedAlert(message: string, cooldownMs = 4000): void 
     }
   }, cooldownMs);
 
-  alert(message);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('noteit-ui-error', { detail: { message } }));
+  }
 }

@@ -325,7 +325,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
 
     const textContent = activeSource.transcript || activeSource.cleanTranscript || activeSource.content || activeSource.text || '';
     if (!textContent.trim()) {
-      alert("A valid transcript is required to generate notes.");
+      setImportError("A valid transcript is required to generate notes.");
       return;
     }
 
@@ -356,7 +356,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
 
     const textContent = activeSource.content || activeSource.transcript || '';
     if (!textContent.trim()) {
-      alert("No content available to generate summary.");
+      setImportError("No content available to generate summary.");
       return;
     }
 
@@ -394,7 +394,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
 
     const textContent = activeSource.content || activeSource.transcript || '';
     if (!textContent.trim()) {
-      alert("No content available to generate flashcards.");
+      setImportError("No content available to generate flashcards.");
       return;
     }
 
@@ -424,7 +424,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
 
     const textContent = activeSource.content || activeSource.transcript || '';
     if (!textContent.trim()) {
-      alert("No content available to generate quiz.");
+      setImportError("No content available to generate quiz.");
       return;
     }
 
@@ -451,7 +451,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
 
     const textContent = activeSource.content || activeSource.transcript || '';
     if (!textContent.trim()) {
-      alert("No content available to generate quiz.");
+      setImportError("No content available to generate quiz.");
       return;
     }
 
@@ -482,7 +482,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
 
     const textContent = activeSource.content || activeSource.transcript || '';
     if (!textContent.trim()) {
-      alert("No content available to generate mind map.");
+      setImportError("No content available to generate mind map.");
       return;
     }
 

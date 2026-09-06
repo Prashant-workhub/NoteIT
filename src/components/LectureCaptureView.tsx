@@ -104,6 +104,20 @@ export default function LectureCaptureView({
   const { subjects } = useSubjects(auth.currentUser?.uid);
   const [captureDestination, setCaptureDestination] = useState<'map' | 'saved' | null>(null);
 
+  // UI Inline Notice Banners (replacing intrusive native browser alert popups)
+  const [uiError, setUiError] = useState<string | null>(null);
+  const [uiSuccess, setUiSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleUiError = (e: any) => {
+      if (e.detail?.message) {
+        setUiError(e.detail.message);
+      }
+    };
+    window.addEventListener('noteit-ui-error', handleUiError);
+    return () => window.removeEventListener('noteit-ui-error', handleUiError);
+  }, []);
+
   // Lecture Metadata inputs
   const [lectureTitle, setLectureTitle] = useState('');
   const [lectureSubject, setLectureSubject] = useState('Data Structures');
@@ -114,12 +128,12 @@ export default function LectureCaptureView({
 
   const handleProcessManualTranscript = async () => {
     if (!manualTranscriptInput.trim()) {
-      alert('Please write or paste your lecture transcript first.');
+      setUiError('Please write or paste your lecture transcript first.');
       return;
     }
     const uid = auth.currentUser?.uid;
     if (!uid) {
-      alert('User not authenticated.');
+      setUiError('User not authenticated.');
       return;
     }
 
@@ -1236,7 +1250,7 @@ export default function LectureCaptureView({
 
     const textContent = activeLecture.transcript || activeLecture.cleanTranscript || '';
     if (!textContent.trim()) {
-      alert("No transcript content available to generate notes.");
+      setUiError("No transcript content available to generate notes.");
       return;
     }
 
@@ -1254,7 +1268,7 @@ export default function LectureCaptureView({
       setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: generated }));
     } catch (err: any) {
       console.error("Notes generation failed:", err);
-      showDeduplicatedAlert(formatUserFriendlyErrorMessage(err, "Failed to generate notes"));
+      setUiError(formatUserFriendlyErrorMessage(err, "Failed to generate notes"));
     } finally {
       setIsGeneratingNotes(false);
     }
@@ -1268,7 +1282,7 @@ export default function LectureCaptureView({
 
     const textContent = activeLecture.transcript || activeLecture.cleanTranscript || '';
     if (!textContent.trim()) {
-      alert("No transcript content available to generate summary.");
+      setUiError("No transcript content available to generate summary.");
       return;
     }
 
@@ -1286,7 +1300,7 @@ export default function LectureCaptureView({
       setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: generated }));
     } catch (err: any) {
       console.error("Summary generation failed:", err);
-      showDeduplicatedAlert(formatUserFriendlyErrorMessage(err, "Failed to generate summary"));
+      setUiError(formatUserFriendlyErrorMessage(err, "Failed to generate summary"));
     } finally {
       setIsGeneratingSummary(false);
     }
@@ -1300,7 +1314,7 @@ export default function LectureCaptureView({
 
     const textContent = activeLecture.transcript || activeLecture.cleanTranscript || '';
     if (!textContent.trim()) {
-      alert("No transcript content available to generate flashcards.");
+      setUiError("No transcript content available to generate flashcards.");
       return;
     }
 
@@ -1323,7 +1337,7 @@ export default function LectureCaptureView({
       setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: generated }));
     } catch (err: any) {
       console.error("Flashcards generation failed:", err);
-      showDeduplicatedAlert(formatUserFriendlyErrorMessage(err, "Failed to generate flashcards"));
+      setUiError(formatUserFriendlyErrorMessage(err, "Failed to generate flashcards"));
     } finally {
       setIsGeneratingFlashcards(false);
     }
@@ -1337,7 +1351,7 @@ export default function LectureCaptureView({
 
     const textContent = activeLecture.transcript || activeLecture.cleanTranscript || '';
     if (!textContent.trim()) {
-      alert("No transcript content available to generate flashcards.");
+      setUiError("No transcript content available to generate flashcards.");
       return;
     }
 
@@ -1358,7 +1372,7 @@ export default function LectureCaptureView({
       setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: newData }));
     } catch (err: any) {
       console.error("Generating more flashcards failed:", err);
-      showDeduplicatedAlert(formatUserFriendlyErrorMessage(err, "Failed to generate more flashcards"));
+      setUiError(formatUserFriendlyErrorMessage(err, "Failed to generate more flashcards"));
     } finally {
       setIsGeneratingFlashcards(false);
     }
@@ -1372,7 +1386,7 @@ export default function LectureCaptureView({
 
     const textContent = activeLecture.transcript || activeLecture.cleanTranscript || '';
     if (!textContent.trim()) {
-      alert("No transcript content available to generate quiz.");
+      setUiError("No transcript content available to generate quiz.");
       return;
     }
 
@@ -1391,7 +1405,7 @@ export default function LectureCaptureView({
       setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: generated }));
     } catch (err: any) {
       console.error("Quiz generation failed:", err);
-      showDeduplicatedAlert(formatUserFriendlyErrorMessage(err, "Failed to generate quiz"));
+      setUiError(formatUserFriendlyErrorMessage(err, "Failed to generate quiz"));
     } finally {
       setIsGeneratingQuiz(false);
     }
@@ -1405,7 +1419,7 @@ export default function LectureCaptureView({
 
     const textContent = activeLecture.transcript || activeLecture.cleanTranscript || '';
     if (!textContent.trim()) {
-      alert("No transcript content available to generate quiz.");
+      setUiError("No transcript content available to generate quiz.");
       return;
     }
 
@@ -1428,7 +1442,7 @@ export default function LectureCaptureView({
       setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: newData }));
     } catch (err: any) {
       console.error("Generating more quiz questions failed:", err);
-      showDeduplicatedAlert(formatUserFriendlyErrorMessage(err, "Failed to generate more questions"));
+      setUiError(formatUserFriendlyErrorMessage(err, "Failed to generate more questions"));
     } finally {
       setIsGeneratingQuiz(false);
     }
@@ -1442,7 +1456,7 @@ export default function LectureCaptureView({
 
     const textContent = activeLecture.transcript || activeLecture.cleanTranscript || '';
     if (!textContent.trim()) {
-      alert("No transcript content available to generate mind map.");
+      setUiError("No transcript content available to generate mind map.");
       return;
     }
 
@@ -1462,7 +1476,7 @@ export default function LectureCaptureView({
       setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: generated }));
     } catch (err: any) {
       console.error("Mindmap generation failed:", err);
-      showDeduplicatedAlert(formatUserFriendlyErrorMessage(err, "Failed to generate mind map"));
+      setUiError(formatUserFriendlyErrorMessage(err, "Failed to generate mind map"));
     } finally {
       setIsGeneratingMindmap(false);
     }
@@ -1674,6 +1688,49 @@ export default function LectureCaptureView({
           </div>
         </div>
 
+        {/* INLINE UI ERROR NOTICE BANNER */}
+        {uiError && (
+          <div className="p-4 bg-[#FF4D4D]/15 text-[#111111] border-b-2 border-[#111111] flex flex-col sm:flex-row items-center justify-between gap-3 shadow-paper-sm animate-fade-in">
+            <div className="flex items-center gap-2.5">
+              <AlertTriangle className="h-5 w-5 text-[#FF4D4D] shrink-0" />
+              <div>
+                <h4 className="text-xs font-mono font-extrabold uppercase text-[#FF4D4D]">AI Processing Notice</h4>
+                <p className="text-xs font-mono font-bold text-[#111111]">{uiError}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => onNavigate?.('settings' as any)}
+                className="px-3 py-1.5 bg-[#111111] text-white text-[11px] font-mono font-extrabold uppercase rounded-[4px] shadow-paper-sm hover:bg-neutral-800 transition-all cursor-pointer"
+              >
+                Settings
+              </button>
+              <button
+                onClick={() => setUiError(null)}
+                className="p-1 text-[#111111] hover:bg-black/10 rounded cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* INLINE UI SUCCESS NOTICE BANNER */}
+        {uiSuccess && (
+          <div className="p-4 bg-[#19B56B]/15 text-[#111111] border-b-2 border-[#111111] flex items-center justify-between gap-3 shadow-paper-sm animate-fade-in">
+            <div className="flex items-center gap-2.5">
+              <CheckCircle className="h-5 w-5 text-[#19B56B] shrink-0" />
+              <p className="text-xs font-mono font-bold text-[#111111]">{uiSuccess}</p>
+            </div>
+            <button
+              onClick={() => setUiSuccess(null)}
+              className="p-1 text-[#111111] hover:bg-black/10 rounded cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
         {/* RECORDED TRANSCRIPT AUTO-GENERATION BANNER IF NOTES ARE MISSING */}
         {(!hasExistingNotes && !hasExistingSummary && (activeLecture.cleanTranscript || activeLecture.transcript)) && (
           <div className="p-4 bg-[#FFC400] text-[#111111] border-b-2 border-[#111111] flex flex-col sm:flex-row items-center justify-between gap-3 shadow-paper-sm">
@@ -1692,11 +1749,13 @@ export default function LectureCaptureView({
                 if (!text) return;
                 setIsGeneratingNotes(true);
                 setIsGeneratingSummary(true);
+                setUiError(null);
+                setUiSuccess(null);
                 try {
                   await generateResourcesFromTranscript(activeLecture.id, text, { mode: 'academic', modeType: 'all' });
-                  alert("Notes and AI assets compiled successfully!");
+                  setUiSuccess("Notes and AI study assets compiled successfully!");
                 } catch (err: any) {
-                  showDeduplicatedAlert(formatUserFriendlyErrorMessage(err, "Note generation paused"));
+                  setUiError(formatUserFriendlyErrorMessage(err, "Note generation paused"));
                 } finally {
                   setIsGeneratingNotes(false);
                   setIsGeneratingSummary(false);
