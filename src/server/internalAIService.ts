@@ -1,4 +1,7 @@
 import crypto from 'crypto';
+import { postOpenRouterWithCreditFallback } from '../providers/OpenRouterProvider';
+import { extractJsonObject } from '../providers/AIProvider';
+
 
 export interface TimestampChunk {
   id: string;
@@ -154,28 +157,13 @@ Return a JSON object matching this schema strictly:
 Raw Transcript:
 ${transcriptText}`;
 
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-      'HTTP-Referer': 'https://noteit.ai',
-      'X-Title': 'NoteIT Internal AI'
-    },
-    body: JSON.stringify({
-      model: modelName,
-      messages: [{ role: 'user', content: prompt }],
-      response_format: { type: 'json_object' },
-      max_tokens: 16384
-    })
-  });
+  const payload = {
+    model: modelName,
+    messages: [{ role: 'user', content: prompt }],
+    response_format: { type: 'json_object' }
+  };
 
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => '');
-    throw new Error(`OpenRouter API call failed with status ${response.status}: ${errorText}`);
-  }
-
-  const data = await response.json();
+  const data = await postOpenRouterWithCreditFallback(apiKey, payload, 4096);
   const textContent = data.choices?.[0]?.message?.content || '';
   const cleaned = extractJsonObject(textContent);
   const parsed = JSON.parse(cleaned);
