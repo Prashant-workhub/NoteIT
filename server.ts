@@ -75,6 +75,17 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+// Helper to determine base backend URL dynamically from request when process.env.APP_URL is not set
+const getBackendUrl = (req: express.Request) => {
+  if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, '');
+  const protoHeader = req.headers['x-forwarded-proto'];
+  const protocol = (Array.isArray(protoHeader) ? protoHeader[0] : protoHeader) || req.protocol || 'http';
+  const hostHeader = req.headers['x-forwarded-host'];
+  const host = (Array.isArray(hostHeader) ? hostHeader[0] : hostHeader) || req.get('host') || `localhost:${PORT}`;
+  return `${protocol}://${host}`;
+};
+
+
 // Temporary request logging middleware for debugging audit
 app.use((req, res, next) => {
   console.log(`[REQUEST LOG] ${req.method} ${req.path}`);
@@ -1221,7 +1232,7 @@ app.get('/api/storage/sas', authenticateFirebaseUser, async (req, res) => {
       const user = req.body.user;
       const uid = user.uid;
       const localFileName = `${uid}-${fileName}`;
-      const backendUrl = process.env.APP_URL || `http://localhost:${PORT}`;
+      const backendUrl = getBackendUrl(req);
       res.json({
         uploadUrl: `${backendUrl}/api/storage/local-upload?fileName=${encodeURIComponent(localFileName)}`,
         audioUrl: `${backendUrl}/uploads/${localFileName}`,
@@ -1290,7 +1301,7 @@ app.get('/api/storage/read-sas', authenticateFirebaseUser, async (req, res) => {
   if (!blobServiceClient || !credential) {
     // If local fallback, return the public local URL directly
     try {
-      const backendUrl = process.env.APP_URL || `http://localhost:${PORT}`;
+      const backendUrl = getBackendUrl(req);
       const fileName = blobPath.split('/').pop() || '';
       const user = req.body.user;
       const uid = user.uid;
