@@ -1,4 +1,4 @@
-import { BaseProvider, extractJsonObject } from './AIProvider';
+import { BaseProvider, extractJsonObject, safeJsonParse } from './AIProvider';
 import { OpenRouterAdapter } from './ValidationAdapters';
 
 /**
@@ -115,8 +115,7 @@ export class OpenRouterProvider extends BaseProvider {
 
     const data = await postOpenRouterWithCreditFallback(this.apiKey, payload, 4096);
     const text = data.choices?.[0]?.message?.content || '';
-    const cleaned = extractJsonObject(text);
-    return JSON.parse(cleaned);
+    return safeJsonParse(text);
   }
 
   async transcribeAudio(base64Audio: string, mimeType: string, model?: string): Promise<string> {

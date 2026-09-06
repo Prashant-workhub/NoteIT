@@ -414,6 +414,9 @@ export default function LectureProcessingView({
 
           const startTime = Date.now();
 
+          const engineChoice = existingData?.transcriptionEngine || 'auto';
+          const liveText = existingData?.browserLiveTranscript || '';
+
           const aiData = await generateLectureContent(
             base64Audio,
             'audio/webm',
@@ -434,7 +437,9 @@ export default function LectureProcessingView({
                   updateLecture(lectureId, { transcriptionFinishedAt: serverTimestamp() }).catch(console.error);
                 }
               }
-            }
+            },
+            engineChoice,
+            liveText
           );
           if (!isSubscribed) return;
 

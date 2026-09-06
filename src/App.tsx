@@ -577,7 +577,15 @@ export default function App() {
     return lectureId;
   };
 
-  const handleSaveCapture = async (title: string, subject: string, duration: string, audioBlob: Blob, existingLectureId?: string) => {
+  const handleSaveCapture = async (
+    title: string, 
+    subject: string, 
+    duration: string, 
+    audioBlob: Blob, 
+    existingLectureId?: string,
+    transcriptionEngine?: 'gemini' | 'speechmatics' | 'browser',
+    browserLiveTranscript?: string
+  ) => {
     if (!sessionUser) return;
     try {
       let lectureId = existingLectureId;
@@ -588,14 +596,18 @@ export default function App() {
           subject,
           duration,
           type: 'recording',
-          status: 'recording'
+          status: 'recording',
+          transcriptionEngine: transcriptionEngine || 'gemini',
+          browserLiveTranscript: browserLiveTranscript || ''
         });
       } else {
         await updateLecture(lectureId, {
           title: finalTitle,
           subject,
           duration,
-          status: 'recording'
+          status: 'recording',
+          transcriptionEngine: transcriptionEngine || 'gemini',
+          browserLiveTranscript: browserLiveTranscript || ''
         });
       }
       

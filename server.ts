@@ -309,7 +309,7 @@ const transcribeWithSpeechmatics = async (
  * generation without ever being asked to transcribe audio itself.
  */
 app.post('/api/ai/transcribe-with-fallback', authenticateFirebaseUser, async (req, res) => {
-  const { base64Audio, mimeType = 'audio/webm', geminiApiKey } = req.body;
+  const { base64Audio, mimeType = 'audio/webm', geminiApiKey, preferredProvider = 'auto' } = req.body;
   if (!base64Audio || typeof base64Audio !== 'string') {
     res.status(400).json({ error: 'Audio data is required for transcription.' });
     return;
@@ -327,8 +327,6 @@ app.post('/api/ai/transcribe-with-fallback', authenticateFirebaseUser, async (re
     try {
       const userData = await getFirestore().collection('users').doc(uid).get();
       const data = userData.exists ? userData.data() : null;
-      // A Gemini key may be stored separately for transcription, or be the
-      // active provider key when Gemini is selected.
       const rawStoredKey = data?.encryptedGeminiTranscriptionKey || data?.geminiApiKey ||
         (data?.aiProvider === 'gemini' ? data?.encryptedApiKey : '');
       if (rawStoredKey) storedGeminiKey = decryptKey(rawStoredKey);
@@ -337,9 +335,25 @@ app.post('/api/ai/transcribe-with-fallback', authenticateFirebaseUser, async (re
     }
 
     const effectiveGeminiKey = (geminiApiKey || storedGeminiKey || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || '').trim();
-    if (effectiveGeminiKey) {
+    
+    // If user explicitly chose Speechmatics, skip Gemini
+    if (preferredProvider === 'speechmatics') {
+      sendTranscriptionEvent(res, 'progress', {
+        provider: 'speechmatics',
+        fallback: false,
+        message: 'Using built-in Speechmatics enterprise transcriber…'
+      });
+      const transcript = await transcribeWithSpeechmatics(base64Audio, mimeType, message => {
+        sendTranscriptionEvent(res, 'progress', { provider: 'speechmatics', fallback: false, message });
+      });
+      sendTranscriptionEvent(res, 'result', { transcript, provider: 'speechmatics', fallback: false });
+      res.end();
+      return;
+    }
+
+    if (effectiveGeminiKey && preferredProvider !== 'speechmatics') {
       try {
-        sendTranscriptionEvent(res, 'progress', { provider: 'gemini', message: 'Transcribing audio with your Gemini key…' });
+        sendTranscriptionEvent(res, 'progress', { provider: 'gemini', message: 'Transcribing audio with Gemini AI…' });
         const gemini = ProviderFactory.getProvider('gemini', effectiveGeminiKey);
         const transcript = (await gemini.transcribeAudio(base64Audio, mimeType, 'gemini-3.6-flash')).trim();
         if (!transcript) throw new Error('Gemini returned an empty transcript.');
@@ -347,6 +361,9 @@ app.post('/api/ai/transcribe-with-fallback', authenticateFirebaseUser, async (re
         res.end();
         return;
       } catch (geminiError: any) {
+        if (preferredProvider === 'gemini') {
+          throw new Error(`Gemini transcription failed: ${geminiError?.message || geminiError}`);
+        }
         console.warn('[transcribe-with-fallback] Gemini transcription failed; using Speechmatics:', geminiError?.message || geminiError);
         sendTranscriptionEvent(res, 'progress', {
           provider: 'speechmatics',

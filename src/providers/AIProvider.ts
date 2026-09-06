@@ -28,6 +28,7 @@ export interface AIProvider {
 }
 
 export const extractJsonObject = (rawText: string): string => {
+  if (!rawText) return '{}';
   let cleaned = rawText.trim();
   const jsonBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/i;
   const match = cleaned.match(jsonBlockRegex);
@@ -35,11 +36,53 @@ export const extractJsonObject = (rawText: string): string => {
     cleaned = match[1].trim();
   }
   const startIdx = cleaned.indexOf('{');
-  const endIdx = cleaned.lastIndexOf('}');
-  if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
-    cleaned = cleaned.substring(startIdx, endIdx + 1);
+  if (startIdx !== -1) {
+    const endIdx = cleaned.lastIndexOf('}');
+    if (endIdx > startIdx) {
+      cleaned = cleaned.substring(startIdx, endIdx + 1);
+    } else {
+      cleaned = cleaned.substring(startIdx);
+    }
   }
   return cleaned;
+};
+
+export const safeJsonParse = <T = any>(rawText: string, fallbackDefault: T = {} as T): T => {
+  if (!rawText || !rawText.trim()) return fallbackDefault;
+  const cleaned = extractJsonObject(rawText);
+  
+  try {
+    return JSON.parse(cleaned);
+  } catch (firstErr) {
+    console.warn('[JSON REPAIR] Standard JSON.parse failed. Executing auto-repair sequence...', firstErr);
+
+    // Attempt 1: Sanitize raw control characters & unescaped line breaks inside strings
+    let repaired = cleaned
+      .replace(/[\u0000-\u001F\u007F-\u009F]/g, (c) => c === '\n' ? '\\n' : c === '\r' ? '\\r' : c === '\t' ? '\\t' : '');
+    
+    try {
+      return JSON.parse(repaired);
+    } catch (e2) {}
+
+    // Attempt 2: Auto-close unterminated string quotes & brackets
+    let quoteCount = (repaired.match(/(?<!\\)"/g) || []).length;
+    if (quoteCount % 2 !== 0) {
+      repaired += '"';
+    }
+
+    let openBraces = (repaired.match(/\{/g) || []).length - (repaired.match(/\}/g) || []).length;
+    let openBrackets = (repaired.match(/\[/g) || []).length - (repaired.match(/\]/g) || []).length;
+
+    while (openBrackets > 0) { repaired += ']'; openBrackets--; }
+    while (openBraces > 0) { repaired += '}'; openBraces--; }
+
+    try {
+      return JSON.parse(repaired);
+    } catch (e3) {
+      console.error('[JSON REPAIR FAILED] Could not parse JSON response:', e3);
+      return fallbackDefault;
+    }
+  }
 };
 
 export abstract class BaseProvider implements AIProvider {

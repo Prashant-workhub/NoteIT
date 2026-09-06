@@ -418,8 +418,9 @@ export const transcribeAudioWithFallback = async (
   base64Audio: string,
   mimeType: string,
   onProgress?: (progress: TranscriptionProgress) => void,
-  onBusy?: (isBusy: boolean) => void
-): Promise<{ transcript: string; provider: 'gemini' | 'speechmatics'; fallback: boolean }> => {
+  onBusy?: (isBusy: boolean) => void,
+  preferredProvider: 'gemini' | 'speechmatics' | 'auto' = 'auto'
+): Promise<{ transcript: string; provider: 'gemini' | 'speechmatics' | 'browser'; fallback: boolean }> => {
   const currentUser = auth.currentUser;
   if (!currentUser) throw new Error('User not authenticated with Firebase Auth.');
 
@@ -435,9 +436,8 @@ export const transcribeAudioWithFallback = async (
       body: JSON.stringify({
         base64Audio,
         mimeType,
-        // The server keeps this request scoped to the authenticated user and
-        // never persists or logs this browser-stored BYOK value.
-        geminiApiKey: getAIConfig().geminiKey
+        geminiApiKey: getAIConfig().geminiKey,
+        preferredProvider
       })
     });
 
@@ -968,37 +968,64 @@ export const generateInitialLectureAssets = async (
     
     Tasks to perform:
     1. Clean up the raw text, converting spoken language or raw layout text into clean, professional academic prose. Preserve any bracketed timestamps (e.g. [00:00], [01:15]) at their approximate correct locations if present in the source. Save this cleaned text under the 'cleanTranscript' field.
+       ### Formulas
+       ### Common Mistakes
+       ### Revision Notes
+       ### Exam Questions
+       ### Real World Applications
+       ### Quick Recap
+    4. Generate a list of key detailed notes.
+       ${mode === 'executive' ? `
+       Each note must be concise, professional, focused on strategic recommendations, and target a word count of 300-600 words in total. Structure each note with the following exact subsections:
+       - 📊 **Executive Overview & Major Findings**
+       - 📈 **Key Metrics & Bullet Points**
+       - 🎯 **Actionable Insights & Deliverables**
+       - 🛑 **Strategic Takeaways**
+       ` : mode === 'revision' ? `
+       Each note must be high-yield, exam-oriented, focused on memory recall, and target a word count of 200-500 words in total. Structure each note with the following exact subsections:
+       - 🔑 **Key Facts & Flash Recall Points**
+       - 📝 **Exam-Oriented Explanations & Common Mistakes**
+       - 💡 **Formula Sheet & Memory Tricks**
+       - 🎯 **High-Yield Practice Questions / High-Intensity Review**
+       ` : `
+       Each note must be highly detailed, academic, and target a word count of 1500+ words in total across the notes. Structure each note with the following exact subsections:
+       - 🧠 **Key Terms & Definitions**
+       - 📝 **Detailed Explanations & Examples**
+       - 💡 **Core Formula or Analogy** (if applicable)
+       - 🎯 **Actionable Summary / Study Focus**
+       `}
+    5. Generate a list of 4 conceptual flashcards. Each card must have a question "q" and a detailed answer "a" in Markdown.
+    6. Generate a quiz of 4 multiple-choice questions from the lecture. Every question must cite the exact section/topic or timestamp from the source context it originated from inside the 'sourceCitation' field. Each question must have:
+       - "question": string
+       - "options": array of 4 strings
+       - "correctAnswer": 0-based index (integer)
+       - "explanation": detailed explanation of why the correct answer is correct
+       - "sourceCitation": string citation
+    7. Generate a list of 6-8 keyConcepts for a mind map representing the lecture. One concept MUST be the root concept with id "root", x: 50, y: 50, and group "center". Other concepts must have an id, label, parent (referencing parent's id, e.g. "root"), x and y coordinates (numbers between 10 and 90 representing positions on a 2D canvas), and a group name (e.g. "math", "concepts", "applications"). For each concept, also include:
+       - "desc": definition/explanation
+       - "examples": examples/analogies
+       - "formula": mathematical formulas or core theories (if any, otherwise empty string)
+       - "applications": real-world applications/cases
+    8. Generate a list of 1-2 weakTopics that this lecture covers, diagnosing typical student struggles. Each topic must have a "topicName", "subject", "aiDiagnosis", and a list of 3 "actionPlan" recommendations.
+    9. Generate a timeline of chronological milestones. Each item must have:
+       - "time": A timestamp matching the lecture (e.g. '01:15' or '05:30'). Must be from the transcript's bracketed timestamps.
+       - "title": A brief title of the event/topic discussed at this time
+       - "description": A short explanation of the concept discussed at this milestone
+    10. Generate sourceIntelligence containing:
+       - "keyPeople": array of names of people/researchers mentioned (e.g. "Sartre", "Einstein")
+       - "keyTerms": array of technical terms/jargon (e.g. "Fisher Esterification", "Categorical Imperative")
+       - "formulas": array of equations/formulas mentioned (e.g. "f'(x) = lim...")
+       - "dates": array of important dates mentioned (e.g. "1781", "Q1 2026")
+       - "statistics": array of statistics or metrics (e.g. "72% yield", "34.2% market share")
+       - "references": array of documents, books, papers, or video sources cited
     
-    STRICT ADMINISTRATIVE NOISE FILTER (MANDATORY):
-    Completely IGNORE and EXCLUDE all administrative syllabus meta-noise such as:
-    - NEVER create sections for "Course Outcomes", "CO-PO Mapping", "Program Outcomes", or "Bloom Taxonomy"
-    - NEVER create sections for "Subject Name Header", "Table of Contents", "Index of Topics", "Course Code"
-    - NEVER create sections for "Faculty Name", "Instructor Profile", "Office Hours", "Grading Criteria", "Prerequisites"
-    - START GENERATING SECTIONS ONLY FROM REAL ACADEMIC CONCEPT CONTENT!
+    CRITICAL GROUNDING INSTRUCTION:
+    Throughout the markdown text of the summary, notes, and flashcard answers, you MUST integrate inline citations referencing the source timestamps or pages in brackets where appropriate (e.g. '[Source: Timestamp 01:30]' or '[Source: Page 3]').
     
-    2. Segment the cleaned text into logical topics or sections (Chapters). For each section, define:
-       - 'id': A unique string id (e.g. 'sec-1', 'sec-2')
-       - 'title': A short, descriptive title of the section/topic
-       - 'startTime': The start timestamp of the section (e.g. '00:00')
-       - 'endTime': The end timestamp of the section (e.g. '01:30')
-       - 'content': A detailed, in-depth academic summary (minimum 200 words) of what was discussed in this section
-       Save this under the 'sections' array.
-    3. Generate a timeline of chronological milestones. Each item must have:
-       - 'time': A timestamp matching the lecture (e.g. '01:15' or '05:30'). Must be from the transcript's bracketed timestamps.
-       - 'title': A brief title of the event/topic discussed at this time
-       - 'description': A short explanation of the concept discussed at this milestone
-    4. Generate sourceIntelligence (Metadata) containing:
-       - 'keyPeople': array of names of people/researchers mentioned
-       - 'keyTerms': array of technical terms/jargon
-       - 'formulas': array of equations/formulas mentioned
-       - 'dates': array of important dates mentioned
-       - 'statistics': array of statistics or metrics
-       - 'references': array of documents, books, papers, or video sources cited
-
     CRITICAL FORMATTING RULE: For any mathematical equations, numbers, variables, or exponents, NEVER use caret notation (like '3^2', 'x^y', 'x^2', '2^n'). Instead, write them with actual superscript Unicode characters representing the power/exponent directly above the base (e.g., '3²', 'xʸ', 'x²', '2ⁿ'). Apply this rule strictly to all mathematical powers and exponents throughout the output.
-
+    
     Raw Source Text:
-    ${cleanRawText.length > 150000 ? cleanRawText.substring(0, 150000) + "\n[Processing full document...]" : cleanRawText}
+    ${rawText.length > 250000 ? rawText.substring(0, 250000) + "\n[Text truncated for rapid processing...]" : rawText}
     
     Return the result STRICTLY as a JSON object matching the requested schema.
   `;
@@ -1019,6 +1046,75 @@ export const generateInitialLectureAssets = async (
             content: { type: 'STRING' }
           },
           required: ['id', 'title', 'startTime', 'endTime', 'content']
+        }
+      },
+      summary: { type: 'STRING' },
+      notes: {
+        type: 'ARRAY',
+        items: {
+          type: 'OBJECT',
+          properties: {
+            title: { type: 'STRING' },
+            content: { type: 'STRING' }
+          },
+          required: ['title', 'content']
+        }
+      },
+      flashcards: {
+        type: 'ARRAY',
+        items: {
+          type: 'OBJECT',
+          properties: {
+            q: { type: 'STRING' },
+            a: { type: 'STRING' }
+          },
+          required: ['q', 'a']
+        }
+      },
+      quiz: {
+        type: 'ARRAY',
+        items: {
+          type: 'OBJECT',
+          properties: {
+            question: { type: 'STRING' },
+            options: { type: 'ARRAY', items: { type: 'STRING' } },
+            correctAnswer: { type: 'INTEGER' },
+            explanation: { type: 'STRING' },
+            sourceCitation: { type: 'STRING' }
+          },
+          required: ['question', 'options', 'correctAnswer', 'explanation', 'sourceCitation']
+        }
+      },
+      keyConcepts: {
+        type: 'ARRAY',
+        items: {
+          type: 'OBJECT',
+          properties: {
+            id: { type: 'STRING' },
+            label: { type: 'STRING' },
+            desc: { type: 'STRING' },
+            parent: { type: 'STRING' },
+            x: { type: 'INTEGER' },
+            y: { type: 'INTEGER' },
+            group: { type: 'STRING' },
+            examples: { type: 'STRING' },
+            formula: { type: 'STRING' },
+            applications: { type: 'STRING' }
+          },
+          required: ['id', 'label', 'desc', 'x', 'y', 'group']
+        }
+      },
+      weakTopics: {
+        type: 'ARRAY',
+        items: {
+          type: 'OBJECT',
+          properties: {
+            topicName: { type: 'STRING' },
+            subject: { type: 'STRING' },
+            aiDiagnosis: { type: 'STRING' },
+            actionPlan: { type: 'ARRAY', items: { type: 'STRING' } }
+          },
+          required: ['topicName', 'subject', 'aiDiagnosis', 'actionPlan']
         }
       },
       timeline: {
@@ -1046,66 +1142,70 @@ export const generateInitialLectureAssets = async (
         required: ['keyPeople', 'keyTerms', 'formulas', 'dates', 'statistics', 'references']
       }
     },
-    required: ['cleanTranscript', 'sections', 'timeline', 'sourceIntelligence']
+    required: ['cleanTranscript', 'sections', 'summary', 'notes', 'flashcards', 'quiz', 'keyConcepts', 'weakTopics', 'timeline', 'sourceIntelligence']
   };
 
-  const res = await executeGeminiCall(prompt, apiKey, undefined, schema, onBusy);
-
-  // JS Post-Filter to strip out any noise sections that bypassed LLM prompt rules
-  if (res && Array.isArray(res.sections)) {
-    res.sections = res.sections.filter((s: any) => 
-      !noiseRegex.test(s.title || '') && !noiseRegex.test(s.content || '')
-    );
-  }
-
-  return res;
+  return executeGeminiCall(prompt, apiKey, undefined, schema, onBusy);
 };
+export const generateFastDocumentAssets = generateInitialLectureAssets;
 
 export const generateLectureContent = async (
   base64Audio: string, 
   mimeType: string = 'audio/webm',
   onBusy?: (isBusy: boolean) => void,
   mode: 'academic' | 'executive' | 'revision' = 'academic',
-  onProgress?: (step: number, message: string) => void
+  onProgress?: (step: number, message: string) => void,
+  transcriptionEngine: 'gemini' | 'speechmatics' | 'browser' | 'auto' = 'auto',
+  browserLiveTranscript?: string
 ): Promise<any> => {
   const apiKey = getAIConfig().geminiKey;
   if (!apiKey && !auth.currentUser) {
     throw new Error("Gemini API key is not configured. Please configure an API key in Settings or environment.");
   }
 
-  // Phase 1: Transcribe Audio. Do not route this through Notion (or another
-  // writing provider): the transcript is passed to that provider in phase 2.
-  if (onProgress) onProgress(1, 'Preparing secure audio transcription…');
-  const transcription = await transcribeAudioWithFallback(
-    base64Audio,
-    mimeType,
-    progress => onProgress?.(1, progress.message),
-    onBusy
-  );
-  const rawTranscript = transcription.transcript;
+  let rawTranscript = '';
+  let providerName: 'gemini' | 'speechmatics' | 'browser' = 'gemini';
 
-  console.log('==================================================');
-  console.log('[AUDIO TRANSCRIPTION AUDIT LOG]');
-  console.log(`- Platform/Provider Used: ${(transcription.provider || 'GEMINI').toUpperCase()} ${transcription.fallback ? '(Fallback Provider)' : '(Primary Provider)'}`);
-  console.log(`- Transcribed Audio Content:\n${rawTranscript}`);
-  console.log('==================================================');
+  // Option 3: Browser Built-in Live STT (Zero Token Cost)
+  if (transcriptionEngine === 'browser' && browserLiveTranscript && browserLiveTranscript.trim().length > 0) {
+    rawTranscript = browserLiveTranscript.trim();
+    providerName = 'browser';
+    if (onProgress) onProgress(1, 'Using Browser Built-in Live Speech Transcript (Zero Token Cost)…');
+    console.log('==================================================');
+    console.log('[AUDIO TRANSCRIPTION AUDIT LOG]');
+    console.log(`- Platform/Provider Used: BROWSER_BUILTIN_STT (Zero Token Cost)`);
+    console.log(`- Transcribed Audio Content:\n${rawTranscript}`);
+    console.log('==================================================');
+  } else {
+    // Option 1 & Option 2: Server-side Gemini or Speechmatics
+    if (onProgress) onProgress(1, `Preparing audio transcription via ${transcriptionEngine === 'speechmatics' ? 'Speechmatics' : transcriptionEngine === 'gemini' ? 'Gemini AI' : 'transcription pipeline'}…`);
+    const transcription = await transcribeAudioWithFallback(
+      base64Audio,
+      mimeType,
+      progress => onProgress?.(1, progress.message),
+      onBusy,
+      transcriptionEngine === 'browser' ? 'auto' : transcriptionEngine
+    );
+    rawTranscript = transcription.transcript;
+    providerName = transcription.provider;
+
+    console.log('==================================================');
+    console.log('[AUDIO TRANSCRIPTION AUDIT LOG]');
+    console.log(`- Platform/Provider Used: ${(providerName || 'GEMINI').toUpperCase()} ${transcription.fallback ? '(Fallback Provider)' : '(Primary Provider)'}`);
+    console.log(`- Transcribed Audio Content:\n${rawTranscript}`);
+    console.log('==================================================');
+  }
 
   // Phase 2: Ingest Assets (Lightweight)
-  if (onProgress) onProgress(2, `Transcript ready via ${transcription.provider === 'gemini' ? 'Gemini' : 'Speechmatics'}. Sending text to your selected AI provider…`);
+  if (onProgress) onProgress(2, `Transcript ready via ${providerName.toUpperCase()}. Sending text to your selected AI provider…`);
   const data = await generateInitialLectureAssets(rawTranscript, apiKey, onBusy);
-
-  return {
-    transcript: rawTranscript,
-    cleanTranscript: data.cleanTranscript || rawTranscript,
-    sections: data.sections || [],
-    timeline: data.timeline || [],
-    sourceIntelligence: data.sourceIntelligence || null,
-    keyConcepts: [], // Will generate Mindmap keyConcepts on demand
-    transcriptionProvider: transcription.provider
-  };
+  return data;
 };
 
-export const generateFastDocumentAssets = (text: string, title?: string): {
+export const parseFallbackRawTranscriptToAssets = (
+  text: string,
+  title?: string
+): {
   cleanTranscript: string;
   sections: Array<{ id: string; title: string; startTime: string; endTime: string; content: string }>;
   timeline: Array<{ time: string; title: string; description: string }>;

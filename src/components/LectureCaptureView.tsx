@@ -50,7 +50,15 @@ import ChromaKeyVideo from './ChromaKeyVideo';
 import { useSubjects } from '../hooks/useSubjects';
 
 interface LectureCaptureViewProps {
-  onSaveCapture: (title: string, subject: string, duration: string, audioBlob: Blob, existingLectureId?: string) => Promise<void>;
+  onSaveCapture: (
+    title: string, 
+    subject: string, 
+    duration: string, 
+    audioBlob: Blob, 
+    existingLectureId?: string,
+    transcriptionEngine?: 'gemini' | 'speechmatics' | 'browser',
+    browserLiveTranscript?: string
+  ) => Promise<void>;
   onStartCapture?: (title: string, subject: string) => Promise<string>;
   setActivePage: (page: PageId) => void;
   theme: 'light' | 'dark';
@@ -102,6 +110,7 @@ export default function LectureCaptureView({
   const [captureInputMode, setCaptureInputMode] = useState<'audio' | 'manual'>('audio');
   const [manualTranscriptInput, setManualTranscriptInput] = useState('');
   const [isSubmittingManual, setIsSubmittingManual] = useState(false);
+  const [transcriptionEngine, setTranscriptionEngine] = useState<'gemini' | 'speechmatics' | 'browser'>('gemini');
 
   const handleProcessManualTranscript = async () => {
     if (!manualTranscriptInput.trim()) {
@@ -723,7 +732,15 @@ export default function LectureCaptureView({
 
         try {
           const recordedSecs = secondsRef.current;
-          await onSaveCapture(lectureTitle, lectureSubject, durationStr, audioBlob, finalId || undefined);
+          await onSaveCapture(
+            lectureTitle, 
+            lectureSubject, 
+            durationStr, 
+            audioBlob, 
+            finalId || undefined,
+            transcriptionEngine,
+            accumulatedTranscriptRef.current || liveTranscriptRef.current
+          );
           
           // Dispatch resource generated notification toast
           if (typeof window !== 'undefined') {
@@ -2914,6 +2931,65 @@ export default function LectureCaptureView({
                     </button>
                   </div>
                 )}
+              </div>
+
+              {/* TRANSCRIPTION ENGINE SELECTION (Token Optimization) */}
+              <div className="w-full text-left space-y-1.5 pt-1">
+                <label className="block text-xs font-mono font-extrabold text-[var(--text-primary)] uppercase tracking-wider">
+                  TRANSCRIPTION ENGINE
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    disabled={isRecording}
+                    onClick={() => setTranscriptionEngine('gemini')}
+                    className={`p-2.5 rounded-[6px] border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
+                      transcriptionEngine === 'gemini'
+                        ? 'bg-[#FFC400] text-[#111111] border-[#111111] shadow-paper-xs font-bold'
+                        : 'bg-[var(--card-bg)] text-[var(--text-primary)] border-[var(--border-main)] hover:border-[#111111]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <span className="text-xs font-mono font-black uppercase">Gemini AI</span>
+                      <Sparkles className="h-3.5 w-3.5" />
+                    </div>
+                    <span className="text-[9px] font-mono opacity-80 mt-1">Cloud AI precision</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isRecording}
+                    onClick={() => setTranscriptionEngine('speechmatics')}
+                    className={`p-2.5 rounded-[6px] border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
+                      transcriptionEngine === 'speechmatics'
+                        ? 'bg-[#FFC400] text-[#111111] border-[#111111] shadow-paper-xs font-bold'
+                        : 'bg-[var(--card-bg)] text-[var(--text-primary)] border-[var(--border-main)] hover:border-[#111111]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <span className="text-xs font-mono font-black uppercase">Speechmatics</span>
+                      <Cpu className="h-3.5 w-3.5" />
+                    </div>
+                    <span className="text-[9px] font-mono opacity-80 mt-1">Built-in engine</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isRecording}
+                    onClick={() => setTranscriptionEngine('browser')}
+                    className={`p-2.5 rounded-[6px] border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
+                      transcriptionEngine === 'browser'
+                        ? 'bg-[#19B56B] text-white border-[#111111] shadow-paper-xs font-bold'
+                        : 'bg-[var(--card-bg)] text-[var(--text-primary)] border-[var(--border-main)] hover:border-[#111111]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <span className="text-xs font-mono font-black uppercase">Browser STT</span>
+                      <span className="text-[9px] font-mono font-black bg-black/20 px-1 rounded">0 TOKENS</span>
+                    </div>
+                    <span className="text-[9px] font-mono opacity-90 mt-1">Zero token cost</span>
+                  </button>
+                </div>
               </div>
 
               {/* Dynamic mascot video / microphone container */}
