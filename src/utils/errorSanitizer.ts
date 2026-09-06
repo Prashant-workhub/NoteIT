@@ -21,13 +21,19 @@ export function formatUserFriendlyErrorMessage(error: any, actionPrefix?: string
   const msgLower = rawMessage.toLowerCase();
   let friendlyMessage = '';
 
-  // 1. API Limit / Rate Limit / Quota Exhausted / HTTP 402 Credit Limit
+  // 1. OpenRouter Credit Limit / HTTP 402 Payment Required
   if (
     msgLower.includes('402') ||
     msgLower.includes('more credits') ||
     msgLower.includes('can only afford') ||
     msgLower.includes('openrouter_credits') ||
     msgLower.includes('openrouter api error: 402') ||
+    msgLower.includes('add openrouter credits')
+  ) {
+    friendlyMessage = "OpenRouter credit limit reached. Please add OpenRouter credits or switch your AI Provider to Google Gemini API Key in Settings.";
+  }
+  // 1b. General Rate Limit / HTTP 429 / Too Many Requests / Quota Exceeded
+  else if (
     msgLower.includes('429') ||
     msgLower.includes('resource_exhausted') ||
     msgLower.includes('quota') ||
@@ -37,7 +43,7 @@ export function formatUserFriendlyErrorMessage(error: any, actionPrefix?: string
     msgLower.includes('exceeded your current quota') ||
     msgLower.includes('insufficient_quota')
   ) {
-    friendlyMessage = "OpenRouter / API credit limit reached. Switch your AI Provider to Google Gemini API Key in Settings or add OpenRouter credits.";
+    friendlyMessage = "Rate limited / API limit reached. Please wait a moment before trying again or check your AI provider quota in Settings.";
   }
   // 2. Network / Server Connection Failures
   else if (

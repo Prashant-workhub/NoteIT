@@ -109,6 +109,7 @@ export default function LectureCaptureView({
   const [uiError, setUiError] = useState<string | null>(null);
   const [uiSuccess, setUiSuccess] = useState<string | null>(null);
   const failedAssetKeysRef = useRef<Set<string>>(new Set());
+  const autoAttemptedLecturesRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const handleUiError = (e: any) => {
@@ -1609,12 +1610,20 @@ export default function LectureCaptureView({
     const activeLec = lectures.find(l => l.id === activeLectureId);
     if (!activeLec) return;
 
+    // Prevent endless retry loop if this lecture ID has already been attempted in this session
+    if (autoAttemptedLecturesRef.current.has(activeLectureId)) return;
+
+    // Check if lecture is currently processing or previously failed to prevent automatic request spamming
+    const resStatus = (activeLec as any).resourceGenerationStatus;
+    if (resStatus === 'processing' || resStatus === 'failed') return;
+
     const hasNotes = activeLec.notes?.academic || activeLec.notes?.quick || activeLec.notes?.detailed;
     const hasSummary = activeLec.summaries?.quick_revision || activeLec.summaries?.academic_format;
     const transcriptText = activeLec.cleanTranscript || activeLec.transcript;
 
     if (!hasNotes && !hasSummary && transcriptText && transcriptText.trim().length > 20) {
       console.log('[LectureCaptureView] Saved transcript detected. Auto-generating notes & AI assets for:', activeLectureId);
+      autoAttemptedLecturesRef.current.add(activeLectureId);
       setIsGeneratingNotes(true);
       setIsGeneratingSummary(true);
       generateResourcesFromTranscript(activeLectureId, transcriptText, { mode: 'academic', modeType: 'all' })
@@ -1623,6 +1632,8 @@ export default function LectureCaptureView({
         })
         .catch((err) => {
           console.error('[LectureCaptureView] Auto note compilation failed:', err);
+          const friendlyMsg = formatUserFriendlyErrorMessage(err, "Auto note compilation failed");
+          setUiError(friendlyMsg);
         })
         .finally(() => {
           setIsGeneratingNotes(false);
