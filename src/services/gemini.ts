@@ -1084,6 +1084,12 @@ export const generateLectureContent = async (
   );
   const rawTranscript = transcription.transcript;
 
+  console.log('==================================================');
+  console.log('[AUDIO TRANSCRIPTION AUDIT LOG]');
+  console.log(`- Platform/Provider Used: ${(transcription.provider || 'GEMINI').toUpperCase()} ${transcription.fallback ? '(Fallback Provider)' : '(Primary Provider)'}`);
+  console.log(`- Transcribed Audio Content:\n${rawTranscript}`);
+  console.log('==================================================');
+
   // Phase 2: Ingest Assets (Lightweight)
   if (onProgress) onProgress(2, `Transcript ready via ${transcription.provider === 'gemini' ? 'Gemini' : 'Speechmatics'}. Sending text to your selected AI provider…`);
   const data = await generateInitialLectureAssets(rawTranscript, apiKey, onBusy);

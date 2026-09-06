@@ -451,6 +451,12 @@ export default function LectureProcessingView({
           const transcriptText = aiData.cleanTranscript || aiData.transcript || '';
           setSavedTranscript(transcriptText);
 
+          console.log('==================================================');
+          console.log('[LECTURE PROCESSING TRANSCRIPT AUDIT LOG]');
+          console.log(`- Platform/Provider Used: ${(aiData.transcriptionProvider || 'GEMINI').toUpperCase()}`);
+          console.log(`- Transcribed Audio Content:\n${transcriptText}`);
+          console.log('==================================================');
+
           await updateLecture(lectureId, {
             title: resolvedTitle,
             recordingStatus: 'uploaded',

@@ -99,6 +99,67 @@ export default function LectureCaptureView({
   // Lecture Metadata inputs
   const [lectureTitle, setLectureTitle] = useState('');
   const [lectureSubject, setLectureSubject] = useState('Data Structures');
+  const [captureInputMode, setCaptureInputMode] = useState<'audio' | 'manual'>('audio');
+  const [manualTranscriptInput, setManualTranscriptInput] = useState('');
+  const [isSubmittingManual, setIsSubmittingManual] = useState(false);
+
+  const handleProcessManualTranscript = async () => {
+    if (!manualTranscriptInput.trim()) {
+      alert('Please write or paste your lecture transcript first.');
+      return;
+    }
+    const uid = auth.currentUser?.uid;
+    if (!uid) {
+      alert('User not authenticated.');
+      return;
+    }
+
+    const title = lectureTitle.trim() || 'Manual Lecture - ' + new Date().toLocaleDateString();
+    const subj = lectureSubject || (availableSubjects[0]?.name || 'General');
+
+    console.log('==================================================');
+    console.log('[MANUAL TRANSCRIPT AUDIT LOG]');
+    console.log(`- Platform/Provider Used: MANUAL_INPUT`);
+    console.log(`- Transcribed Audio Content:\n${manualTranscriptInput}`);
+    console.log('==================================================');
+
+    setIsSubmittingManual(true);
+    try {
+      const docRef = await addDoc(collection(db, 'users', uid, 'lectures'), {
+        title,
+        subject: subj,
+        duration: 'Manual Entry',
+        transcript: manualTranscriptInput,
+        cleanTranscript: manualTranscriptInput,
+        status: 'transcribed',
+        recordingStatus: 'manual',
+        transcriptionStatus: 'completed',
+        resourceGenerationStatus: 'processing',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+
+      setActiveLectureId(docRef.id);
+
+      const { generateResourcesFromTranscript } = await import('../services/gemini');
+      await generateResourcesFromTranscript(docRef.id, manualTranscriptInput, { mode: 'academic', modeType: 'all' });
+
+      await updateDoc(doc(db, 'users', uid, 'lectures', docRef.id), {
+        resourceGenerationStatus: 'completed',
+        status: 'generated',
+        generationFinishedAt: serverTimestamp(),
+        processingCompletedAt: serverTimestamp()
+      });
+
+      alert('Transcript saved successfully! AI Study Notes & Resources have been generated.');
+      setManualTranscriptInput('');
+    } catch (err: any) {
+      console.error('Failed to process manual transcript:', err);
+      alert(formatUserFriendlyErrorMessage(err, 'Failed to process manual transcript'));
+    } finally {
+      setIsSubmittingManual(false);
+    }
+  };
 
   const defaultSubjectsList = React.useMemo(() => [
     { id: 'def-1', name: 'Data Structures', code: 'CS201' },
@@ -3007,9 +3068,68 @@ export default function LectureCaptureView({
                   ))}
                 </div>
 
+                {/* Mode Selector Tabs for Live Microphone vs Manual Transcript Entry */}
+                <div className="flex items-center gap-2 my-2">
+                  <button
+                    type="button"
+                    onClick={() => setCaptureInputMode('audio')}
+                    className={`flex-1 py-1.5 px-3 rounded-[4px] border-2 border-[var(--border-main)] font-mono text-xs font-extrabold uppercase transition-all cursor-pointer ${
+                      captureInputMode === 'audio'
+                        ? 'bg-[#FFC400] text-[#111111] shadow-paper-sm'
+                        : 'bg-[var(--card-bg)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                    }`}
+                  >
+                    🎙️ Microphone Live
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCaptureInputMode('manual')}
+                    className={`flex-1 py-1.5 px-3 rounded-[4px] border-2 border-[var(--border-main)] font-mono text-xs font-extrabold uppercase transition-all cursor-pointer ${
+                      captureInputMode === 'manual'
+                        ? 'bg-[#FFC400] text-[#111111] shadow-paper-sm'
+                        : 'bg-[var(--card-bg)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                    }`}
+                  >
+                    ✍️ Write / Paste Transcript
+                  </button>
+                </div>
+
                 {/* Live Input message box */}
-                <div className="flex-1 flex items-center justify-center rounded-[6px] bg-[var(--panel-bg)] border-2 border-[var(--border-main)] p-4 text-[var(--text-primary)]">
-                  {!isRecording ? (
+                <div className="flex-1 flex flex-col items-center justify-center rounded-[6px] bg-[var(--panel-bg)] border-2 border-[var(--border-main)] p-4 text-[var(--text-primary)]">
+                  {captureInputMode === 'manual' ? (
+                    <div className="flex flex-col h-full w-full space-y-3">
+                      <div className="flex items-center justify-between border-b-2 border-[var(--border-main)] pb-2">
+                        <span className="text-xs font-mono font-extrabold uppercase text-[var(--text-primary)] flex items-center gap-1.5">
+                          <FileText className="h-4 w-4 text-[#2563EB]" />
+                          Lecture Transcript Input
+                        </span>
+                        <span className="text-[10px] font-mono font-bold text-[var(--text-secondary)] bg-[var(--card-bg)] px-2 py-0.5 rounded border border-[var(--border-main)]">
+                          {manualTranscriptInput.trim().split(/\s+/).filter(Boolean).length} WORDS | {manualTranscriptInput.length} CHARS
+                        </span>
+                      </div>
+                      <textarea
+                        value={manualTranscriptInput}
+                        onChange={(e) => setManualTranscriptInput(e.target.value)}
+                        placeholder="Type or paste your raw lecture transcript, notes, or spoken lecture text here. NoteIT AI will automatically analyze the text, log it to the console, and generate comprehensive study notes, flashcards, quizzes, and mind maps..."
+                        className="w-full h-40 p-3 rounded-[4px] border-2 border-[var(--border-main)] bg-[var(--card-bg)] text-xs font-mono text-[var(--text-primary)] placeholder-[var(--text-secondary)] resize-none focus:outline-none focus:ring-2 focus:ring-[#FFC400]"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleProcessManualTranscript}
+                        disabled={isSubmittingManual || !manualTranscriptInput.trim()}
+                        className="w-full py-2.5 rounded-[4px] border-2 border-[var(--border-main)] bg-[#FFC400] text-[#111111] text-xs font-mono font-extrabold uppercase shadow-paper-sm hover:bg-[#ffe066] disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        {isSubmittingManual ? (
+                          <BruteLoader size="sm" message="Processing transcript & generating AI study notes..." />
+                        ) : (
+                          <>
+                            <Sparkles className="h-4 w-4 text-[#111111]" />
+                            <span>Process Transcript & Generate AI Study Notes</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  ) : !isRecording ? (
                     <div className="flex flex-col items-center justify-center text-center h-full space-y-2">
                       <MicOff className="h-8 w-8 text-[var(--text-secondary)]" />
                       <p className="text-xs font-heading font-extrabold uppercase text-[var(--text-primary)]">Microphone Standby</p>
