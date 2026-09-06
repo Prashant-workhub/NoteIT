@@ -222,6 +222,7 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
         title: string;
         type: 'text' | 'concept' | 'diagram' | 'formula' | 'terms' | 'bullets' | 'table' | 'remember' | 'examFocus';
         content: any;
+        table?: Array<{ col1: string; col2: string }>;
       }>;
     }> = [];
 

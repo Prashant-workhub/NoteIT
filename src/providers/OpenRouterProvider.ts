@@ -11,12 +11,33 @@ export async function postOpenRouterWithCreditFallback(
   payload: any,
   requestedMaxTokens?: number
 ): Promise<any> {
-  const attemptRequest = async (modelName: string, tokens?: number): Promise<Response> => {
-    const body: any = { ...payload, model: modelName };
+  const FREE_MODELS_POOL = [
+    'google/gemini-2.0-flash-exp:free',
+    'meta-llama/llama-3.3-70b-instruct:free',
+    'qwen/qwen-2.5-72b-instruct:free',
+    'deepseek/deepseek-r1:free',
+    'mistralai/mistral-7b-instruct:free',
+    'google/gemini-2.0-flash-lite-preview:free'
+  ];
+
+  const attemptRequest = async (modelName: string | string[], tokens?: number, omitFormat = false): Promise<Response> => {
+    const body: any = { ...payload };
+    if (Array.isArray(modelName)) {
+      body.models = modelName;
+      delete body.model;
+    } else {
+      body.model = modelName;
+      delete body.models;
+    }
+
     if (tokens !== undefined && tokens > 0) {
       body.max_tokens = tokens;
     } else {
       delete body.max_tokens;
+    }
+
+    if (omitFormat) {
+      delete body.response_format;
     }
 
     return await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -31,7 +52,7 @@ export async function postOpenRouterWithCreditFallback(
     });
   };
 
-  let initialModel = payload.model || 'google/gemini-2.0-flash-001';
+  let initialModel = payload.model || 'google/gemini-2.0-flash-exp:free';
   if (
     !initialModel ||
     initialModel.startsWith('sk-') ||
@@ -44,66 +65,68 @@ export async function postOpenRouterWithCreditFallback(
     (initialModel.length > 40 && !initialModel.includes('/')) ||
     /^[a-zA-Z0-9_\-]{40,}$/.test(initialModel)
   ) {
-    console.warn(`[OpenRouter] Invalid model string detected ("${initialModel?.slice(0, 12)}..."). Fallback to 'google/gemini-2.0-flash-001'.`);
-    initialModel = 'google/gemini-2.0-flash-001';
+    console.warn(`[OpenRouter] Invalid model string detected ("${initialModel?.slice(0, 12)}..."). Fallback to free models pool.`);
+    initialModel = 'google/gemini-2.0-flash-exp:free';
   }
 
-  // 1. Initial Attempt
+  // 1. Initial Attempt using specified model or free pool
   let response = await attemptRequest(initialModel, requestedMaxTokens);
 
-  // 2. Handle HTTP 402 (Insufficient Credits / max_tokens credit reservation failure)
-  if (!response.ok && (response.status === 402 || response.status === 403)) {
-    let errText = await response.text().catch(() => '');
-    console.warn(`[OpenRouter] Received status ${response.status} with model=${initialModel}, max_tokens=${requestedMaxTokens}. Executing credit-adaptive fallback...`, errText);
+  // 2. If initial attempt succeeded, return data
+  if (response.ok) {
+    return await response.json();
+  }
 
-    // Try parsing affordable tokens limit from OpenRouter's 402 response
+  const errText = await response.text().catch(() => '');
+  console.warn(`[OpenRouter] Initial request status ${response.status} with model=${initialModel}. Executing fallback sequence...`, errText);
+
+  // 3. Retry with affordable token budget if 402/403 max_tokens credit reservation error
+  if (response.status === 402 || response.status === 403) {
     const match = errText.match(/can only afford (\d+)/i);
     if (match && match[1]) {
       const affordableTokens = Math.max(300, Math.floor(parseInt(match[1], 10) * 0.9));
       console.log(`[OpenRouter] Retrying request with affordable max_tokens: ${affordableTokens}`);
       response = await attemptRequest(initialModel, affordableTokens);
-    } else {
-      console.log(`[OpenRouter] Retrying request with reduced max_tokens: 1000`);
-      response = await attemptRequest(initialModel, 1000);
+      if (response.ok) return await response.json();
     }
-
-    // 3. If still 402/403, AUTOMATIC FAILOVER TO OPENROUTER FREE TIER MODELS ($0 credit reservation)
-    if (!response.ok && (response.status === 402 || response.status === 403)) {
-      console.warn('[OpenRouter] Paid model credit reservation failed (402). Attempting automatic switch to OpenRouter Free tier models...');
-      const freeModels = [
-        'google/gemini-2.0-flash-exp:free',
-        'meta-llama/llama-3.3-70b-instruct:free',
-        'qwen/qwen-2.5-72b-instruct:free',
-        'deepseek/deepseek-r1:free'
-      ];
-
-      for (const freeModel of freeModels) {
-        console.log(`[OpenRouter] Trying free tier model: ${freeModel}`);
-        const freeResponse = await attemptRequest(freeModel, undefined);
-        if (freeResponse.ok) {
-          console.log(`[OpenRouter] Successfully generated response using free model: ${freeModel}`);
-          return await freeResponse.json();
-        }
-      }
-
-      throw new Error(`OpenRouter API error: 402 - Insufficient OpenRouter credits for model '${initialModel}'. Please add credits at openrouter.ai/settings/credits or switch to Google Gemini API Key in Settings.`);
-    }
-
-    if (!response.ok) {
-      const retryErrText = await response.text().catch(() => errText);
-      throw new Error(`OpenRouter API error: ${response.status} - ${retryErrText}`);
-    }
-  } else if (!response.ok) {
-    const errText = await response.text().catch(() => '');
-    throw new Error(`OpenRouter API error: ${response.status} - ${errText}`);
   }
 
-  return await response.json();
+  // 4. Try native OpenRouter multi-model router array across FREE models pool (omitting max_tokens reservation)
+  console.log('[OpenRouter] Executing multi-model fallback across OpenRouter Free pool...');
+  const poolResponse = await attemptRequest(FREE_MODELS_POOL, undefined);
+  if (poolResponse.ok) {
+    console.log('[OpenRouter] Successfully generated response via OpenRouter Free model router array.');
+    return await poolResponse.json();
+  }
+
+  // 5. Try free models individually (also test without response_format if json_object caused 400)
+  for (const freeModel of FREE_MODELS_POOL) {
+    console.log(`[OpenRouter] Retrying individual free model: ${freeModel}`);
+    const freeRes = await attemptRequest(freeModel, undefined, false);
+    if (freeRes.ok) return await freeRes.json();
+
+    // Retry without response_format in case upstream provider doesn't support json_object mode
+    if (payload.response_format) {
+      const plainRes = await attemptRequest(freeModel, undefined, true);
+      if (plainRes.ok) return await plainRes.json();
+    }
+  }
+
+  // 6. Handle final failure with clear, friendly explanation
+  if (response.status === 402 || poolResponse.status === 402) {
+    throw new Error('OpenRouter API limit reached: Accounts with $0 credits have a daily free quota of 50 requests/day. Add $5-$10 credits to OpenRouter to expand limits to 1,000/day, or switch your AI Provider to Google Gemini API Key in Settings.');
+  }
+
+  if (response.status === 429 || poolResponse.status === 429) {
+    throw new Error('OpenRouter rate limit reached (20 req/min). Please wait 30 seconds or switch your AI Provider to Google Gemini API Key in Settings.');
+  }
+
+  throw new Error(`OpenRouter API error (${response.status}): ${errText || 'Service temporarily unavailable.'}`);
 }
 
 export class OpenRouterProvider extends BaseProvider {
   constructor(apiKey: string) {
-    super(apiKey, 'google/gemini-2.0-flash-001');
+    super(apiKey, 'google/gemini-2.0-flash-exp:free');
   }
 
   getAvailableModels(): string[] {
