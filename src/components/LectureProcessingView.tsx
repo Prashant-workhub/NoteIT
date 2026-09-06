@@ -38,7 +38,7 @@ const COMPILATION_STEPS = [
   { label: "Uploading Audio", description: "Saving raw audio bytes to Azure Blob Storage." },
   { label: "Deciphering Speech", description: "Trying Gemini transcription first, with automatic Speechmatics fallback." },
   { label: "Cleaning Transcript", description: "Removing stutters, filler words, and converting to professional academic prose." },
-  { label: "Detecting Chapters", description: "Segmenting lecture sections and milestones." },
+  { label: "Generating Study Assets", description: "Segmenting chapters, writing study notes, flashcards, quizzes & mindmaps." },
   { label: "Saving Results", description: "Persisting the completed academic workspace directly to Firestore." }
 ];
 
@@ -46,7 +46,7 @@ const DOCUMENT_COMPILATION_STEPS = [
   { label: "Uploading Document", description: "Uploading document file payload to Azure Storage." },
   { label: "Extracting Content", description: "Extracting structural text data from file format (PDF/DOCX/PPTX)." },
   { label: "Cleaning Transcript", description: "Formatting text and generating transcript lines." },
-  { label: "Detecting Chapters", description: "Segmenting lecture sections and milestones." },
+  { label: "Generating Study Assets", description: "Segmenting chapters, writing study notes, flashcards, quizzes & mindmaps." },
   { label: "Saving Results", description: "Persisting the completed academic workspace directly to Firestore." }
 ];
 

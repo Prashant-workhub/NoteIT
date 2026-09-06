@@ -1143,8 +1143,22 @@ export default function ResearchHubView({
               </div>
 
               {!selectedLecture.flashcards || selectedLecture.flashcards.length === 0 ? (
-                <div className="text-center py-16 text-neutral-500 font-mono text-[11px] border border-dashed border-neutral-800 rounded-2xl p-6 bg-neutral-900/5">
-                  Upload a source to generate content.
+                <div className="text-center py-16 text-neutral-500 font-sans border border-dashed border-neutral-800/80 rounded-2xl p-6 bg-[#0c0d12]/50 space-y-4">
+                  <Sparkles className="h-10 w-10 mx-auto opacity-40 text-orange-400" />
+                  <div>
+                    <p className="font-bold text-sm text-neutral-200">No Flashcards Generated Yet</p>
+                    <p className="text-xs text-neutral-400 mt-1 max-w-sm mx-auto">
+                      Generate active recall flashcards on demand from your lecture transcript.
+                    </p>
+                  </div>
+                  <button
+                    disabled={isGeneratingHubResources}
+                    onClick={() => handleHubGenerateResources('missing')}
+                    className="px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-md cursor-pointer inline-flex items-center gap-2"
+                  >
+                    {isGeneratingHubResources ? <RotateCw className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    <span>Generate Flashcards On-Demand</span>
+                  </button>
                 </div>
               ) : (
                 <>
@@ -1277,8 +1291,22 @@ export default function ResearchHubView({
               </div>
 
               {!selectedLecture.quiz || selectedLecture.quiz.length === 0 ? (
-                <div className="text-center py-16 text-neutral-500 font-mono text-[11px] border border-dashed border-neutral-800 rounded-2xl p-6 bg-neutral-900/5">
-                  Upload a source to generate content.
+                <div className="text-center py-16 text-neutral-500 font-sans border border-dashed border-neutral-800/80 rounded-2xl p-6 bg-[#0c0d12]/50 space-y-4">
+                  <Award className="h-10 w-10 mx-auto opacity-40 text-emerald-400" />
+                  <div>
+                    <p className="font-bold text-sm text-neutral-200">No Quiz Generated Yet</p>
+                    <p className="text-xs text-neutral-400 mt-1 max-w-sm mx-auto">
+                      Generate a practice assessment on demand from your lecture transcript.
+                    </p>
+                  </div>
+                  <button
+                    disabled={isGeneratingHubResources}
+                    onClick={() => handleHubGenerateResources('missing')}
+                    className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-md cursor-pointer inline-flex items-center gap-2"
+                  >
+                    {isGeneratingHubResources ? <RotateCw className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    <span>Generate Quiz On-Demand</span>
+                  </button>
                 </div>
               ) : (
                 <>
@@ -1391,8 +1419,22 @@ export default function ResearchHubView({
               </div>
 
               {!selectedLecture.keyConcepts || selectedLecture.keyConcepts.length === 0 ? (
-                <div className="text-center py-16 text-neutral-500 font-mono text-[11px] border border-dashed border-neutral-800 rounded-2xl p-6 bg-neutral-900/5">
-                  Upload a source to generate content.
+                <div className="text-center py-16 text-neutral-500 font-sans border border-dashed border-neutral-800/80 rounded-2xl p-6 bg-[#0c0d12]/50 space-y-4">
+                  <Brain className="h-10 w-10 mx-auto opacity-40 text-cyan-400" />
+                  <div>
+                    <p className="font-bold text-sm text-neutral-200">No Mind Map Generated Yet</p>
+                    <p className="text-xs text-neutral-400 mt-1 max-w-sm mx-auto">
+                      Generate structured concept mapping on demand from your lecture transcript.
+                    </p>
+                  </div>
+                  <button
+                    disabled={isGeneratingHubResources}
+                    onClick={() => handleHubGenerateResources('missing')}
+                    className="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-md cursor-pointer inline-flex items-center gap-2"
+                  >
+                    {isGeneratingHubResources ? <RotateCw className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    <span>Generate Mind Map On-Demand</span>
+                  </button>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
