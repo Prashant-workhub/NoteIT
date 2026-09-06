@@ -32,7 +32,7 @@ export class ClaudeProvider extends BaseProvider {
       },
       body: JSON.stringify({
         model: activeModel,
-        max_tokens: 4096,
+        max_tokens: 8192,
         messages: [{ role: 'user', content: prompt }]
       })
     });
@@ -59,7 +59,7 @@ export class ClaudeProvider extends BaseProvider {
       },
       body: JSON.stringify({
         model: activeModel,
-        max_tokens: 4096,
+        max_tokens: 8192,
         system: systemPrompt,
         messages: [{ role: 'user', content: prompt }]
       })

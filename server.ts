@@ -832,10 +832,10 @@ app.post(['/api/lectures/:lectureId/generate-resources', '/api/lectures/generate
       sourceText = buildOptimizedContextForResource(aiAnalysis, mode);
     } else {
       console.log(`[GENERATE-RESOURCES] OpenRouter analysis unavailable. Using raw transcript pipeline.`);
-      // Chunking fallback logic for large transcripts when OpenRouter is unavailable
-      if (transcriptText.length > 12000) {
+      // Chunking fallback logic for extremely large transcripts (>250k chars) when OpenRouter is unavailable
+      if (transcriptText.length > 250000) {
         console.log(`[CHUNK] Transcript length (${transcriptText.length} chars) exceeds threshold. Chunking...`);
-        const chunks = chunkTranscriptText(transcriptText, 9000, 500);
+        const chunks = chunkTranscriptText(transcriptText, 30000, 1000);
         const chunkSummaries: string[] = [];
         for (let i = 0; i < chunks.length; i++) {
           const chunkPrompt = `Summarize the following lecture section (Chunk ${i + 1} of ${chunks.length}) in detailed academic bullet points:\n\n${chunks[i]}`;
@@ -844,7 +844,7 @@ app.post(['/api/lectures/:lectureId/generate-resources', '/api/lectures/generate
             chunkSummaries.push(`--- Chunk ${i + 1} ---\n${chunkRes}`);
           } catch (cErr) {
             console.warn(`[CHUNK] Failed to process chunk ${i + 1}, using fallback snippet:`, cErr);
-            chunkSummaries.push(`--- Chunk ${i + 1} ---\n${chunks[i].substring(0, 3000)}`);
+            chunkSummaries.push(`--- Chunk ${i + 1} ---\n${chunks[i]}`);
           }
         }
         sourceText = chunkSummaries.join('\n\n');

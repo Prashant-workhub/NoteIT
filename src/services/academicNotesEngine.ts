@@ -192,7 +192,7 @@ CRITICAL MANDATORY INSTRUCTIONS:
 
   if (sanitizedText.trim().length > 0) {
     parts.push({
-      text: `SANITIZED ACADEMIC DOCUMENT TEXT (SYLLABUS NOISE REMOVED):\n\n${sanitizedText.slice(0, 100000)}`
+      text: `SANITIZED ACADEMIC DOCUMENT TEXT (SYLLABUS NOISE REMOVED):\n\n${sanitizedText.slice(0, 250000)}`
     });
   }
 

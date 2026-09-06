@@ -165,7 +165,8 @@ ${transcriptText}`;
     body: JSON.stringify({
       model: modelName,
       messages: [{ role: 'user', content: prompt }],
-      response_format: { type: 'json_object' }
+      response_format: { type: 'json_object' },
+      max_tokens: 16384
     })
   });
 

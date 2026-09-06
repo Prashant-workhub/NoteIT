@@ -830,7 +830,7 @@ export const generateIngestedAssetsFromText = async (
     CRITICAL FORMATTING RULE: For any mathematical equations, numbers, variables, or exponents, NEVER use caret notation (like '3^2', 'x^y', 'x^2', '2^n'). Instead, write them with actual superscript Unicode characters representing the power/exponent directly above the base (e.g., '3²', 'xʸ', 'x²', '2ⁿ'). Apply this rule strictly to all mathematical powers and exponents throughout the output.
     
     Raw Source Text:
-    ${rawText.length > 20000 ? rawText.substring(0, 20000) + "\n[Text truncated for rapid processing...]" : rawText}
+    ${rawText.length > 250000 ? rawText.substring(0, 250000) + "\n[Text truncated for rapid processing...]" : rawText}
     
     Return the result STRICTLY as a JSON object matching the requested schema.
   `;

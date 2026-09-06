@@ -39,7 +39,8 @@ export class OpenRouterProvider extends BaseProvider {
       },
       body: JSON.stringify({
         model: activeModel,
-        messages: [{ role: 'user', content: prompt }]
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 16384
       })
     });
 
@@ -65,7 +66,8 @@ export class OpenRouterProvider extends BaseProvider {
       body: JSON.stringify({
         model: activeModel,
         messages: [{ role: 'user', content: `${prompt}\n\nYou MUST return the response strictly matching this JSON schema: ${JSON.stringify(schema)}` }],
-        response_format: { type: 'json_object' }
+        response_format: { type: 'json_object' },
+        max_tokens: 16384
       })
     });
 
