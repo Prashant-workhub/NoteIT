@@ -31,7 +31,22 @@ export async function postOpenRouterWithCreditFallback(
     });
   };
 
-  const initialModel = payload.model || 'google/gemini-2.0-flash-001';
+  let initialModel = payload.model || 'google/gemini-2.0-flash-001';
+  if (
+    !initialModel ||
+    initialModel.startsWith('sk-') ||
+    initialModel.startsWith('sk-or-') ||
+    initialModel.startsWith('AIza') ||
+    initialModel.startsWith('gsk_') ||
+    initialModel.startsWith('nvapi-') ||
+    initialModel.startsWith('ms-') ||
+    initialModel.startsWith('xai-') ||
+    (initialModel.length > 40 && !initialModel.includes('/')) ||
+    /^[a-zA-Z0-9_\-]{40,}$/.test(initialModel)
+  ) {
+    console.warn(`[OpenRouter] Invalid model string detected ("${initialModel?.slice(0, 12)}..."). Fallback to 'google/gemini-2.0-flash-001'.`);
+    initialModel = 'google/gemini-2.0-flash-001';
+  }
 
   // 1. Initial Attempt
   let response = await attemptRequest(initialModel, requestedMaxTokens);

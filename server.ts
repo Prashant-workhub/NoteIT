@@ -178,7 +178,7 @@ app.post('/api/ai/validate-key', authenticateFirebaseUser, async (req, res) => {
     const encrypted = encryptKey(inputKey);
 
     const providerInstance = ProviderFactory.getProvider(inputProvider, inputKey);
-    const defaultModel = model || providerInstance.getAvailableModels()[0];
+    const defaultModel = sanitizeModelName(model, activeProvider);
 
     try {
       const adminDb = getFirestore();
@@ -217,9 +217,40 @@ app.post('/api/ai/validate-key', authenticateFirebaseUser, async (req, res) => {
   }
 });
 
-function sanitizeModelName(model?: string): string {
-  if (!model || !model.trim()) return 'gemini-3.6-flash';
+function getDefaultModelForProvider(provider?: string): string {
+  const p = (provider || 'gemini').toLowerCase();
+  if (p === 'openrouter') return 'google/gemini-2.0-flash-001';
+  if (p === 'openai') return 'gpt-4o-mini';
+  if (p === 'groq') return 'llama-3.3-70b-versatile';
+  if (p === 'claude' || p === 'anthropic') return 'claude-3-5-sonnet-latest';
+  if (p === 'deepseek') return 'deepseek-chat';
+  if (p === 'grok' || p === 'xai') return 'grok-2';
+  if (p === 'mistral') return 'mistral-large-latest';
+  if (p === 'nvidia') return 'z-ai/glm-5.2';
+  return 'gemini-3.6-flash';
+}
+
+function sanitizeModelName(model?: string, providerName?: string): string {
+  const defaultModel = getDefaultModelForProvider(providerName);
+  if (!model || !model.trim()) return defaultModel;
   const trimmed = model.trim().replace(/^models\//, '');
+
+  // Detect if an API key string was accidentally passed as modelName
+  if (
+    trimmed.startsWith('sk-') ||
+    trimmed.startsWith('sk-or-') ||
+    trimmed.startsWith('AIza') ||
+    trimmed.startsWith('gsk_') ||
+    trimmed.startsWith('nvapi-') ||
+    trimmed.startsWith('ms-') ||
+    trimmed.startsWith('xai-') ||
+    (trimmed.length > 40 && !trimmed.includes('/') && !trimmed.includes('-')) ||
+    /^[a-zA-Z0-9_\-]{40,}$/.test(trimmed)
+  ) {
+    console.warn(`[sanitizeModelName] Detected API Key string passed as modelName ("${trimmed.slice(0, 12)}..."). Fallback to default model '${defaultModel}'.`);
+    return defaultModel;
+  }
+
   if (trimmed === 'gemini-2.5-flash') return 'gemini-3.6-flash';
   return trimmed;
 }
@@ -440,7 +471,7 @@ app.post('/api/ai/provider-proxy', authenticateFirebaseUser, async (req, res) =>
     }
 
     const providerName = data?.aiProvider || 'gemini';
-    const selectedModel = sanitizeModelName(model || data?.selectedModel || ProviderFactory.getAvailableModels(providerName)[0]);
+    const selectedModel = sanitizeModelName(model || data?.selectedModel || ProviderFactory.getAvailableModels(providerName)[0], providerName);
 
     let decryptedKey: string;
     try {
@@ -822,7 +853,7 @@ app.post(['/api/lectures/:lectureId/generate-resources', '/api/lectures/generate
     }
 
     const providerName = userData?.aiProvider || 'gemini';
-    const selectedModel = sanitizeModelName(options?.model || userData?.selectedModel || ProviderFactory.getAvailableModels(providerName)[0]);
+    const selectedModel = sanitizeModelName(options?.model || userData?.selectedModel || ProviderFactory.getAvailableModels(providerName)[0], providerName);
 
     let decryptedKey: string;
     try {

@@ -94,6 +94,15 @@ export function formatUserFriendlyErrorMessage(error: any, actionPrefix?: string
   ) {
     friendlyMessage = "No API key configured. Please add your API key in Settings to continue.";
   }
+  // 5b. Invalid AI Model ID
+  else if (
+    msgLower.includes('is not a valid model') ||
+    msgLower.includes('invalid model') ||
+    msgLower.includes('model_not_found') ||
+    msgLower.includes('unknown model')
+  ) {
+    friendlyMessage = "The AI model specified is invalid. Reverting to the default model for your AI provider.";
+  }
   // 6. Missing Transcript or Source Content
   else if (
     msgLower.includes('transcript is not available') ||
