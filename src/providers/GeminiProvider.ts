@@ -10,9 +10,12 @@ function sanitizeGeminiModel(model?: string): string {
 
 export async function fetchGeminiApi(apiKey: string, requestedModel: string, bodyObj: any): Promise<Response> {
   const model = sanitizeGeminiModel(requestedModel);
-  for (const ver of ['v1beta', 'v1']) {
-    const url = `https://generativelanguage.googleapis.com/${ver}/models/${model}:generateContent?key=${apiKey}`;
-    try {
+
+  const executeFetchWithRetry = async (url: string): Promise<Response> => {
+    let attempts = 0;
+    const maxAttempts = 3;
+    while (attempts < maxAttempts) {
+      attempts++;
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -23,28 +26,35 @@ export async function fetchGeminiApi(apiKey: string, requestedModel: string, bod
         return response;
       }
 
-      const errText = await response.text();
-      if (response.status !== 404) {
-        throw new Error(`Gemini API error: ${response.status} - ${errText}`);
+      const status = response.status;
+      if ((status === 429 || status === 503) && attempts < maxAttempts) {
+        const backoffMs = attempts * 1500;
+        console.warn(`[Gemini API] Status ${status} encountered. Retrying attempt ${attempts + 1}/${maxAttempts} in ${backoffMs}ms...`);
+        await new Promise(resolve => setTimeout(resolve, backoffMs));
+        continue;
       }
+
+      const errText = await response.text().catch(() => '');
+      const errObj: any = new Error(`Gemini API error: ${status} - ${errText}`);
+      errObj.status = status;
+      throw errObj;
+    }
+    throw new Error(`Gemini API error: Max retries reached for ${model}`);
+  };
+
+  for (const ver of ['v1beta', 'v1']) {
+    const url = `https://generativelanguage.googleapis.com/${ver}/models/${model}:generateContent?key=${apiKey}`;
+    try {
+      return await executeFetchWithRetry(url);
     } catch (err: any) {
-      if (err.message && err.message.startsWith('Gemini API error:')) {
+      if (err.status && err.status !== 404) {
         throw err;
       }
     }
   }
 
   const finalUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-  const response = await fetch(finalUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: typeof bodyObj === 'string' ? bodyObj : JSON.stringify(bodyObj)
-  });
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Gemini API error: ${response.status} - ${errText}`);
-  }
-  return response;
+  return await executeFetchWithRetry(finalUrl);
 }
 
 export class GeminiProvider extends BaseProvider {

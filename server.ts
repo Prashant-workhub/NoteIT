@@ -497,24 +497,42 @@ app.post('/api/ai/provider-proxy', authenticateFirebaseUser, async (req, res) =>
     
     console.log(`\n[provider-proxy] 🚀 Executing "${actualAction}" using Provider: ${providerName.toUpperCase()} (Model: ${selectedModel})\n`);
 
-    if (actualAction === 'transcribeAudio') {
-      const base64 = inlineData?.data || req.body.base64Audio;
-      const mType = inlineData?.mimeType || req.body.mimeType || 'audio/webm';
-      result = await providerInstance.transcribeAudio(base64, mType, selectedModel);
-    } else if (actualAction === 'generateStructuredOutput') {
-      result = await providerInstance.generateStructuredOutput(prompt, responseSchema, selectedModel);
-    } else if (actualAction === 'generateQuiz') {
-      result = await providerInstance.generateQuiz(prompt, selectedModel);
-    } else if (actualAction === 'generateMindMap') {
-      result = await providerInstance.generateMindMap(prompt, selectedModel);
-    } else if (actualAction === 'generateFlashcards') {
-      result = await providerInstance.generateFlashcards(prompt, selectedModel);
-    } else if (actualAction === 'generatePresentation') {
-      result = await providerInstance.generatePresentation(prompt, selectedModel);
-    } else if (actualAction === 'generateNotes') {
-      result = await providerInstance.generateNotes(prompt, selectedModel);
-    } else {
-      result = await providerInstance.generateText(prompt, selectedModel);
+    const executeProxyCall = async (provider: any, modelToUse: string) => {
+      if (actualAction === 'transcribeAudio') {
+        const base64 = inlineData?.data || req.body.base64Audio;
+        const mType = inlineData?.mimeType || req.body.mimeType || 'audio/webm';
+        return await provider.transcribeAudio(base64, mType, modelToUse);
+      } else if (actualAction === 'generateStructuredOutput') {
+        return await provider.generateStructuredOutput(prompt, responseSchema, modelToUse);
+      } else if (actualAction === 'generateQuiz') {
+        return await provider.generateQuiz(prompt, modelToUse);
+      } else if (actualAction === 'generateMindMap') {
+        return await provider.generateMindMap(prompt, modelToUse);
+      } else if (actualAction === 'generateFlashcards') {
+        return await provider.generateFlashcards(prompt, modelToUse);
+      } else if (actualAction === 'generatePresentation') {
+        return await provider.generatePresentation(prompt, modelToUse);
+      } else if (actualAction === 'generateNotes') {
+        return await provider.generateNotes(prompt, modelToUse);
+      } else {
+        return await provider.generateText(prompt, modelToUse);
+      }
+    };
+
+    try {
+      result = await executeProxyCall(providerInstance, selectedModel);
+    } catch (primaryErr: any) {
+      const isRateLimitOrQuota = primaryErr?.status === 429 || primaryErr?.status === 402 || primaryErr?.status === 503 ||
+        /429|quota|rate limit|resource_exhausted|too many requests|credit limit/i.test(primaryErr?.message || '');
+
+      const fallbackKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+      if (isRateLimitOrQuota && fallbackKey && decryptedKey !== fallbackKey) {
+        console.warn(`[provider-proxy] Primary provider (${providerName}) rate limited/quota error. Executing automatic server platform key fallback...`);
+        const fallbackProvider = ProviderFactory.getProvider('gemini', fallbackKey);
+        result = await executeProxyCall(fallbackProvider, 'gemini-3.6-flash');
+      } else {
+        throw primaryErr;
+      }
     }
 
     const latency = Date.now() - startTime;
@@ -1029,7 +1047,22 @@ app.post(['/api/lectures/:lectureId/generate-resources', '/api/lectures/generate
       required: ['summary', 'notes', 'flashcards', 'quiz', 'keyConcepts', 'weakTopics', 'timeline', 'sourceIntelligence']
     };
 
-    const generated = await providerInstance.generateStructuredOutput(prompt, schema, selectedModel);
+    let generated: any;
+    try {
+      generated = await providerInstance.generateStructuredOutput(prompt, schema, selectedModel);
+    } catch (primaryErr: any) {
+      const isRateLimitOrQuota = primaryErr?.status === 429 || primaryErr?.status === 402 || primaryErr?.status === 503 ||
+        /429|quota|rate limit|resource_exhausted|too many requests|credit limit/i.test(primaryErr?.message || '');
+
+      const fallbackKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+      if (isRateLimitOrQuota && fallbackKey && decryptedKey !== fallbackKey) {
+        console.warn('[GENERATE-RESOURCES] Primary AI Provider rate limited/quota error. Executing automatic server platform key fallback...');
+        const fallbackProvider = ProviderFactory.getProvider('gemini', fallbackKey);
+        generated = await fallbackProvider.generateStructuredOutput(prompt, schema, 'gemini-3.6-flash');
+      } else {
+        throw primaryErr;
+      }
+    }
 
     const updatedFields: any = {
       resourceGenerationStatus: 'completed',

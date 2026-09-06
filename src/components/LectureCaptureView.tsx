@@ -177,11 +177,11 @@ export default function LectureCaptureView({
         processingCompletedAt: serverTimestamp()
       });
 
-      alert('Transcript saved successfully! AI Study Notes & Resources have been generated.');
+      setUiSuccess('Transcript saved successfully! AI Study Notes & Resources have been generated.');
       setManualTranscriptInput('');
     } catch (err: any) {
       console.error('Failed to process manual transcript:', err);
-      alert(formatUserFriendlyErrorMessage(err, 'Failed to process manual transcript'));
+      setUiError(formatUserFriendlyErrorMessage(err, 'Failed to process manual transcript'));
     } finally {
       setIsSubmittingManual(false);
     }
