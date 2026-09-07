@@ -4,18 +4,18 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Mic, 
-  MicOff, 
-  Play, 
-  Pause, 
-  Square, 
-  Clock, 
-  Cpu, 
-  Sparkles, 
-  Bookmark, 
-  FileText, 
-  CheckCircle, 
+import {
+  Mic,
+  MicOff,
+  Play,
+  Pause,
+  Square,
+  Clock,
+  Cpu,
+  Sparkles,
+  Bookmark,
+  FileText,
+  CheckCircle,
   TrendingUp,
   Brain,
   ListRestart,
@@ -52,10 +52,10 @@ import { useSubjects } from '../hooks/useSubjects';
 
 interface LectureCaptureViewProps {
   onSaveCapture: (
-    title: string, 
-    subject: string, 
-    duration: string, 
-    audioBlob: Blob, 
+    title: string,
+    subject: string,
+    duration: string,
+    audioBlob: Blob,
     existingLectureId?: string,
     transcriptionEngine?: 'gemini' | 'speechmatics' | 'browser',
     browserLiveTranscript?: string
@@ -100,7 +100,7 @@ export default function LectureCaptureView({
   notes = [],
   onRecordingStatusChange
 }: LectureCaptureViewProps) {
-  
+
   // Hook up user subjects from Academic Library
   const { subjects } = useSubjects(auth.currentUser?.uid);
   const [captureDestination, setCaptureDestination] = useState<'map' | 'saved' | null>(null);
@@ -312,12 +312,12 @@ export default function LectureCaptureView({
   useEffect(() => {
     liveTranscriptRef.current = liveTranscript;
   }, [liveTranscript]);
-  
+
   // Refs for audio capturing
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
-  
+
   // Refs for visualizer
   const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -344,7 +344,7 @@ export default function LectureCaptureView({
   const [chatInput, setChatInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
-  
+
   // Format / Mode selectors
   const [selectedNotesMode, setSelectedNotesMode] = useState<'quick' | 'detailed' | 'academic' | 'exam' | 'bhailang' | 'bhailang_normal' | 'bhailang_savage' | 'bhailang_pro'>('quick');
   const [selectedSummaryMode, setSelectedSummaryMode] = useState<'quick_revision' | 'detailed_notes' | 'executive_summary' | 'beginner_friendly' | 'academic_format' | 'bhailang' | 'bhailang_normal' | 'bhailang_savage' | 'bhailang_pro'>('quick_revision');
@@ -359,7 +359,7 @@ export default function LectureCaptureView({
   const [isGeneratingFlashcards, setIsGeneratingFlashcards] = useState(false);
   const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
   const [isGeneratingMindmap, setIsGeneratingMindmap] = useState(false);
-  
+
   // Quiz gameplay state
   const [activeQuizQuestionIdx, setActiveQuizQuestionIdx] = useState(0);
   const [selectedQuizAnswerIdx, setSelectedQuizAnswerIdx] = useState<number | null>(null);
@@ -377,12 +377,12 @@ export default function LectureCaptureView({
   // Lazy Loading & Caching State
   const [localAssets, setLocalAssets] = useState<any>({});
   const [isAssetLoading, setIsAssetLoading] = useState<boolean>(false);
-  
+
   const getAsset = (lectureId: string | null | undefined, type: string, mode: string = '') => {
     if (!lectureId) return null;
     const cacheKey = `noteit_asset_${lectureId}_${type}${mode ? '_' + mode : ''}`;
     if (localAssets[cacheKey]) return localAssets[cacheKey];
-    
+
     // Check sessionStorage and localStorage synchronously for instant session retrieval
     try {
       const cached = sessionStorage.getItem(cacheKey) || localStorage.getItem(cacheKey);
@@ -401,7 +401,7 @@ export default function LectureCaptureView({
   const loadAsset = async (lectureId: string, assetType: string, mode: string = '') => {
     if (!lectureId || !auth.currentUser) return;
     const cacheKey = `noteit_asset_${lectureId}_${assetType}${mode ? '_' + mode : ''}`;
-    
+
     // 1. Check local & session storage cache
     const cached = sessionStorage.getItem(cacheKey) || localStorage.getItem(cacheKey);
     if (cached) {
@@ -415,7 +415,7 @@ export default function LectureCaptureView({
     }
 
     setIsAssetLoading(true);
-    
+
     // 2. Try fetching from Firestore subcollection
     try {
       const { getDoc } = await import('firebase/firestore');
@@ -442,7 +442,7 @@ export default function LectureCaptureView({
       if (assetType === 'flashcards') legacyData = activeLec.flashcards;
       if (assetType === 'quiz') legacyData = activeLec.quiz;
       if (assetType === 'keyConcepts') legacyData = activeLec.keyConcepts;
-      
+
       if (legacyData) {
         sessionStorage.setItem(cacheKey, JSON.stringify(legacyData));
         localStorage.setItem(cacheKey, JSON.stringify(legacyData));
@@ -608,22 +608,22 @@ export default function LectureCaptureView({
       cleanupAudio();
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
       const analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 64; 
-      
+      analyser.fftSize = 64;
+
       const source = audioCtx.createMediaStreamSource(stream);
       source.connect(analyser);
-      
+
       audioCtxRef.current = audioCtx;
       analyserRef.current = analyser;
       sourceRef.current = source;
-      
+
       const bufferLength = analyser.frequencyBinCount;
       const dataArray = new Uint8Array(bufferLength);
-      
+
       const updateWaveform = () => {
         if (!analyserRef.current) return;
         analyserRef.current.getByteFrequencyData(dataArray);
-        
+
         if (visualizerRef.current) {
           const bars = visualizerRef.current.querySelectorAll('.waveform-bar');
           bars.forEach((bar, index) => {
@@ -635,7 +635,7 @@ export default function LectureCaptureView({
         }
         animationFrameIdRef.current = requestAnimationFrame(updateWaveform);
       };
-      
+
       animationFrameIdRef.current = requestAnimationFrame(updateWaveform);
     } catch (err) {
       console.error('Failed to initialize audio visualizer:', err);
@@ -712,16 +712,16 @@ export default function LectureCaptureView({
     setLiveTranscript('');
     accumulatedTranscriptRef.current = '';
     liveTranscriptRef.current = '';
-    
+
     if (!captureDestination) {
       setCaptureDestination('map');
       if (subjects.length > 0) setLectureSubject(subjects[0].name);
     }
-    
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
-      
+
       const options = { mimeType: 'audio/webm' };
       let recorder: MediaRecorder;
       try {
@@ -729,7 +729,7 @@ export default function LectureCaptureView({
       } catch (e) {
         recorder = new MediaRecorder(stream);
       }
-      
+
       mediaRecorderRef.current = recorder;
 
       if (onStartCapture) {
@@ -755,7 +755,7 @@ export default function LectureCaptureView({
           }
         }
       };
-      
+
       recorder.onstop = async () => {
         const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
         const durationStr = formatTime(secondsRef.current);
@@ -773,15 +773,15 @@ export default function LectureCaptureView({
         try {
           const recordedSecs = secondsRef.current;
           await onSaveCapture(
-            lectureTitle, 
-            lectureSubject, 
-            durationStr, 
-            audioBlob, 
+            lectureTitle,
+            lectureSubject,
+            durationStr,
+            audioBlob,
             finalId || undefined,
             transcriptionEngine,
             accumulatedTranscriptRef.current || liveTranscriptRef.current
           );
-          
+
           // Dispatch resource generated notification toast
           if (typeof window !== 'undefined') {
             window.dispatchEvent(
@@ -832,7 +832,7 @@ export default function LectureCaptureView({
           setAiStatus('idle');
         }
       };
-      
+
       recorder.start(1000);
       startVisualizer(stream);
       setIsRecording(true);
@@ -919,7 +919,7 @@ export default function LectureCaptureView({
       if (regex.test(part)) {
         const timeMatch = part.match(/(\d{1,2}:\d{2})/);
         const timestamp = timeMatch ? timeMatch[1] : null;
-        
+
         const handleClick = () => {
           if (timestamp) {
             handleTimelineTimestampClick(timestamp);
@@ -930,8 +930,8 @@ export default function LectureCaptureView({
         };
 
         return (
-          <span 
-            key={index} 
+          <span
+            key={index}
             onClick={handleClick}
             className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[4px] text-[10px] font-mono font-bold bg-[#FFC400] text-[#111111] border border-[#111111] shadow-paper-sm cursor-pointer hover:bg-[#ffe066] transition-all ml-1 select-none"
             title="Jump to source in transcript"
@@ -1104,7 +1104,7 @@ export default function LectureCaptureView({
   // PDF Export
   const exportPDFFile = (title: string, rawData: any, pdfTheme: 'academic' | 'modern' | 'corporate' | 'dark' = 'academic') => {
     let contentHtml = '';
-    
+
     if (typeof rawData === 'string') {
       const sections = parseSummaryIntoSections(rawData);
       contentHtml = `
@@ -1287,11 +1287,11 @@ export default function LectureCaptureView({
     try {
       const { generateNotes: callGenerateNotes, getAIConfig } = await import('../services/gemini');
       const generated = await callGenerateNotes(textContent, mode, getAIConfig().geminiKey);
-      
+
       const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
       const docRef = doc(db, 'users', uid, 'lectures', activeLecture.id, 'assets', `notes_${mode}`);
       await setDoc(docRef, { data: generated, updatedAt: serverTimestamp() });
-      
+
       const cacheKey = `noteit_asset_${activeLecture.id}_notes_${mode}`;
       localStorage.setItem(cacheKey, JSON.stringify(generated));
       setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: generated }));
@@ -1352,17 +1352,17 @@ export default function LectureCaptureView({
     setIsGeneratingFlashcards(true);
     try {
       const { generateFlashcards: callGenerateFlashcards } = await import('../services/gemini');
-      
+
       // Flashcard count based on lecture size
       const textLen = textContent.length;
       const count = textLen < 3000 ? 15 : textLen < 10000 ? 30 : 50;
 
       const generated = await callGenerateFlashcards(textContent, count, [], getAIConfig().geminiKey);
-      
+
       const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
       const docRef = doc(db, 'users', uid, 'lectures', activeLecture.id, 'assets', `flashcards`);
       await setDoc(docRef, { data: generated, updatedAt: serverTimestamp() });
-      
+
       const cacheKey = `noteit_asset_${activeLecture.id}_flashcards`;
       localStorage.setItem(cacheKey, JSON.stringify(generated));
       setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: generated }));
@@ -1393,12 +1393,12 @@ export default function LectureCaptureView({
       const existing = getAsset(activeLecture.id, 'flashcards') || [];
 
       const generated = await callGenerateFlashcards(textContent, 10, existing, getAIConfig().geminiKey);
-      
+
       const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
       const docRef = doc(db, 'users', uid, 'lectures', activeLecture.id, 'assets', `flashcards`);
       const newData = [...existing, ...generated];
       await setDoc(docRef, { data: newData, updatedAt: serverTimestamp() });
-      
+
       const cacheKey = `noteit_asset_${activeLecture.id}_flashcards`;
       localStorage.setItem(cacheKey, JSON.stringify(newData));
       setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: newData }));
@@ -1425,13 +1425,13 @@ export default function LectureCaptureView({
     setIsGeneratingQuiz(true);
     try {
       const { generateQuiz: callGenerateQuiz, getAIConfig } = await import('../services/gemini');
-      
+
       const generated = await callGenerateQuiz(textContent, getAIConfig().geminiKey);
-      
+
       const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
       const docRef = doc(db, 'users', uid, 'lectures', activeLecture.id, 'assets', `quiz`);
       await setDoc(docRef, { data: generated, updatedAt: serverTimestamp() });
-      
+
       const cacheKey = `noteit_asset_${activeLecture.id}_quiz`;
       localStorage.setItem(cacheKey, JSON.stringify(generated));
       setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: generated }));
@@ -1464,12 +1464,12 @@ export default function LectureCaptureView({
       const questionTexts = difficultyQuestions.map((q: any) => q.question);
 
       const generated = await callGenerateMoreQuiz(textContent, selectedQuizDifficulty, questionTexts, getAIConfig().geminiKey);
-      
+
       const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
       const docRef = doc(db, 'users', uid, 'lectures', activeLecture.id, 'assets', `quiz`);
       const newData = [...existing, ...generated];
       await setDoc(docRef, { data: newData, updatedAt: serverTimestamp() });
-      
+
       const cacheKey = `noteit_asset_${activeLecture.id}_quiz`;
       localStorage.setItem(cacheKey, JSON.stringify(newData));
       setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: newData }));
@@ -1499,11 +1499,11 @@ export default function LectureCaptureView({
       const sections = activeLecture.sections || [];
 
       const generated = await callGenerateMindmap(textContent, sections, getAIConfig().geminiKey);
-      
+
       const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
       const docRef = doc(db, 'users', uid, 'lectures', activeLecture.id, 'assets', `keyConcepts`);
       await setDoc(docRef, { data: generated, updatedAt: serverTimestamp() });
-      
+
       const cacheKey = `noteit_asset_${activeLecture.id}_keyConcepts`;
       localStorage.setItem(cacheKey, JSON.stringify(generated));
       setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: generated }));
@@ -1564,7 +1564,7 @@ export default function LectureCaptureView({
   const sendMessageText = async (text: string) => {
     const activeLecture = lectures.find(l => l.id === activeLectureId);
     if (!text.trim() || !activeLecture || isChatLoading) return;
-    
+
     const userMsg = text.trim();
     setIsChatLoading(true);
 
@@ -1575,7 +1575,7 @@ export default function LectureCaptureView({
 
       const activeHistory = activeLecture.chatHistory || [];
       const updatedHistoryBefore = [...activeHistory, { sender: 'user', text: userMsg }];
-      
+
       await updateDoc(doc(db, 'users', uid, 'lectures', activeLecture.id), {
         chatHistory: updatedHistoryBefore
       });
@@ -1655,7 +1655,7 @@ export default function LectureCaptureView({
         <div className="max-w-4xl mx-auto p-12 text-center space-y-4">
           <Brain className="h-12 w-12 text-red-500 mx-auto animate-pulse" />
           <h3 className="text-sm font-bold text-neutral-400">Lecture workspace not found.</h3>
-          <button 
+          <button
             onClick={() => setActiveLectureId(null)}
             className="px-4 py-2 bg-indigo-600 rounded-lg text-xs font-bold text-white cursor-pointer"
           >
@@ -1668,14 +1668,13 @@ export default function LectureCaptureView({
     const filteredNotes = notes.filter((n: any) => n.lectureId === activeLectureId);
     const hasExistingNotes = activeLecture.notes?.academic || activeLecture.notes?.quick || activeLecture.notes?.detailed;
     const hasExistingSummary = activeLecture.summaries?.quick_revision || activeLecture.summaries?.academic_format;
-    
+
     return (
       <React.Fragment>
         {/* STEALTH FOCUS AUTO-DIM SCREEN OVERLAY WHEN RECORDING AND UNTOUCHED */}
-        <div 
-          className={`fixed inset-0 z-[9999] bg-[#050508] transition-opacity duration-1000 ease-in-out flex flex-col items-center justify-center p-6 ${
-            isRecording && !isPaused && autoDimEnabled && isScreenDimmed ? 'opacity-95' : 'opacity-0 pointer-events-none'
-          }`}
+        <div
+          className={`fixed inset-0 z-[9999] bg-[#050508] transition-opacity duration-1000 ease-in-out flex flex-col items-center justify-center p-6 ${isRecording && !isPaused && autoDimEnabled && isScreenDimmed ? 'opacity-95' : 'opacity-0 pointer-events-none'
+            }`}
         >
           <div className="flex flex-col items-center space-y-4 text-center select-none">
             <div className="relative flex items-center justify-center">
@@ -1702,563 +1701,555 @@ export default function LectureCaptureView({
         </div>
 
         <div className="flex flex-col h-full bg-grid-paper rounded-[6px] border-2 border-[#111111] shadow-paper-lg overflow-hidden select-none">
-        
-        {/* ACTIVE WORKSPACE HEADER BAR */}
-        <div className="p-4 border-b-2 border-[#111111] bg-white flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={() => setActiveLectureId(null)}
-              className="p-2 rounded-[6px] border-2 border-[#111111] bg-white text-[#111111] shadow-paper-sm hover:bg-[#FFC400] transition-colors cursor-pointer"
-              title="Back to Standby Capture"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </button>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="rounded-[4px] bg-[#FFC400] border border-[#111111] px-2 py-0.5 text-[10px] font-bold text-[#111111] font-mono uppercase">
-                  {activeLecture.subject.toUpperCase()}
-                </span>
-                <span className="text-xs text-[#666666] font-mono font-bold">
-                  {activeLecture.duration || '00:00:00'} Duration
-                </span>
-              </div>
-              <h1 className="text-base font-heading font-extrabold tracking-tight text-[#111111] uppercase mt-0.5 truncate max-w-[200px] sm:max-w-md">
-                {activeLecture.title.toUpperCase()}
-              </h1>
-            </div>
-          </div>
 
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-[4px] bg-[#19B56B]/15 border-2 border-[#111111] px-3 py-1 text-xs font-bold text-[#111111] font-mono uppercase shadow-paper-sm">
-              <CheckCircle className="h-3.5 w-3.5 text-[#19B56B]" />
-              <span className="hidden sm:inline">WORKSPACE RESOLVED</span>
-              <span className="inline sm:hidden">READY</span>
-            </span>
-          </div>
-        </div>
-
-        {/* INLINE UI ERROR NOTICE BANNER */}
-        {uiError && (
-          <div className="p-4 bg-[#FF4D4D]/15 text-[#111111] border-b-2 border-[#111111] flex flex-col sm:flex-row items-center justify-between gap-3 shadow-paper-sm animate-fade-in">
-            <div className="flex items-center gap-2.5">
-              <AlertTriangle className="h-5 w-5 text-[#FF4D4D] shrink-0" />
-              <div>
-                <h4 className="text-xs font-mono font-extrabold uppercase text-[#FF4D4D]">AI Processing Notice</h4>
-                <p className="text-xs font-mono font-bold text-[#111111]">{uiError}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
+          {/* ACTIVE WORKSPACE HEADER BAR */}
+          <div className="p-4 border-b-2 border-[#111111] bg-white flex items-center justify-between">
+            <div className="flex items-center gap-3">
               <button
-                onClick={() => setActivePage?.('settings' as any)}
-                className="px-3 py-1.5 bg-[#111111] text-white text-[11px] font-mono font-extrabold uppercase rounded-[4px] shadow-paper-sm hover:bg-neutral-800 transition-all cursor-pointer"
+                onClick={() => setActiveLectureId(null)}
+                className="p-2 rounded-[6px] border-2 border-[#111111] bg-white text-[#111111] shadow-paper-sm hover:bg-[#FFC400] transition-colors cursor-pointer"
+                title="Back to Standby Capture"
               >
-                Settings
+                <ArrowLeft className="h-4 w-4" />
               </button>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-[4px] bg-[#FFC400] border border-[#111111] px-2 py-0.5 text-[10px] font-bold text-[#111111] font-mono uppercase">
+                    {activeLecture.subject.toUpperCase()}
+                  </span>
+                  <span className="text-xs text-[#666666] font-mono font-bold">
+                    {activeLecture.duration || '00:00:00'} Duration
+                  </span>
+                </div>
+                <h1 className="text-base font-heading font-extrabold tracking-tight text-[#111111] uppercase mt-0.5 truncate max-w-[200px] sm:max-w-md">
+                  {activeLecture.title.toUpperCase()}
+                </h1>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-[4px] bg-[#19B56B]/15 border-2 border-[#111111] px-3 py-1 text-xs font-bold text-[#111111] font-mono uppercase shadow-paper-sm">
+                <CheckCircle className="h-3.5 w-3.5 text-[#19B56B]" />
+                <span className="hidden sm:inline">WORKSPACE RESOLVED</span>
+                <span className="inline sm:hidden">READY</span>
+              </span>
+            </div>
+          </div>
+
+          {/* INLINE UI ERROR NOTICE BANNER */}
+          {uiError && (
+            <div className="p-4 bg-[#FF4D4D]/15 text-[#111111] border-b-2 border-[#111111] flex flex-col sm:flex-row items-center justify-between gap-3 shadow-paper-sm animate-fade-in">
+              <div className="flex items-center gap-2.5">
+                <AlertTriangle className="h-5 w-5 text-[#FF4D4D] shrink-0" />
+                <div>
+                  <h4 className="text-xs font-mono font-extrabold uppercase text-[#FF4D4D]">AI Processing Notice</h4>
+                  <p className="text-xs font-mono font-bold text-[#111111]">{uiError}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => setActivePage?.('settings' as any)}
+                  className="px-3 py-1.5 bg-[#111111] text-white text-[11px] font-mono font-extrabold uppercase rounded-[4px] shadow-paper-sm hover:bg-neutral-800 transition-all cursor-pointer"
+                >
+                  Settings
+                </button>
+                <button
+                  onClick={() => setUiError(null)}
+                  className="p-1 text-[#111111] hover:bg-black/10 rounded cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* INLINE UI SUCCESS NOTICE BANNER */}
+          {uiSuccess && (
+            <div className="p-4 bg-[#19B56B]/15 text-[#111111] border-b-2 border-[#111111] flex items-center justify-between gap-3 shadow-paper-sm animate-fade-in">
+              <div className="flex items-center gap-2.5">
+                <CheckCircle className="h-5 w-5 text-[#19B56B] shrink-0" />
+                <p className="text-xs font-mono font-bold text-[#111111]">{uiSuccess}</p>
+              </div>
               <button
-                onClick={() => setUiError(null)}
+                onClick={() => setUiSuccess(null)}
                 className="p-1 text-[#111111] hover:bg-black/10 rounded cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* INLINE UI SUCCESS NOTICE BANNER */}
-        {uiSuccess && (
-          <div className="p-4 bg-[#19B56B]/15 text-[#111111] border-b-2 border-[#111111] flex items-center justify-between gap-3 shadow-paper-sm animate-fade-in">
-            <div className="flex items-center gap-2.5">
-              <CheckCircle className="h-5 w-5 text-[#19B56B] shrink-0" />
-              <p className="text-xs font-mono font-bold text-[#111111]">{uiSuccess}</p>
+          {/* RECORDED TRANSCRIPT AUTO-GENERATION BANNER IF NOTES ARE MISSING */}
+          {(!hasExistingNotes && !hasExistingSummary && (activeLecture.cleanTranscript || activeLecture.transcript)) && (
+            <div className="p-4 bg-[#FFC400] text-[#111111] border-b-2 border-[#111111] flex flex-col sm:flex-row items-center justify-between gap-3 shadow-paper-sm">
+              <div className="flex items-center gap-2.5">
+                <Sparkles className="h-5 w-5 text-[#111111] animate-bounce shrink-0" />
+                <div>
+                  <h4 className="text-xs font-mono font-extrabold uppercase">Recorded Transcript Saved in Database!</h4>
+                  <p className="text-[10px] font-mono font-bold text-[#334155]">
+                    {isGeneratingNotes || isGeneratingSummary ? 'AI is compiling study notes, executive summary, flashcards, & quiz now...' : 'Click below to compile full academic study notes, summary, flashcards & quiz now.'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={async () => {
+                  const text = activeLecture.cleanTranscript || activeLecture.transcript;
+                  if (!text) return;
+                  setIsGeneratingNotes(true);
+                  setIsGeneratingSummary(true);
+                  setUiError(null);
+                  setUiSuccess(null);
+                  try {
+                    await generateResourcesFromTranscript(activeLecture.id, text, { mode: 'academic', modeType: 'all' });
+                    setUiSuccess("Notes and AI study assets compiled successfully!");
+                  } catch (err: any) {
+                    setUiError(formatUserFriendlyErrorMessage(err, "Note generation paused"));
+                  } finally {
+                    setIsGeneratingNotes(false);
+                    setIsGeneratingSummary(false);
+                  }
+                }}
+                disabled={isGeneratingNotes || isGeneratingSummary}
+                className="px-4 py-2 bg-[#2F6BFF] text-white text-xs font-mono font-extrabold uppercase rounded-[6px] border-2 border-[#111111] shadow-paper-sm hover:bg-[#255cd9] cursor-pointer shrink-0 disabled:opacity-50"
+              >
+                {isGeneratingNotes || isGeneratingSummary ? 'Compiling Notes...' : '⚡ Generate Notes & Assets Now'}
+              </button>
             </div>
-            <button
-              onClick={() => setUiSuccess(null)}
-              className="p-1 text-[#111111] hover:bg-black/10 rounded cursor-pointer"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        )}
+          )}
 
-        {/* RECORDED TRANSCRIPT AUTO-GENERATION BANNER IF NOTES ARE MISSING */}
-        {(!hasExistingNotes && !hasExistingSummary && (activeLecture.cleanTranscript || activeLecture.transcript)) && (
-          <div className="p-4 bg-[#FFC400] text-[#111111] border-b-2 border-[#111111] flex flex-col sm:flex-row items-center justify-between gap-3 shadow-paper-sm">
-            <div className="flex items-center gap-2.5">
-              <Sparkles className="h-5 w-5 text-[#111111] animate-bounce shrink-0" />
-              <div>
-                <h4 className="text-xs font-mono font-extrabold uppercase">Recorded Transcript Saved in Database!</h4>
-                <p className="text-[10px] font-mono font-bold text-[#334155]">
-                  {isGeneratingNotes || isGeneratingSummary ? 'AI is compiling study notes, executive summary, flashcards, & quiz now...' : 'Click below to compile full academic study notes, summary, flashcards & quiz now.'}
-                </p>
+          {/* Mobile Workspace Toggle Header */}
+          {isMobile && (
+            <div className={`flex border-b text-xs font-bold font-sans ${theme === 'dark' ? 'bg-[#0d0e12] border-neutral-900 text-neutral-400' : 'bg-white border-gray-200 text-gray-500'
+              }`}>
+              <button
+                onClick={() => setMobileWorkspaceTab('transcript')}
+                className={`flex-1 py-3 text-center border-b-2 transition-all cursor-pointer ${mobileWorkspaceTab === 'transcript'
+                    ? theme === 'dark'
+                      ? 'border-indigo-500 text-white font-black'
+                      : 'border-black text-black font-black'
+                    : 'border-transparent'
+                  }`}
+              >
+                Lecture Transcript
+              </button>
+              <button
+                onClick={() => setMobileWorkspaceTab('tools')}
+                className={`flex-1 py-3 text-center border-b-2 transition-all cursor-pointer ${mobileWorkspaceTab === 'tools'
+                    ? theme === 'dark'
+                      ? 'border-indigo-500 text-white font-black'
+                      : 'border-black text-black font-black'
+                    : 'border-transparent'
+                  }`}
+              >
+                Workspace Tools
+              </button>
+            </div>
+          )}
+
+          {/* SPLIT PANE CONTENT CONTAINER */}
+          <div id="split-pane-container" className="flex-1 flex flex-col md:flex-row overflow-hidden">
+
+            {/* PANE 1: LEFT - TRANSCRIPT COLUMN */}
+            <div
+              className={`w-full md:flex-shrink-0 flex flex-col border-r border-[#111111] overflow-hidden bg-[#F6F2EA] ${isMobile && mobileWorkspaceTab !== 'transcript' ? 'hidden' : 'flex'
+                }`}
+              style={!isMobile ? { width: `${transcriptWidth}%` } : {}}
+            >
+              <div className="p-4 border-b border-[#111111] bg-white">
+                <h2 className="text-xs font-heading font-extrabold text-[#111111] uppercase tracking-wider font-mono">Lecture Transcript</h2>
+                <p className="text-[10px] text-[#666666] font-mono mt-0.5">Click timestamps to sync milestone highlights.</p>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 space-y-3 font-sans text-xs text-[#111111] leading-relaxed select-text bg-white m-3 rounded-[6px] border border-[#111111] shadow-paper-sm">
+                {renderTranscriptContent(activeLecture.cleanTranscript || activeLecture.transcript || '')}
               </div>
             </div>
-            <button
-              onClick={async () => {
-                const text = activeLecture.cleanTranscript || activeLecture.transcript;
-                if (!text) return;
-                setIsGeneratingNotes(true);
-                setIsGeneratingSummary(true);
-                setUiError(null);
-                setUiSuccess(null);
-                try {
-                  await generateResourcesFromTranscript(activeLecture.id, text, { mode: 'academic', modeType: 'all' });
-                  setUiSuccess("Notes and AI study assets compiled successfully!");
-                } catch (err: any) {
-                  setUiError(formatUserFriendlyErrorMessage(err, "Note generation paused"));
-                } finally {
-                  setIsGeneratingNotes(false);
-                  setIsGeneratingSummary(false);
-                }
-              }}
-              disabled={isGeneratingNotes || isGeneratingSummary}
-              className="px-4 py-2 bg-[#2F6BFF] text-white text-xs font-mono font-extrabold uppercase rounded-[6px] border-2 border-[#111111] shadow-paper-sm hover:bg-[#255cd9] cursor-pointer shrink-0 disabled:opacity-50"
+
+            {/* Drag Handle Divider */}
+            <div
+              onMouseDown={startResizing}
+              className="hidden md:block w-2 hover:w-2.5 transition-all cursor-col-resize self-stretch flex-shrink-0 relative group bg-[#111111]"
             >
-              {isGeneratingNotes || isGeneratingSummary ? 'Compiling Notes...' : '⚡ Generate Notes & Assets Now'}
-            </button>
-          </div>
-        )}
-
-        {/* Mobile Workspace Toggle Header */}
-        {isMobile && (
-          <div className={`flex border-b text-xs font-bold font-sans ${
-            theme === 'dark' ? 'bg-[#0d0e12] border-neutral-900 text-neutral-400' : 'bg-white border-gray-200 text-gray-500'
-          }`}>
-            <button
-              onClick={() => setMobileWorkspaceTab('transcript')}
-              className={`flex-1 py-3 text-center border-b-2 transition-all cursor-pointer ${
-                mobileWorkspaceTab === 'transcript'
-                  ? theme === 'dark'
-                    ? 'border-indigo-500 text-white font-black'
-                    : 'border-black text-black font-black'
-                  : 'border-transparent'
-              }`}
-            >
-              Lecture Transcript
-            </button>
-            <button
-              onClick={() => setMobileWorkspaceTab('tools')}
-              className={`flex-1 py-3 text-center border-b-2 transition-all cursor-pointer ${
-                mobileWorkspaceTab === 'tools'
-                  ? theme === 'dark'
-                    ? 'border-indigo-500 text-white font-black'
-                    : 'border-black text-black font-black'
-                  : 'border-transparent'
-              }`}
-            >
-              Workspace Tools
-            </button>
-          </div>
-        )}
-
-        {/* SPLIT PANE CONTENT CONTAINER */}
-        <div id="split-pane-container" className="flex-1 flex flex-col md:flex-row overflow-hidden">
-          
-          {/* PANE 1: LEFT - TRANSCRIPT COLUMN */}
-          <div 
-            className={`w-full md:flex-shrink-0 flex flex-col border-r border-[#111111] overflow-hidden bg-[#F6F2EA] ${
-              isMobile && mobileWorkspaceTab !== 'transcript' ? 'hidden' : 'flex'
-            }`}
-            style={!isMobile ? { width: `${transcriptWidth}%` } : {}}
-          >
-            <div className="p-4 border-b border-[#111111] bg-white">
-              <h2 className="text-xs font-heading font-extrabold text-[#111111] uppercase tracking-wider font-mono">Lecture Transcript</h2>
-              <p className="text-[10px] text-[#666666] font-mono mt-0.5">Click timestamps to sync milestone highlights.</p>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 font-sans text-xs text-[#111111] leading-relaxed select-text bg-white m-3 rounded-[6px] border border-[#111111] shadow-paper-sm">
-              {renderTranscriptContent(activeLecture.cleanTranscript || activeLecture.transcript || '')}
-            </div>
-          </div>
-
-          {/* Drag Handle Divider */}
-          <div 
-            onMouseDown={startResizing}
-            className="hidden md:block w-2 hover:w-2.5 transition-all cursor-col-resize self-stretch flex-shrink-0 relative group bg-[#111111]"
-          >
-            <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[2px] bg-[#FFC400]" />
-          </div>
-
-          {/* PANE 2: RIGHT - STUDY TABS COLUMN */}
-          <div 
-            className={`flex-grow flex-1 flex flex-col overflow-hidden p-4 space-y-4 ${
-              isMobile && mobileWorkspaceTab !== 'tools' ? 'hidden' : 'flex'
-            }`}
-            style={!isMobile ? { width: `${100 - transcriptWidth}%` } : {}}
-          >
-            
-            {/* MINI TAB ROW SELECTOR */}
-            <div className="shrink-0 sticky top-0 z-20 flex items-center gap-1.5 overflow-x-auto p-2.5 scrollbar-none whitespace-nowrap bg-[#F6F2EA] rounded-[6px] border-2 border-[#111111] shadow-paper-sm">
-              {(['notes', 'summary', 'flashcards', 'quiz', 'mindmap', 'timeline', 'slides', 'handwritten', 'chat'] as const).map(tab => (
-                <button
-                  key={tab}
-                  onClick={() => {
-                    setActiveOutputTab(tab as any);
-                    setSelectedMindmapNode(null);
-                  }}
-                  className={`shrink-0 px-3.5 py-2 rounded-[4px] text-xs font-mono font-extrabold uppercase transition-all cursor-pointer flex items-center justify-center ${
-                    activeOutputTab === (tab as any)
-                      ? 'bg-[#FFC400] text-[#111111] border border-[#111111] shadow-paper-sm' 
-                      : 'bg-white text-[#111111] border border-[#111111] shadow-paper-sm hover:bg-[#FFF8D6]'
-                  }`}
-                >
-                  {tab === 'mindmap' ? 'Mind Map' : tab === 'handwritten' ? '📝 Handwritten' : tab === 'chat' ? 'Ask Lecture AI' : tab}
-                </button>
-              ))}
+              <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[2px] bg-[#FFC400]" />
             </div>
 
-            {/* TAB CONTENTS SCROLLABLE FRAME */}
-            <div className="flex-grow overflow-y-auto pr-1">
-              
-              {/* 1. NOTES TAB */}
-              {activeOutputTab === 'notes' && (
-                <div className="space-y-4">
-                  <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 p-2 rounded-[6px] border border-[#111111] bg-[#F6F2EA] shadow-paper-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#666666]">Format:</span>
-                      <div className="relative">
-                        <select
-                          value={selectedNotesMode}
-                          onChange={(e) => setSelectedNotesMode(e.target.value as any)}
-                          className="bg-white text-[#111111] text-xs font-mono font-bold uppercase px-3 py-1.5 rounded-[4px] border border-[#111111] shadow-paper-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#FFC400] appearance-auto"
-                        >
-                          <option value="quick">⚡ Quick Notes</option>
-                          <option value="detailed">📜 Detailed Notes</option>
-                          <option value="academic">🎓 Academic Notes</option>
-                          <option value="exam">🎯 Exam Notes</option>
-                          <option value="bhailang_normal">🔥 Normal Bhai</option>
-                          <option value="bhailang_savage">💥 Savage Bhai (Sarcasm)</option>
-                          <option value="bhailang_pro">🚀 Bhai Pro (Analogies)</option>
-                        </select>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setPdfExportData({ 
-                          title: `${activeLecture.title} - ${selectedNotesMode} Notes`, 
-                          data: getAsset(activeLecture.id, 'notes', selectedNotesMode) || ''
-                        });
-                        setShowPdfModal(true);
-                      }}
-                      disabled={!getAsset(activeLecture.id, 'notes', selectedNotesMode)}
-                      className="flex items-center gap-1.5 px-3 py-1 bg-[#FFC400] text-[#111111] text-xs font-mono font-extrabold uppercase rounded-[4px] border border-[#111111] shadow-paper-sm hover:bg-[#ffe066] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                      <span>Export PDF</span>
-                    </button>
-                  </div>
+            {/* PANE 2: RIGHT - STUDY TABS COLUMN */}
+            <div
+              className={`flex-grow flex-1 flex flex-col overflow-hidden p-4 space-y-4 ${isMobile && mobileWorkspaceTab !== 'tools' ? 'hidden' : 'flex'
+                }`}
+              style={!isMobile ? { width: `${100 - transcriptWidth}%` } : {}}
+            >
 
-                  <div className="space-y-3">
-                    {getAsset(activeLecture.id, 'notes', selectedNotesMode) ? (
-                      <div className="p-5 rounded-[6px] border border-[#111111] bg-white text-[#111111] shadow-paper-sm font-sans">
-                        <AcademicNotesViewer content={getAsset(activeLecture.id, 'notes', selectedNotesMode)} mode={selectedNotesMode} theme={theme} />
-                      </div>
-                    ) : (isGeneratingNotes || isAssetLoading) ? (
-                      <div className="py-16 flex flex-col items-center justify-center border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5">
-                        <BruteLoader size="md" message={`Loading / Generating ${selectedNotesMode} notes...`} />
-                      </div>
-                    ) : (
-                      <div className="text-center py-16 border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5 p-6 space-y-4">
-                        <FileText className="h-10 w-10 text-neutral-600 mx-auto animate-pulse" />
-                        <h4 className="text-xs font-bold text-neutral-400">Notes for this mode have not been generated yet.</h4>
-                        <button
-                          onClick={() => triggerGenerateNotes(selectedNotesMode)}
-                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all shadow-md cursor-pointer"
-                        >
-                          Generate {selectedNotesMode} Notes
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
+              {/* MINI TAB ROW SELECTOR */}
+              <div className="shrink-0 sticky top-0 z-20 flex items-center gap-1.5 overflow-x-auto p-2.5 scrollbar-none whitespace-nowrap bg-[#F6F2EA] rounded-[6px] border-2 border-[#111111] shadow-paper-sm">
+                {(['notes', 'summary', 'flashcards', 'quiz', 'mindmap', 'timeline', 'slides', 'handwritten', 'chat'] as const).map(tab => (
+                  <button
+                    key={tab}
+                    onClick={() => {
+                      setActiveOutputTab(tab as any);
+                      setSelectedMindmapNode(null);
+                    }}
+                    className={`shrink-0 px-3.5 py-2 rounded-[4px] text-xs font-mono font-extrabold uppercase transition-all cursor-pointer flex items-center justify-center ${activeOutputTab === (tab as any)
+                        ? 'bg-[#FFC400] text-[#111111] border border-[#111111] shadow-paper-sm'
+                        : 'bg-white text-[#111111] border border-[#111111] shadow-paper-sm hover:bg-[#FFF8D6]'
+                      }`}
+                  >
+                    {tab === 'mindmap' ? 'Mind Map' : tab === 'handwritten' ? '📝 Handwritten' : tab === 'chat' ? 'Ask Lecture AI' : tab}
+                  </button>
+                ))}
+              </div>
 
-              {/* 2. SUMMARY TAB */}
-              {activeOutputTab === 'summary' && (
-                <div className="space-y-4">
-                  <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 p-2 rounded-[6px] border border-[#111111] bg-[#F6F2EA] shadow-paper-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#666666]">Format:</span>
-                      <div className="relative">
-                        <select
-                          value={selectedSummaryMode}
-                          onChange={(e) => setSelectedSummaryMode(e.target.value as any)}
-                          className="bg-white text-[#111111] text-xs font-mono font-bold uppercase px-3 py-1.5 rounded-[4px] border border-[#111111] shadow-paper-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#FFC400] appearance-auto"
-                        >
-                          <option value="quick_revision">⚡ Quick Revision</option>
-                          <option value="detailed_notes">📜 Detailed Notes</option>
-                          <option value="executive_summary">💼 Executive Summary</option>
-                          <option value="beginner_friendly">🌱 Beginner Friendly</option>
-                          <option value="academic_format">🎓 Academic Format</option>
-                          <option value="bhailang_normal">🔥 Normal Bhai</option>
-                          <option value="bhailang_savage">💥 Savage Bhai (Sarcasm)</option>
-                          <option value="bhailang_pro">🚀 Bhai Pro (Analogies)</option>
-                        </select>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setPdfExportData({ 
-                          title: `${activeLecture.title} - Summary (${selectedSummaryMode})`, 
-                          data: getAsset(activeLecture.id, 'summaries', selectedSummaryMode) || ''
-                        });
-                        setShowPdfModal(true);
-                      }}
-                      disabled={!getAsset(activeLecture.id, 'summaries', selectedSummaryMode)}
-                      className="flex items-center gap-1.5 px-3 py-1 bg-[#FFC400] text-[#111111] text-xs font-mono font-extrabold uppercase rounded-[4px] border border-[#111111] shadow-paper-sm hover:bg-[#ffe066] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                      <span>Export PDF</span>
-                    </button>
-                  </div>
+              {/* TAB CONTENTS SCROLLABLE FRAME */}
+              <div className="flex-grow overflow-y-auto pr-1">
 
+                {/* 1. NOTES TAB */}
+                {activeOutputTab === 'notes' && (
                   <div className="space-y-4">
-                    {getAsset(activeLecture.id, 'summaries', selectedSummaryMode) ? (
-                      <div className="space-y-4 animate-fade-in">
-                        {(() => {
-                          const sections = parseSummaryIntoSections(getAsset(activeLecture.id, 'summaries', selectedSummaryMode));
-                          
-                          const allSections = [
-                            { key: 'overview', label: 'Overview', content: sections.overview },
-                            { key: 'keyConcepts', label: 'Key Concepts', content: sections.keyConcepts },
-                            { key: 'importantDefinitions', label: 'Important Definitions', content: sections.importantDefinitions },
-                            { key: 'examples', label: 'Examples', content: sections.examples },
-                            { key: 'applications', label: 'Applications', content: sections.applications },
-                            { key: 'commonMistakes', label: 'Common Mistakes', content: sections.commonMistakes },
-                            { key: 'revisionNotes', label: 'Revision Notes', content: sections.revisionNotes },
-                            { key: 'examQuestions', label: 'Exam Questions', content: sections.examQuestions },
-                            { key: 'keyTakeaways', label: 'Key Takeaways', content: sections.keyTakeaways },
-                            { key: 'oneMinuteRevision', label: 'One Minute Revision', content: sections.oneMinuteRevision }
-                          ];
-
-                          const filteredSections = allSections.filter(sec => {
-                            if (!sec.content || sec.content.trim().length === 0) return false;
-                            
-                            if (selectedSummaryMode === 'quick_revision') {
-                              return ['revisionNotes', 'commonMistakes', 'keyTakeaways', 'oneMinuteRevision'].includes(sec.key);
-                            } else if (selectedSummaryMode === 'detailed_notes') {
-                              return ['overview', 'keyConcepts', 'examples', 'applications', 'importantDefinitions'].includes(sec.key);
-                            } else if (selectedSummaryMode === 'executive_summary') {
-                              return ['overview', 'applications', 'keyTakeaways'].includes(sec.key);
-                            } else if (selectedSummaryMode === 'beginner_friendly') {
-                              return ['keyConcepts', 'examples', 'oneMinuteRevision'].includes(sec.key);
-                            } else if (selectedSummaryMode === 'academic_format') {
-                              return ['overview', 'keyConcepts', 'importantDefinitions', 'applications'].includes(sec.key);
-                            }
-                            return true;
+                    <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 p-2 rounded-[6px] border border-[#111111] bg-[#F6F2EA] shadow-paper-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#666666]">Format:</span>
+                        <div className="relative">
+                          <select
+                            value={selectedNotesMode}
+                            onChange={(e) => setSelectedNotesMode(e.target.value as any)}
+                            className="bg-white text-[#111111] text-xs font-mono font-bold uppercase px-3 py-1.5 rounded-[4px] border border-[#111111] shadow-paper-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#FFC400] appearance-auto"
+                          >
+                            <option value="quick">⚡ Quick Notes</option>
+                            <option value="detailed">📜 Detailed Notes</option>
+                            <option value="academic">🎓 Academic Notes</option>
+                            <option value="exam">🎯 Exam Notes</option>
+                            <option value="bhailang_normal">🔥 Normal Bhai</option>
+                            <option value="bhailang_savage">💥 Savage Bhai (Sarcasm)</option>
+                            <option value="bhailang_pro">🚀 Bhai Pro (Analogies)</option>
+                          </select>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setPdfExportData({
+                            title: `${activeLecture.title} - ${selectedNotesMode} Notes`,
+                            data: getAsset(activeLecture.id, 'notes', selectedNotesMode) || ''
                           });
-
-                          return filteredSections.map((sec, idx) => (
-                            <div key={idx} className="p-5 rounded-[6px] border border-[#111111] bg-white text-[#111111] shadow-paper-sm font-sans">
-                              <h4 className="text-xs font-heading font-extrabold text-[#111111] uppercase tracking-wider font-mono border-b border-[#111111] pb-1.5 mb-2.5">{sec.label}</h4>
-                              <p className="text-xs text-[#111111] leading-relaxed whitespace-pre-wrap">
-                                {renderTextWithCitations(cleanMarkdownText(sec.content))}
-                              </p>
-                            </div>
-                          ));
-                        })()}
-                      </div>
-                    ) : (isGeneratingSummary || isAssetLoading) ? (
-                      <div className="py-16 flex flex-col items-center justify-center border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5">
-                        <BruteLoader size="md" message={`Loading / Generating ${selectedSummaryMode.replace('_', ' ')} summary...`} />
-                      </div>
-                    ) : (
-                      <div className="text-center py-16 border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5 p-6 space-y-4">
-                        <FileText className="h-10 w-10 text-neutral-600 mx-auto animate-pulse" />
-                        <h4 className="text-xs font-bold text-neutral-400">Summary for this mode has not been generated yet.</h4>
-                        <button
-                          onClick={() => triggerGenerateSummary(selectedSummaryMode)}
-                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all shadow-md cursor-pointer"
-                        >
-                          Generate Summary
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* 3. FLASHCARDS TAB */}
-              {activeOutputTab === 'flashcards' && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-none max-w-full">
-                      {(['All', 'Basic Recall', 'Concept Understanding', 'Application Based'] as const).map(cat => (
-                        <button
-                          key={cat}
-                          onClick={() => setSelectedFlashcardCategory(cat)}
-                          className={`px-2.5 py-1 rounded-lg text-[9px] font-extrabold uppercase whitespace-nowrap ${
-                            selectedFlashcardCategory === cat ? 'bg-indigo-500/10 text-indigo-400' : 'text-neutral-400'
-                          }`}
-                        >
-                          {cat}
-                        </button>
-                      ))}
+                          setShowPdfModal(true);
+                        }}
+                        disabled={!getAsset(activeLecture.id, 'notes', selectedNotesMode)}
+                        className="flex items-center gap-1.5 px-3 py-1 bg-[#FFC400] text-[#111111] text-xs font-mono font-extrabold uppercase rounded-[4px] border border-[#111111] shadow-paper-sm hover:bg-[#ffe066] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        <span>Export PDF</span>
+                      </button>
                     </div>
-                    <button
-                      onClick={() => {
-                        setPdfExportData({ title: `${activeLecture.title} - Flashcards`, data: getAsset(activeLecture.id, 'flashcards') || [] });
-                        setShowPdfModal(true);
-                      }}
-                      disabled={!getAsset(activeLecture.id, 'flashcards') || getAsset(activeLecture.id, 'flashcards').length === 0 || !getAsset(activeLecture.id, 'flashcards').some((c: any) => c.category)}
-                      className="flex items-center gap-1 text-[10px] font-bold text-indigo-400 hover:underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-                    >
-                      <Download className="h-3 w-3" />
-                      <span>Export PDF</span>
-                    </button>
+
+                    <div className="space-y-3">
+                      {getAsset(activeLecture.id, 'notes', selectedNotesMode) ? (
+                        <div className="p-5 rounded-[6px] border border-[#111111] bg-white text-[#111111] shadow-paper-sm font-sans">
+                          <AcademicNotesViewer content={getAsset(activeLecture.id, 'notes', selectedNotesMode)} mode={selectedNotesMode} theme={theme} />
+                        </div>
+                      ) : (isGeneratingNotes || isAssetLoading) ? (
+                        <div className="py-16 flex flex-col items-center justify-center border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5">
+                          <BruteLoader size="md" message={`Loading / Generating ${selectedNotesMode} notes...`} />
+                        </div>
+                      ) : (
+                        <div className="text-center py-16 border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5 p-6 space-y-4">
+                          <FileText className="h-10 w-10 text-neutral-600 mx-auto animate-pulse" />
+                          <h4 className="text-xs font-bold text-neutral-400">Notes for this mode have not been generated yet.</h4>
+                          <button
+                            onClick={() => triggerGenerateNotes(selectedNotesMode)}
+                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all shadow-md cursor-pointer"
+                          >
+                            Generate {selectedNotesMode} Notes
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
+                )}
 
-                  <div className="space-y-3">
-                    {getAsset(activeLecture.id, 'flashcards') && getAsset(activeLecture.id, 'flashcards').length > 0 && getAsset(activeLecture.id, 'flashcards').some((c: any) => c.category) ? (
-                      <>
+                {/* 2. SUMMARY TAB */}
+                {activeOutputTab === 'summary' && (
+                  <div className="space-y-4">
+                    <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 p-2 rounded-[6px] border border-[#111111] bg-[#F6F2EA] shadow-paper-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#666666]">Format:</span>
+                        <div className="relative">
+                          <select
+                            value={selectedSummaryMode}
+                            onChange={(e) => setSelectedSummaryMode(e.target.value as any)}
+                            className="bg-white text-[#111111] text-xs font-mono font-bold uppercase px-3 py-1.5 rounded-[4px] border border-[#111111] shadow-paper-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#FFC400] appearance-auto"
+                          >
+                            <option value="quick_revision">⚡ Quick Revision</option>
+                            <option value="detailed_notes">📜 Detailed Notes</option>
+                            <option value="executive_summary">💼 Executive Summary</option>
+                            <option value="beginner_friendly">🌱 Beginner Friendly</option>
+                            <option value="academic_format">🎓 Academic Format</option>
+                            <option value="bhailang_normal">🔥 Normal Bhai</option>
+                            <option value="bhailang_savage">💥 Savage Bhai (Sarcasm)</option>
+                            <option value="bhailang_pro">🚀 Bhai Pro (Analogies)</option>
+                          </select>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setPdfExportData({
+                            title: `${activeLecture.title} - Summary (${selectedSummaryMode})`,
+                            data: getAsset(activeLecture.id, 'summaries', selectedSummaryMode) || ''
+                          });
+                          setShowPdfModal(true);
+                        }}
+                        disabled={!getAsset(activeLecture.id, 'summaries', selectedSummaryMode)}
+                        className="flex items-center gap-1.5 px-3 py-1 bg-[#FFC400] text-[#111111] text-xs font-mono font-extrabold uppercase rounded-[4px] border border-[#111111] shadow-paper-sm hover:bg-[#ffe066] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        <span>Export PDF</span>
+                      </button>
+                    </div>
+
+                    <div className="space-y-4">
+                      {getAsset(activeLecture.id, 'summaries', selectedSummaryMode) ? (
+                        <div className="space-y-4 animate-fade-in">
+                          {(() => {
+                            const sections = parseSummaryIntoSections(getAsset(activeLecture.id, 'summaries', selectedSummaryMode));
+
+                            const allSections = [
+                              { key: 'overview', label: 'Overview', content: sections.overview },
+                              { key: 'keyConcepts', label: 'Key Concepts', content: sections.keyConcepts },
+                              { key: 'importantDefinitions', label: 'Important Definitions', content: sections.importantDefinitions },
+                              { key: 'examples', label: 'Examples', content: sections.examples },
+                              { key: 'applications', label: 'Applications', content: sections.applications },
+                              { key: 'commonMistakes', label: 'Common Mistakes', content: sections.commonMistakes },
+                              { key: 'revisionNotes', label: 'Revision Notes', content: sections.revisionNotes },
+                              { key: 'examQuestions', label: 'Exam Questions', content: sections.examQuestions },
+                              { key: 'keyTakeaways', label: 'Key Takeaways', content: sections.keyTakeaways },
+                              { key: 'oneMinuteRevision', label: 'One Minute Revision', content: sections.oneMinuteRevision }
+                            ];
+
+                            const filteredSections = allSections.filter(sec => {
+                              if (!sec.content || sec.content.trim().length === 0) return false;
+
+                              if (selectedSummaryMode === 'quick_revision') {
+                                return ['revisionNotes', 'commonMistakes', 'keyTakeaways', 'oneMinuteRevision'].includes(sec.key);
+                              } else if (selectedSummaryMode === 'detailed_notes') {
+                                return ['overview', 'keyConcepts', 'examples', 'applications', 'importantDefinitions'].includes(sec.key);
+                              } else if (selectedSummaryMode === 'executive_summary') {
+                                return ['overview', 'applications', 'keyTakeaways'].includes(sec.key);
+                              } else if (selectedSummaryMode === 'beginner_friendly') {
+                                return ['keyConcepts', 'examples', 'oneMinuteRevision'].includes(sec.key);
+                              } else if (selectedSummaryMode === 'academic_format') {
+                                return ['overview', 'keyConcepts', 'importantDefinitions', 'applications'].includes(sec.key);
+                              }
+                              return true;
+                            });
+
+                            return filteredSections.map((sec, idx) => (
+                              <div key={idx} className="p-5 rounded-[6px] border border-[#111111] bg-white text-[#111111] shadow-paper-sm font-sans">
+                                <h4 className="text-xs font-heading font-extrabold text-[#111111] uppercase tracking-wider font-mono border-b border-[#111111] pb-1.5 mb-2.5">{sec.label}</h4>
+                                <p className="text-xs text-[#111111] leading-relaxed whitespace-pre-wrap">
+                                  {renderTextWithCitations(cleanMarkdownText(sec.content))}
+                                </p>
+                              </div>
+                            ));
+                          })()}
+                        </div>
+                      ) : (isGeneratingSummary || isAssetLoading) ? (
+                        <div className="py-16 flex flex-col items-center justify-center border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5">
+                          <BruteLoader size="md" message={`Loading / Generating ${selectedSummaryMode.replace('_', ' ')} summary...`} />
+                        </div>
+                      ) : (
+                        <div className="text-center py-16 border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5 p-6 space-y-4">
+                          <FileText className="h-10 w-10 text-neutral-600 mx-auto animate-pulse" />
+                          <h4 className="text-xs font-bold text-neutral-400">Summary for this mode has not been generated yet.</h4>
+                          <button
+                            onClick={() => triggerGenerateSummary(selectedSummaryMode)}
+                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all shadow-md cursor-pointer"
+                          >
+                            Generate Summary
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. FLASHCARDS TAB */}
+                {activeOutputTab === 'flashcards' && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-none max-w-full">
+                        {(['All', 'Basic Recall', 'Concept Understanding', 'Application Based'] as const).map(cat => (
+                          <button
+                            key={cat}
+                            onClick={() => setSelectedFlashcardCategory(cat)}
+                            className={`px-2.5 py-1 rounded-lg text-[9px] font-extrabold uppercase whitespace-nowrap ${selectedFlashcardCategory === cat ? 'bg-indigo-500/10 text-indigo-400' : 'text-neutral-400'
+                              }`}
+                          >
+                            {cat}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        onClick={() => {
+                          setPdfExportData({ title: `${activeLecture.title} - Flashcards`, data: getAsset(activeLecture.id, 'flashcards') || [] });
+                          setShowPdfModal(true);
+                        }}
+                        disabled={!getAsset(activeLecture.id, 'flashcards') || getAsset(activeLecture.id, 'flashcards').length === 0 || !getAsset(activeLecture.id, 'flashcards').some((c: any) => c.category)}
+                        className="flex items-center gap-1 text-[10px] font-bold text-indigo-400 hover:underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                      >
+                        <Download className="h-3 w-3" />
+                        <span>Export PDF</span>
+                      </button>
+                    </div>
+
+                    <div className="space-y-3">
+                      {getAsset(activeLecture.id, 'flashcards') && getAsset(activeLecture.id, 'flashcards').length > 0 && getAsset(activeLecture.id, 'flashcards').some((c: any) => c.category) ? (
+                        <>
+                          {(() => {
+                            const filteredCards = getAsset(activeLecture.id, 'flashcards').filter(
+                              (c: any) => selectedFlashcardCategory === 'All' || c.category === selectedFlashcardCategory
+                            );
+
+                            if (filteredCards.length === 0) {
+                              return (
+                                <div className="text-center py-12 text-neutral-500 font-mono text-[11px] border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl p-6 bg-gray-50/10 dark:bg-neutral-900/5">
+                                  No flashcards in category: {selectedFlashcardCategory}
+                                </div>
+                              );
+                            }
+
+                            return filteredCards.map((f: any, i: number) => (
+                              <div key={i} className="p-5 rounded-[6px] border border-[#111111] bg-white text-[#111111] shadow-paper-sm font-sans space-y-3">
+                                <div className="flex items-center justify-between text-xs font-bold font-mono border-b border-[#111111] pb-2">
+                                  <span className="bg-[#FFC400] text-[#111111] px-2 py-0.5 rounded-[4px] border border-[#111111]">CARD #{i + 1}</span>
+                                  <span className="text-[#666666] uppercase tracking-widest text-[10px]">{f.category || 'Concept'}</span>
+                                </div>
+                                <div className="text-xs font-extrabold text-[#111111] leading-relaxed">
+                                  <span className="text-[#2F6BFF] font-mono mr-1.5 font-extrabold">Q:</span>
+                                  {renderTextWithCitations(cleanMarkdownText(f.q))}
+                                </div>
+                                <div className="text-xs text-[#111111] leading-relaxed pt-2.5 border-t border-dashed border-[#111111]">
+                                  <span className="text-[#19B56B] font-mono mr-1.5 font-bold">A:</span>
+                                  {renderTextWithCitations(cleanMarkdownText(f.a))}
+                                </div>
+                              </div>
+                            ));
+                          })()}
+
+                          {/* Generate More Button */}
+                          <div className="pt-4 flex justify-center">
+                            {isGeneratingFlashcards ? (
+                              <BruteLoader size="sm" message="Generating 10 more flashcards..." />
+                            ) : (
+                              <button
+                                onClick={triggerGenerateMoreFlashcards}
+                                className="px-5 py-2.5 rounded-[4px] border border-[#111111] bg-[#FFC400] text-[#111111] text-xs font-mono font-extrabold shadow-paper-sm hover:bg-[#ffe066] transition-all cursor-pointer uppercase"
+                              >
+                                Generate 10 More Flashcards
+                              </button>
+                            )}
+                          </div>
+                        </>
+                      ) : (isGeneratingFlashcards || isAssetLoading) ? (
+                        <div className="py-16 flex flex-col items-center justify-center border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5">
+                          <BruteLoader size="md" message="Loading / Generating flashcard deck..." />
+                        </div>
+                      ) : (
+                        <div className="text-center py-16 border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5 p-6 space-y-4">
+                          <Brain className="h-10 w-10 text-neutral-600 mx-auto animate-pulse" />
+                          <h4 className="text-xs font-bold text-neutral-400">Flashcards have not been generated yet.</h4>
+                          <button
+                            onClick={triggerGenerateFlashcards}
+                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all shadow-md cursor-pointer"
+                          >
+                            Generate Flashcard Deck
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 4. QUIZ TAB */}
+                {activeOutputTab === 'quiz' && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-none max-w-full">
+                        {([
+                          { difficulty: 'easy', label: 'Easy' },
+                          { difficulty: 'medium', label: 'Medium' },
+                          { difficulty: 'hard', label: 'Hard' },
+                          { difficulty: 'scenario', label: 'Scenario' },
+                          { difficulty: 'application', label: 'Application' }
+                        ] as const).map(dOpt => (
+                          <button
+                            key={dOpt.difficulty}
+                            onClick={() => {
+                              setSelectedQuizDifficulty(dOpt.difficulty);
+                              setActiveQuizQuestionIdx(0);
+                              setSelectedQuizAnswerIdx(null);
+                              setIsQuizRevealed(false);
+                              setQuizScore(0);
+                            }}
+                            className={`px-2.5 py-1 rounded-lg text-[9px] font-extrabold uppercase whitespace-nowrap ${selectedQuizDifficulty === dOpt.difficulty ? 'bg-indigo-500/10 text-indigo-400' : 'text-neutral-400'
+                              }`}
+                          >
+                            {dOpt.label}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        onClick={() => {
+                          setPdfExportData({ title: `${activeLecture.title} - Quiz`, data: getAsset(activeLecture.id, 'quiz') || [] });
+                          setShowPdfModal(true);
+                        }}
+                        disabled={!getAsset(activeLecture.id, 'quiz') || getAsset(activeLecture.id, 'quiz').length === 0 || !getAsset(activeLecture.id, 'quiz').some((q: any) => q.difficulty)}
+                        className="flex items-center gap-1 text-[10px] font-bold text-indigo-400 hover:underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                      >
+                        <Download className="h-3 w-3" />
+                        <span>Export PDF</span>
+                      </button>
+                    </div>
+
+                    {getAsset(activeLecture.id, 'quiz') && getAsset(activeLecture.id, 'quiz').length > 0 && getAsset(activeLecture.id, 'quiz').some((q: any) => q.difficulty) ? (
+                      <div className="space-y-4">
                         {(() => {
-                          const filteredCards = getAsset(activeLecture.id, 'flashcards').filter(
-                            (c: any) => selectedFlashcardCategory === 'All' || c.category === selectedFlashcardCategory
-                          );
+                          const filteredQuestions = getAsset(activeLecture.id, 'quiz').filter((q: any) => q.difficulty === selectedQuizDifficulty);
 
-                          if (filteredCards.length === 0) {
+                          if (filteredQuestions.length === 0) {
                             return (
-                              <div className="text-center py-12 text-neutral-500 font-mono text-[11px] border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl p-6 bg-gray-50/10 dark:bg-neutral-900/5">
-                                No flashcards in category: {selectedFlashcardCategory}
+                              <div className="text-center py-16 border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5 p-6 space-y-4">
+                                <HelpCircle className="h-10 w-10 text-neutral-600 mx-auto animate-pulse" />
+                                <h4 className="text-xs font-bold text-neutral-400">No questions of this type generated yet.</h4>
+                                <button
+                                  onClick={triggerGenerateMoreQuiz}
+                                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all shadow-md cursor-pointer"
+                                >
+                                  Generate Questions
+                                </button>
                               </div>
                             );
                           }
 
-                          return filteredCards.map((f: any, i: number) => (
-                            <div key={i} className="p-5 rounded-[6px] border border-[#111111] bg-white text-[#111111] shadow-paper-sm font-sans space-y-3">
-                              <div className="flex items-center justify-between text-xs font-bold font-mono border-b border-[#111111] pb-2">
-                                <span className="bg-[#FFC400] text-[#111111] px-2 py-0.5 rounded-[4px] border border-[#111111]">CARD #{i + 1}</span>
-                                <span className="text-[#666666] uppercase tracking-widest text-[10px]">{f.category || 'Concept'}</span>
-                              </div>
-                              <div className="text-xs font-extrabold text-[#111111] leading-relaxed">
-                                <span className="text-[#2F6BFF] font-mono mr-1.5 font-extrabold">Q:</span>
-                                {renderTextWithCitations(cleanMarkdownText(f.q))}
-                              </div>
-                              <div className="text-xs text-[#111111] leading-relaxed pt-2.5 border-t border-dashed border-[#111111]">
-                                <span className="text-[#19B56B] font-mono mr-1.5 font-bold">A:</span>
-                                {renderTextWithCitations(cleanMarkdownText(f.a))}
-                              </div>
-                            </div>
-                          ));
-                        })()}
+                          const activeQuestion = filteredQuestions[activeQuizQuestionIdx];
 
-                        {/* Generate More Button */}
-                        <div className="pt-4 flex justify-center">
-                          {isGeneratingFlashcards ? (
-                            <BruteLoader size="sm" message="Generating 10 more flashcards..." />
-                          ) : (
-                            <button
-                              onClick={triggerGenerateMoreFlashcards}
-                              className="px-5 py-2.5 rounded-[4px] border border-[#111111] bg-[#FFC400] text-[#111111] text-xs font-mono font-extrabold shadow-paper-sm hover:bg-[#ffe066] transition-all cursor-pointer uppercase"
-                            >
-                              Generate 10 More Flashcards
-                            </button>
-                          )}
-                        </div>
-                      </>
-                    ) : (isGeneratingFlashcards || isAssetLoading) ? (
-                      <div className="py-16 flex flex-col items-center justify-center border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5">
-                        <BruteLoader size="md" message="Loading / Generating flashcard deck..." />
-                      </div>
-                    ) : (
-                      <div className="text-center py-16 border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5 p-6 space-y-4">
-                        <Brain className="h-10 w-10 text-neutral-600 mx-auto animate-pulse" />
-                        <h4 className="text-xs font-bold text-neutral-400">Flashcards have not been generated yet.</h4>
-                        <button
-                          onClick={triggerGenerateFlashcards}
-                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all shadow-md cursor-pointer"
-                        >
-                          Generate Flashcard Deck
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* 4. QUIZ TAB */}
-              {activeOutputTab === 'quiz' && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-none max-w-full">
-                      {([
-                        { difficulty: 'easy', label: 'Easy' },
-                        { difficulty: 'medium', label: 'Medium' },
-                        { difficulty: 'hard', label: 'Hard' },
-                        { difficulty: 'scenario', label: 'Scenario' },
-                        { difficulty: 'application', label: 'Application' }
-                      ] as const).map(dOpt => (
-                        <button
-                          key={dOpt.difficulty}
-                          onClick={() => {
-                            setSelectedQuizDifficulty(dOpt.difficulty);
-                            setActiveQuizQuestionIdx(0);
-                            setSelectedQuizAnswerIdx(null);
-                            setIsQuizRevealed(false);
-                            setQuizScore(0);
-                          }}
-                          className={`px-2.5 py-1 rounded-lg text-[9px] font-extrabold uppercase whitespace-nowrap ${
-                            selectedQuizDifficulty === dOpt.difficulty ? 'bg-indigo-500/10 text-indigo-400' : 'text-neutral-400'
-                          }`}
-                        >
-                          {dOpt.label}
-                        </button>
-                      ))}
-                    </div>
-                    <button
-                      onClick={() => {
-                        setPdfExportData({ title: `${activeLecture.title} - Quiz`, data: getAsset(activeLecture.id, 'quiz') || [] });
-                        setShowPdfModal(true);
-                      }}
-                      disabled={!getAsset(activeLecture.id, 'quiz') || getAsset(activeLecture.id, 'quiz').length === 0 || !getAsset(activeLecture.id, 'quiz').some((q: any) => q.difficulty)}
-                      className="flex items-center gap-1 text-[10px] font-bold text-indigo-400 hover:underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-                    >
-                      <Download className="h-3 w-3" />
-                      <span>Export PDF</span>
-                    </button>
-                  </div>
-
-                  {getAsset(activeLecture.id, 'quiz') && getAsset(activeLecture.id, 'quiz').length > 0 && getAsset(activeLecture.id, 'quiz').some((q: any) => q.difficulty) ? (
-                    <div className="space-y-4">
-                      {(() => {
-                        const filteredQuestions = getAsset(activeLecture.id, 'quiz').filter((q: any) => q.difficulty === selectedQuizDifficulty);
-
-                        if (filteredQuestions.length === 0) {
                           return (
-                            <div className="text-center py-16 border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5 p-6 space-y-4">
-                              <HelpCircle className="h-10 w-10 text-neutral-600 mx-auto animate-pulse" />
-                              <h4 className="text-xs font-bold text-neutral-400">No questions of this type generated yet.</h4>
-                              <button
-                                onClick={triggerGenerateMoreQuiz}
-                                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all shadow-md cursor-pointer"
-                              >
-                                Generate Questions
-                              </button>
-                            </div>
-                          );
-                        }
+                            <div className="space-y-4 animate-fade-in">
+                              <div className="p-5 rounded-[6px] border border-[#111111] bg-white text-[#111111] shadow-paper-sm font-sans space-y-4">
+                                <div className="flex items-center justify-between text-xs font-mono font-bold border-b border-[#111111] pb-2">
+                                  <span className="bg-[#FFC400] text-[#111111] px-2 py-0.5 rounded-[4px] border border-[#111111]">
+                                    QUESTION {activeQuizQuestionIdx + 1} OF {filteredQuestions.length}
+                                  </span>
+                                  <span className="text-[#666666] uppercase font-mono">{selectedQuizDifficulty} LEVEL</span>
+                                </div>
+                                <h4 className="text-xs font-extrabold font-heading text-[#111111] leading-relaxed">
+                                  {renderTextWithCitations(cleanMarkdownText(activeQuestion.question))}
+                                </h4>
 
-                        const activeQuestion = filteredQuestions[activeQuizQuestionIdx];
+                                <div className="grid grid-cols-1 gap-2.5 mt-4">
+                                  {activeQuestion.options.map((opt: string, optIdx: number) => {
+                                    const isSelected = selectedQuizAnswerIdx === optIdx;
+                                    const isCorrect = optIdx === activeQuestion.correctAnswer;
 
-                        return (
-                          <div className="space-y-4 animate-fade-in">
-                            <div className="p-5 rounded-[6px] border border-[#111111] bg-white text-[#111111] shadow-paper-sm font-sans space-y-4">
-                              <div className="flex items-center justify-between text-xs font-mono font-bold border-b border-[#111111] pb-2">
-                                <span className="bg-[#FFC400] text-[#111111] px-2 py-0.5 rounded-[4px] border border-[#111111]">
-                                  QUESTION {activeQuizQuestionIdx + 1} OF {filteredQuestions.length}
-                                </span>
-                                <span className="text-[#666666] uppercase font-mono">{selectedQuizDifficulty} LEVEL</span>
-                              </div>
-                              <h4 className="text-xs font-extrabold font-heading text-[#111111] leading-relaxed">
-                                {renderTextWithCitations(cleanMarkdownText(activeQuestion.question))}
-                              </h4>
-                              
-                              <div className="grid grid-cols-1 gap-2.5 mt-4">
-                                {activeQuestion.options.map((opt: string, optIdx: number) => {
-                                  const isSelected = selectedQuizAnswerIdx === optIdx;
-                                  const isCorrect = optIdx === activeQuestion.correctAnswer;
-                                  
-                                  let btnClass = "";
-                                  if (isQuizRevealed) {
+                                    let btnClass = "";
+                                    if (isQuizRevealed) {
                                       if (isCorrect) {
                                         btnClass = "border-[#111111] bg-[#19B56B] text-white shadow-paper-sm font-bold";
                                       } else if (isSelected) {
@@ -2266,507 +2257,502 @@ export default function LectureCaptureView({
                                       } else {
                                         btnClass = "border-[#111111] bg-[#F6F2EA] text-[#888888] opacity-60";
                                       }
-                                  } else {
+                                    } else {
                                       if (isSelected) {
                                         btnClass = "border-[#111111] bg-[#FFC400] text-[#111111] shadow-paper-sm font-bold";
                                       } else {
                                         btnClass = "border-[#111111] bg-white text-[#111111] hover:bg-[#FFF8D6] shadow-paper-sm";
                                       }
-                                  }
+                                    }
 
-                                  return (
+                                    return (
+                                      <button
+                                        key={optIdx}
+                                        onClick={() => !isQuizRevealed && setSelectedQuizAnswerIdx(optIdx)}
+                                        className={`rounded-[4px] py-2.5 px-3.5 text-left text-xs font-mono font-bold border outline-none transition-all cursor-pointer ${btnClass}`}
+                                      >
+                                        {opt}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+
+                                {isQuizRevealed && (
+                                  <div className="mt-4 pt-3 border-t border-dashed border-[#111111] text-xs text-[#111111] bg-[#F6F2EA] p-3 rounded-[4px] border border-[#111111]">
+                                    <span className="font-mono text-[10px] font-extrabold text-[#111111] block mb-1 uppercase">EXPLANATION:</span>
+                                    {renderTextWithCitations(cleanMarkdownText(activeQuestion.explanation))}
+                                    {activeQuestion.sourceCitation && (
+                                      <div className="mt-2 text-[10px] font-bold text-[#111111] font-mono">
+                                        Citation: {activeQuestion.sourceCitation}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
+                                <div className="flex justify-between items-center mt-5 pt-3 border-t border-[#111111]">
+                                  {!isQuizRevealed ? (
                                     <button
-                                      key={optIdx}
-                                      onClick={() => !isQuizRevealed && setSelectedQuizAnswerIdx(optIdx)}
-                                      className={`rounded-[4px] py-2.5 px-3.5 text-left text-xs font-mono font-bold border outline-none transition-all cursor-pointer ${btnClass}`}
+                                      disabled={selectedQuizAnswerIdx === null}
+                                      onClick={() => setIsQuizRevealed(true)}
+                                      className="px-5 py-2.5 bg-[#FFC400] hover:bg-[#ffe066] text-[#111111] rounded-[4px] border border-[#111111] text-xs font-mono font-extrabold shadow-paper-sm disabled:opacity-30 cursor-pointer uppercase"
                                     >
-                                      {opt}
+                                      Verify Choice
                                     </button>
-                                  );
-                                })}
-                              </div>
-
-                              {isQuizRevealed && (
-                                <div className="mt-4 pt-3 border-t border-dashed border-[#111111] text-xs text-[#111111] bg-[#F6F2EA] p-3 rounded-[4px] border border-[#111111]">
-                                  <span className="font-mono text-[10px] font-extrabold text-[#111111] block mb-1 uppercase">EXPLANATION:</span>
-                                  {renderTextWithCitations(cleanMarkdownText(activeQuestion.explanation))}
-                                  {activeQuestion.sourceCitation && (
-                                    <div className="mt-2 text-[10px] font-bold text-[#111111] font-mono">
-                                      Citation: {activeQuestion.sourceCitation}
-                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={() => {
+                                        setIsQuizRevealed(false);
+                                        setSelectedQuizAnswerIdx(null);
+                                        setActiveQuizQuestionIdx(prev => (prev + 1) % filteredQuestions.length);
+                                      }}
+                                      className="px-5 py-2.5 bg-[#111111] hover:bg-[#222222] text-white rounded-[4px] border border-[#111111] text-xs font-mono font-extrabold shadow-paper-sm cursor-pointer uppercase"
+                                    >
+                                      Next Question
+                                    </button>
                                   )}
                                 </div>
-                              )}
+                              </div>
 
-                              <div className="flex justify-between items-center mt-5 pt-3 border-t border-[#111111]">
-                                {!isQuizRevealed ? (
-                                  <button
-                                    disabled={selectedQuizAnswerIdx === null}
-                                    onClick={() => setIsQuizRevealed(true)}
-                                    className="px-5 py-2.5 bg-[#FFC400] hover:bg-[#ffe066] text-[#111111] rounded-[4px] border border-[#111111] text-xs font-mono font-extrabold shadow-paper-sm disabled:opacity-30 cursor-pointer uppercase"
-                                  >
-                                    Verify Choice
-                                  </button>
+                              {/* Generate More Questions Button */}
+                              <div className="flex justify-center pt-2">
+                                {isGeneratingQuiz ? (
+                                  <BruteLoader size="sm" message={`Generating 10 more ${selectedQuizDifficulty} questions...`} />
                                 ) : (
                                   <button
-                                    onClick={() => {
-                                      setIsQuizRevealed(false);
-                                      setSelectedQuizAnswerIdx(null);
-                                      setActiveQuizQuestionIdx(prev => (prev + 1) % filteredQuestions.length);
-                                    }}
-                                    className="px-5 py-2.5 bg-[#111111] hover:bg-[#222222] text-white rounded-[4px] border border-[#111111] text-xs font-mono font-extrabold shadow-paper-sm cursor-pointer uppercase"
+                                    onClick={triggerGenerateMoreQuiz}
+                                    className="px-5 py-2.5 rounded-[4px] border border-[#111111] bg-[#FFC400] text-[#111111] text-xs font-mono font-extrabold shadow-paper-sm hover:bg-[#ffe066] transition-all cursor-pointer uppercase"
                                   >
-                                    Next Question
+                                    Generate 10 More {selectedQuizDifficulty} Questions
                                   </button>
                                 )}
                               </div>
                             </div>
+                          );
+                        })()}
+                      </div>
+                    ) : (isGeneratingQuiz || isAssetLoading) ? (
+                      <div className="py-16 flex flex-col items-center justify-center border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5">
+                        <BruteLoader size="md" message="Loading / Generating 40-question quiz..." />
+                      </div>
+                    ) : (
+                      <div className="text-center py-16 border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5 p-6 space-y-4">
+                        <HelpCircle className="h-10 w-10 text-neutral-600 mx-auto animate-pulse" />
+                        <h4 className="text-xs font-bold text-neutral-400">Quiz has not been generated yet.</h4>
+                        <button
+                          onClick={triggerGenerateQuiz}
+                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all shadow-md cursor-pointer"
+                        >
+                          Generate 40-Question Quiz
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
 
-                            {/* Generate More Questions Button */}
-                            <div className="flex justify-center pt-2">
-                              {isGeneratingQuiz ? (
-                                <BruteLoader size="sm" message={`Generating 10 more ${selectedQuizDifficulty} questions...`} />
-                              ) : (
-                                <button
-                                  onClick={triggerGenerateMoreQuiz}
-                                  className="px-5 py-2.5 rounded-[4px] border border-[#111111] bg-[#FFC400] text-[#111111] text-xs font-mono font-extrabold shadow-paper-sm hover:bg-[#ffe066] transition-all cursor-pointer uppercase"
-                                >
-                                  Generate 10 More {selectedQuizDifficulty} Questions
-                                </button>
-                              )}
+                {/* 5. MIND MAP TAB */}
+                {activeOutputTab === 'mindmap' && (
+                  <div className="space-y-4">
+                    {(() => {
+                      const mindmapNodes = getEffectiveMindmapNodes(
+                        getAsset(activeLecture.id, 'keyConcepts'),
+                        activeLecture.sections,
+                        activeLecture.title
+                      );
+
+                      return (
+                        <div className="space-y-4">
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-mono font-extrabold text-[#111111] uppercase">Interactive Concept Net</span>
+                              <span className="text-[10px] font-mono font-bold bg-[#FFC400] text-[#111111] px-2 py-0.5 rounded-[4px] border border-[#111111]">
+                                {mindmapNodes.length} NODES
+                              </span>
                             </div>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  ) : (isGeneratingQuiz || isAssetLoading) ? (
-                    <div className="py-16 flex flex-col items-center justify-center border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5">
-                      <BruteLoader size="md" message="Loading / Generating 40-question quiz..." />
-                    </div>
-                  ) : (
-                    <div className="text-center py-16 border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5 p-6 space-y-4">
-                      <HelpCircle className="h-10 w-10 text-neutral-600 mx-auto animate-pulse" />
-                      <h4 className="text-xs font-bold text-neutral-400">Quiz has not been generated yet.</h4>
-                      <button
-                        onClick={triggerGenerateQuiz}
-                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all shadow-md cursor-pointer"
-                      >
-                        Generate 40-Question Quiz
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* 5. MIND MAP TAB */}
-              {activeOutputTab === 'mindmap' && (
-                <div className="space-y-4">
-                  {(() => {
-                    const mindmapNodes = getEffectiveMindmapNodes(
-                      getAsset(activeLecture.id, 'keyConcepts'),
-                      activeLecture.sections,
-                      activeLecture.title
-                    );
-
-                    return (
-                      <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-mono font-extrabold text-[#111111] uppercase">Interactive Concept Net</span>
-                            <span className="text-[10px] font-mono font-bold bg-[#FFC400] text-[#111111] px-2 py-0.5 rounded-[4px] border border-[#111111]">
-                              {mindmapNodes.length} NODES
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={triggerGenerateMindmap}
-                              disabled={isGeneratingMindmap}
-                              className="flex items-center gap-1 text-[10px] font-mono font-bold text-[#111111] bg-[#FFC400] px-2.5 py-1 rounded-[4px] border border-[#111111] shadow-paper-sm hover:bg-[#ffe066] cursor-pointer uppercase disabled:opacity-50"
-                            >
-                              <RotateCcw className={`h-3 w-3 ${isGeneratingMindmap ? 'animate-spin' : ''}`} />
-                              <span>Re-synthesize AI Net</span>
-                            </button>
-                            <button
-                              onClick={() => {
-                                setPdfExportData({ title: `${activeLecture.title} - Concept Map`, data: mindmapNodes });
-                                setShowPdfModal(true);
-                              }}
-                              className="flex items-center gap-1 text-[10px] font-mono font-bold text-[#111111] bg-white px-2.5 py-1 rounded-[4px] border border-[#111111] shadow-paper-sm hover:bg-[#FFF8D6] cursor-pointer"
-                            >
-                              <Download className="h-3 w-3" />
-                              <span>Export PDF</span>
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="h-72 rounded-[6px] border border-[#111111] bg-[#F6F2EA] shadow-paper-sm overflow-hidden relative">
-                          <svg className="w-full h-full">
-                            <defs>
-                              <marker id="arrow" viewBox="0 0 10 10" refX="18" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
-                                <path d="M 0 0 L 10 5 L 0 10 z" fill="#111111" />
-                              </marker>
-                            </defs>
-
-                            {mindmapNodes.map((node: any, idx: number) => {
-                              if (node.parent) {
-                                const parentNode = mindmapNodes.find((n: any) => n.id === node.parent) || mindmapNodes[0];
-                                if (parentNode) {
-                                  const px1 = parseFloat(String(parentNode.x || 50));
-                                  const py1 = parseFloat(String(parentNode.y || 50));
-                                  const px2 = parseFloat(String(node.x || 50));
-                                  const py2 = parseFloat(String(node.y || 50));
-                                  const x1 = isNaN(px1) ? 50 : px1;
-                                  const y1 = isNaN(py1) ? 50 : py1;
-                                  const x2 = isNaN(px2) ? 50 : px2;
-                                  const y2 = isNaN(py2) ? 50 : py2;
-                                  const midX = (x1 + x2) / 2;
-                                  const midY = (y1 + y2) / 2;
-
-                                  return (
-                                    <g key={idx}>
-                                      <line
-                                        x1={`${x1}%`}
-                                        y1={`${y1}%`}
-                                        x2={`${x2}%`}
-                                        y2={`${y2}%`}
-                                        stroke="#111111"
-                                        strokeWidth="2"
-                                        markerEnd="url(#arrow)"
-                                      />
-                                    </g>
-                                  );
-                                }
-                              }
-                              return null;
-                            })}
-
-                            {mindmapNodes.map((node: any, idx: number) => {
-                              const rawX = parseFloat(String(node.x || 50));
-                              const rawY = parseFloat(String(node.y || 50));
-                              const nx = isNaN(rawX) ? 50 : rawX;
-                              const ny = isNaN(rawY) ? 50 : rawY;
-
-                              const isSelected = selectedMindmapNode?.id === node.id;
-                              const isRoot = node.id === 'root';
-
-                              return (
-                                <g key={idx} onClick={() => setSelectedMindmapNode(node)} className="cursor-pointer group">
-                                  <circle
-                                    cx={`${nx}%`}
-                                    cy={`${ny}%`}
-                                    r={isRoot ? 14 : 9}
-                                    fill={getNodeColor(node, isSelected)}
-                                    stroke="#111111"
-                                    strokeWidth="2"
-                                    className="transition-all hover:scale-125"
-                                  />
-                                  <text
-                                    x={`${nx}%`}
-                                    y={`${Math.max(5, ny - 4)}%`}
-                                    textAnchor="middle"
-                                    fill="#111111"
-                                    fontSize="10px"
-                                    fontWeight="bold"
-                                    className="font-mono select-none"
-                                  >
-                                    {node.label}
-                                  </text>
-                                </g>
-                              );
-                            })}
-                          </svg>
-                          <div className="absolute bottom-2 left-2 text-[9px] font-mono text-[#111111] bg-white border border-[#111111] px-2 py-0.5 rounded-[4px] shadow-paper-sm font-bold">
-                            Click nodes to view details
-                          </div>
-                        </div>
-
-                        {selectedMindmapNode && (
-                          <div className="p-5 rounded-[6px] border border-[#111111] bg-white text-[#111111] shadow-paper-sm text-left space-y-3 animate-fade-in font-sans">
-                            <div className="flex items-center justify-between border-b border-[#111111] pb-2">
-                              <h4 className="text-xs font-mono font-extrabold text-[#111111] uppercase tracking-wider">
-                                {selectedMindmapNode.label}
-                              </h4>
-                              <button 
-                                onClick={() => setSelectedMindmapNode(null)}
-                                className="text-xs font-bold text-[#111111] hover:bg-[#FFC400] px-2 py-0.5 rounded border border-[#111111] cursor-pointer"
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={triggerGenerateMindmap}
+                                disabled={isGeneratingMindmap}
+                                className="flex items-center gap-1 text-[10px] font-mono font-bold text-[#111111] bg-[#FFC400] px-2.5 py-1 rounded-[4px] border border-[#111111] shadow-paper-sm hover:bg-[#ffe066] cursor-pointer uppercase disabled:opacity-50"
                               >
-                                ✕
+                                <RotateCcw className={`h-3 w-3 ${isGeneratingMindmap ? 'animate-spin' : ''}`} />
+                                <span>Re-synthesize AI Net</span>
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setPdfExportData({ title: `${activeLecture.title} - Concept Map`, data: mindmapNodes });
+                                  setShowPdfModal(true);
+                                }}
+                                className="flex items-center gap-1 text-[10px] font-mono font-bold text-[#111111] bg-white px-2.5 py-1 rounded-[4px] border border-[#111111] shadow-paper-sm hover:bg-[#FFF8D6] cursor-pointer"
+                              >
+                                <Download className="h-3 w-3" />
+                                <span>Export PDF</span>
                               </button>
                             </div>
-                            
-                            <div className="text-xs text-[#111111] leading-relaxed">
-                              <strong className="text-[#111111] block text-[10px] uppercase font-mono tracking-wider font-extrabold">Definition & Explanation</strong>
-                              {renderTextWithCitations(cleanMarkdownText(selectedMindmapNode.desc || selectedMindmapNode.explanation || 'Provides logical synthesis for this section.'))}
-                            </div>
-                            
-                            {selectedMindmapNode.examples && (
-                              <div className="text-xs text-[#111111] leading-relaxed">
-                                <strong className="text-[#111111] block text-[10px] uppercase font-mono tracking-wider font-extrabold">Examples & Analogies</strong>
-                                {renderTextWithCitations(cleanMarkdownText(selectedMindmapNode.examples))}
-                              </div>
-                            )}
-
-                            {selectedMindmapNode.formula && (
-                              <div className="text-xs text-[#111111] leading-relaxed">
-                                <strong className="text-[#111111] block text-[10px] uppercase font-mono tracking-wider font-extrabold">Equations or Theories</strong>
-                                <code className="block p-2 rounded-[4px] text-xs font-mono mt-1 text-[#111111] bg-[#FFF8D6] border border-[#111111] font-bold">
-                                  {selectedMindmapNode.formula}
-                                </code>
-                              </div>
-                            )}
-
-                            {selectedMindmapNode.applications && (
-                              <div className="text-xs text-[#111111] leading-relaxed">
-                                <strong className="text-[#111111] block text-[10px] uppercase font-mono tracking-wider font-extrabold">Applications & Use Cases</strong>
-                                {renderTextWithCitations(cleanMarkdownText(selectedMindmapNode.applications))}
-                              </div>
-                            )}
-
-                            {selectedMindmapNode.examImportance && (
-                              <div className="text-xs text-[#111111] leading-relaxed">
-                                <strong className="text-[#111111] block text-[10px] uppercase font-mono tracking-wider font-extrabold">Exam Importance</strong>
-                                <span className="inline-block px-2.5 py-0.5 rounded-[4px] text-[10px] font-mono font-bold mt-1 bg-[#FFC400] text-[#111111] border border-[#111111]">
-                                  🎯 {selectedMindmapNode.examImportance}
-                                </span>
-                              </div>
-                            )}
                           </div>
-                        )}
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
 
-              {/* 6. TIMELINE TAB */}
-              {activeOutputTab === 'timeline' && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono font-extrabold text-[#111111] uppercase">Chronological Milestones</span>
-                    <button
-                      onClick={() => {
-                        setPdfExportData({ title: `${activeLecture.title} - Timeline`, data: activeLecture.timeline });
-                        setShowPdfModal(true);
-                      }}
-                      className="flex items-center gap-1 text-xs font-mono font-bold text-[#111111] bg-[#FFC400] px-2.5 py-1 rounded-[4px] border border-[#111111] shadow-paper-sm hover:bg-[#ffe066] cursor-pointer"
-                    >
-                      <Download className="h-3 w-3" />
-                      <span>Export PDF</span>
-                    </button>
+                          <div className="h-72 rounded-[6px] border border-[#111111] bg-[#F6F2EA] shadow-paper-sm overflow-hidden relative">
+                            <svg className="w-full h-full">
+                              <defs>
+                                <marker id="arrow" viewBox="0 0 10 10" refX="18" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#111111" />
+                                </marker>
+                              </defs>
+
+                              {mindmapNodes.map((node: any, idx: number) => {
+                                if (node.parent) {
+                                  const parentNode = mindmapNodes.find((n: any) => n.id === node.parent) || mindmapNodes[0];
+                                  if (parentNode) {
+                                    const px1 = parseFloat(String(parentNode.x || 50));
+                                    const py1 = parseFloat(String(parentNode.y || 50));
+                                    const px2 = parseFloat(String(node.x || 50));
+                                    const py2 = parseFloat(String(node.y || 50));
+                                    const x1 = isNaN(px1) ? 50 : px1;
+                                    const y1 = isNaN(py1) ? 50 : py1;
+                                    const x2 = isNaN(px2) ? 50 : px2;
+                                    const y2 = isNaN(py2) ? 50 : py2;
+                                    const midX = (x1 + x2) / 2;
+                                    const midY = (y1 + y2) / 2;
+
+                                    return (
+                                      <g key={idx}>
+                                        <line
+                                          x1={`${x1}%`}
+                                          y1={`${y1}%`}
+                                          x2={`${x2}%`}
+                                          y2={`${y2}%`}
+                                          stroke="#111111"
+                                          strokeWidth="2"
+                                          markerEnd="url(#arrow)"
+                                        />
+                                      </g>
+                                    );
+                                  }
+                                }
+                                return null;
+                              })}
+
+                              {mindmapNodes.map((node: any, idx: number) => {
+                                const rawX = parseFloat(String(node.x || 50));
+                                const rawY = parseFloat(String(node.y || 50));
+                                const nx = isNaN(rawX) ? 50 : rawX;
+                                const ny = isNaN(rawY) ? 50 : rawY;
+
+                                const isSelected = selectedMindmapNode?.id === node.id;
+                                const isRoot = node.id === 'root';
+
+                                return (
+                                  <g key={idx} onClick={() => setSelectedMindmapNode(node)} className="cursor-pointer group">
+                                    <circle
+                                      cx={`${nx}%`}
+                                      cy={`${ny}%`}
+                                      r={isRoot ? 14 : 9}
+                                      fill={getNodeColor(node, isSelected)}
+                                      stroke="#111111"
+                                      strokeWidth="2"
+                                      className="transition-all hover:scale-125"
+                                    />
+                                    <text
+                                      x={`${nx}%`}
+                                      y={`${Math.max(5, ny - 4)}%`}
+                                      textAnchor="middle"
+                                      fill="#111111"
+                                      fontSize="10px"
+                                      fontWeight="bold"
+                                      className="font-mono select-none"
+                                    >
+                                      {node.label}
+                                    </text>
+                                  </g>
+                                );
+                              })}
+                            </svg>
+                            <div className="absolute bottom-2 left-2 text-[9px] font-mono text-[#111111] bg-white border border-[#111111] px-2 py-0.5 rounded-[4px] shadow-paper-sm font-bold">
+                              Click nodes to view details
+                            </div>
+                          </div>
+
+                          {selectedMindmapNode && (
+                            <div className="p-5 rounded-[6px] border border-[#111111] bg-white text-[#111111] shadow-paper-sm text-left space-y-3 animate-fade-in font-sans">
+                              <div className="flex items-center justify-between border-b border-[#111111] pb-2">
+                                <h4 className="text-xs font-mono font-extrabold text-[#111111] uppercase tracking-wider">
+                                  {selectedMindmapNode.label}
+                                </h4>
+                                <button
+                                  onClick={() => setSelectedMindmapNode(null)}
+                                  className="text-xs font-bold text-[#111111] hover:bg-[#FFC400] px-2 py-0.5 rounded border border-[#111111] cursor-pointer"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+
+                              <div className="text-xs text-[#111111] leading-relaxed">
+                                <strong className="text-[#111111] block text-[10px] uppercase font-mono tracking-wider font-extrabold">Definition & Explanation</strong>
+                                {renderTextWithCitations(cleanMarkdownText(selectedMindmapNode.desc || selectedMindmapNode.explanation || 'Provides logical synthesis for this section.'))}
+                              </div>
+
+                              {selectedMindmapNode.examples && (
+                                <div className="text-xs text-[#111111] leading-relaxed">
+                                  <strong className="text-[#111111] block text-[10px] uppercase font-mono tracking-wider font-extrabold">Examples & Analogies</strong>
+                                  {renderTextWithCitations(cleanMarkdownText(selectedMindmapNode.examples))}
+                                </div>
+                              )}
+
+                              {selectedMindmapNode.formula && (
+                                <div className="text-xs text-[#111111] leading-relaxed">
+                                  <strong className="text-[#111111] block text-[10px] uppercase font-mono tracking-wider font-extrabold">Equations or Theories</strong>
+                                  <code className="block p-2 rounded-[4px] text-xs font-mono mt-1 text-[#111111] bg-[#FFF8D6] border border-[#111111] font-bold">
+                                    {selectedMindmapNode.formula}
+                                  </code>
+                                </div>
+                              )}
+
+                              {selectedMindmapNode.applications && (
+                                <div className="text-xs text-[#111111] leading-relaxed">
+                                  <strong className="text-[#111111] block text-[10px] uppercase font-mono tracking-wider font-extrabold">Applications & Use Cases</strong>
+                                  {renderTextWithCitations(cleanMarkdownText(selectedMindmapNode.applications))}
+                                </div>
+                              )}
+
+                              {selectedMindmapNode.examImportance && (
+                                <div className="text-xs text-[#111111] leading-relaxed">
+                                  <strong className="text-[#111111] block text-[10px] uppercase font-mono tracking-wider font-extrabold">Exam Importance</strong>
+                                  <span className="inline-block px-2.5 py-0.5 rounded-[4px] text-[10px] font-mono font-bold mt-1 bg-[#FFC400] text-[#111111] border border-[#111111]">
+                                    🎯 {selectedMindmapNode.examImportance}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
+                )}
 
+                {/* 6. TIMELINE TAB */}
+                {activeOutputTab === 'timeline' && (
                   <div className="space-y-4">
-                    {activeLecture.timeline && activeLecture.timeline.length > 0 ? (
-                      <div className="relative ml-4 py-2 space-y-4 border-l-2 border-[#111111]">
-                        {activeLecture.timeline.map((event: any, idx: number) => (
-                          <div key={idx} className="relative pl-6">
-                            <span 
-                              onClick={() => handleTimelineTimestampClick(event.time)}
-                              className="absolute -left-3.5 top-1 flex h-7 px-2 items-center justify-center rounded-[4px] bg-[#FFC400] border border-[#111111] text-[10px] font-mono font-bold text-[#111111] cursor-pointer hover:bg-[#ffe066] transition-all shadow-paper-sm"
-                            >
-                              {event.time}
-                            </span>
-                            <div className="p-4 rounded-[6px] border border-[#111111] bg-white text-[#111111] shadow-paper-sm space-y-1 ml-4">
-                              <h4 className="text-xs font-heading font-extrabold text-[#111111] border-b border-[#111111] pb-1 mb-1.5">{event.title}</h4>
-                              <p className="text-xs text-[#111111] leading-relaxed">{event.description}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-12 text-[#666666] font-mono text-xs border border-dashed border-[#111111] rounded-[6px] bg-white">No timeline segments parsed.</div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* 7. SLIDES TAB */}
-              {activeOutputTab === 'slides' && (
-                <PresentationWorkspace
-                  theme={theme}
-                  apiKey={import.meta.env.VITE_GEMINI_API_KEY || ''}
-                  contentSourceText={activeLecture.transcript || activeLecture.summary || ''}
-                  initialBlueprint={activeLecture.presentationBlueprint}
-                  title={activeLecture.title}
-                  onUpdateSlides={async (updatedBlueprint) => {
-                    const uid = auth.currentUser?.uid;
-                    if (!uid) return;
-                    const docRef = doc(db, 'users', uid, 'lectures', activeLecture.id);
-                    await updateDoc(docRef, { presentationBlueprint: updatedBlueprint });
-                  }}
-                />
-              )}
-
-              {/* 8. HANDWRITTEN NOTES TAB */}
-              {activeOutputTab === 'handwritten' && (
-                <HandwrittenNotesViewer 
-                  lectureData={activeLecture} 
-                  theme={theme} 
-                  isCompiling={isGeneratingNotes || activeLecture?.status === 'transcribing'}
-                />
-              )}
-
-              {/* 9. LECTURE CHAT TAB */}
-              {activeOutputTab === 'chat' && (
-                <div className="flex flex-col h-[520px] border border-neutral-900 rounded-xl overflow-hidden bg-neutral-950/30 animate-fade-in">
-                  {/* Chat messages */}
-                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                    {(!activeLecture.chatHistory || activeLecture.chatHistory.length === 0) ? (
-                      <div className="flex flex-col items-center justify-center h-full text-center p-6 space-y-3 select-none">
-                        <Brain className="h-8 w-8 text-indigo-500 animate-pulse" />
-                        <h4 className="text-xs font-bold text-neutral-300">Ask Lecture AI</h4>
-                        <p className="text-[10px] text-neutral-500 max-w-xs leading-relaxed font-semibold">
-                          Query the cognitive grounding engine about the details of this lecture. Ask questions, clarify concepts, or request summary bullets.
-                        </p>
-                      </div>
-                    ) : (
-                      activeLecture.chatHistory.map((msg: any, idx: number) => (
-                        <div key={idx} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                          <div className={`max-w-[85%] rounded-xl p-3 text-xs leading-relaxed shadow-sm ${
-                            msg.sender === 'user'
-                              ? 'bg-indigo-600 text-white rounded-br-none'
-                              : theme === 'dark'
-                                ? 'bg-neutral-950 border border-neutral-800 text-neutral-200 rounded-bl-none'
-                                : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none'
-                          }`}>
-                            <div className="text-[9px] font-bold font-mono text-indigo-400 mb-1">
-                              {msg.sender === 'user' ? 'STUDENT' : 'PROFESSOR AI'}
-                            </div>
-                            <div className="whitespace-pre-wrap">
-                              {renderTextWithCitations(msg.text)}
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                    {isChatLoading && (
-                      <div className="flex justify-start">
-                        <div className={`rounded-xl p-3 text-xs shadow-sm flex items-center gap-2 ${
-                          theme === 'dark' ? 'bg-neutral-950 border border-neutral-800' : 'bg-white border border-gray-200'
-                        }`}>
-                          <Cpu className="h-3.5 w-3.5 text-indigo-500 animate-spin" />
-                          <span className="text-neutral-500 font-mono text-[9px] animate-pulse">Thinking...</span>
-                        </div>
-                      </div>
-                    )}
-                    <div ref={chatEndRef} />
-                  </div>
-
-                  {/* Preset prompts for Ask Lecture AI */}
-                  <div className="flex gap-1.5 overflow-x-auto px-3 pb-2 scrollbar-none pt-2 border-t border-neutral-900/40">
-                    {[
-                      { label: 'Explain Chapter 2', prompt: 'Explain chapter 2' },
-                      { label: 'What formula was discussed?', prompt: 'What formula was discussed?' },
-                      { label: 'Give Revision Notes', prompt: 'Give revision notes' },
-                      { label: 'Create 5 Difficult Questions', prompt: 'Create 5 difficult questions' },
-                      { label: 'Translate in Hindi', prompt: 'Translate in Hindi' }
-                    ].map((p, idx) => (
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-mono font-extrabold text-[#111111] uppercase">Chronological Milestones</span>
                       <button
-                        key={idx}
-                        type="button"
-                        onClick={() => sendMessageText(p.prompt)}
-                        disabled={isChatLoading}
-                        className={`px-2.5 py-1 rounded-full text-[9px] font-bold border transition-all whitespace-nowrap cursor-pointer ${
-                          theme === 'dark'
-                            ? 'border-neutral-800 bg-neutral-900 text-neutral-300 hover:bg-neutral-800 hover:text-white'
-                            : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100 hover:text-gray-900'
-                        }`}
+                        onClick={() => {
+                          setPdfExportData({ title: `${activeLecture.title} - Timeline`, data: activeLecture.timeline });
+                          setShowPdfModal(true);
+                        }}
+                        className="flex items-center gap-1 text-xs font-mono font-bold text-[#111111] bg-[#FFC400] px-2.5 py-1 rounded-[4px] border border-[#111111] shadow-paper-sm hover:bg-[#ffe066] cursor-pointer"
                       >
-                        {p.label}
+                        <Download className="h-3 w-3" />
+                        <span>Export PDF</span>
                       </button>
-                    ))}
+                    </div>
+
+                    <div className="space-y-4">
+                      {activeLecture.timeline && activeLecture.timeline.length > 0 ? (
+                        <div className="relative ml-4 py-2 space-y-4 border-l-2 border-[#111111]">
+                          {activeLecture.timeline.map((event: any, idx: number) => (
+                            <div key={idx} className="relative pl-6">
+                              <span
+                                onClick={() => handleTimelineTimestampClick(event.time)}
+                                className="absolute -left-3.5 top-1 flex h-7 px-2 items-center justify-center rounded-[4px] bg-[#FFC400] border border-[#111111] text-[10px] font-mono font-bold text-[#111111] cursor-pointer hover:bg-[#ffe066] transition-all shadow-paper-sm"
+                              >
+                                {event.time}
+                              </span>
+                              <div className="p-4 rounded-[6px] border border-[#111111] bg-white text-[#111111] shadow-paper-sm space-y-1 ml-4">
+                                <h4 className="text-xs font-heading font-extrabold text-[#111111] border-b border-[#111111] pb-1 mb-1.5">{event.title}</h4>
+                                <p className="text-xs text-[#111111] leading-relaxed">{event.description}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-12 text-[#666666] font-mono text-xs border border-dashed border-[#111111] rounded-[6px] bg-white">No timeline segments parsed.</div>
+                      )}
+                    </div>
                   </div>
+                )}
 
-                  {/* Input form */}
-                  <form onSubmit={handleSendChatMessage} className="p-3 border-t border-neutral-900 bg-neutral-950/70 flex gap-2">
-                    <input
-                      type="text"
-                      value={chatInput}
-                      onChange={(e) => setChatInput(e.target.value)}
-                      placeholder="Ask a question about this lecture..."
-                      className="flex-1 rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-xs text-white placeholder-neutral-600 focus:outline-none focus:border-indigo-500"
-                      disabled={isChatLoading}
-                    />
-                    <button
-                      type="submit"
-                      disabled={!chatInput.trim() || isChatLoading}
-                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white text-xs font-bold rounded-lg cursor-pointer transition-all"
-                    >
-                      Send
-                    </button>
-                  </form>
-                </div>
-              )}
-
-            </div>
-          </div>
-
-        </div>
-
-        {/* PDF CUSTOMIZATION MODAL */}
-        {showPdfModal && pdfExportData && (
-          <div className="fixed inset-0 bg-neutral-950/65 backdrop-blur-xs flex items-center justify-center z-50 p-4 select-none animate-fade-in">
-            <div className={`rounded-2xl max-w-md w-full border p-6 space-y-4 shadow-2xl relative ${
-              theme === 'dark' ? 'bg-[#0d0e12] border-neutral-800 text-white' : 'bg-white border-gray-200 text-gray-900'
-            }`}>
-              <div className="flex items-center justify-between pb-3 border-b border-neutral-900/40">
-                <h3 className="font-sans font-black text-sm flex items-center gap-1.5">
-                  <FileText className="h-4 w-4 text-indigo-400" />
-                  <span>Configure PDF Document Theme</span>
-                </h3>
-                <button 
-                  onClick={() => { setShowPdfModal(false); setPdfExportData(null); }}
-                  className="text-neutral-500 hover:text-white text-xs font-bold cursor-pointer"
-                >
-                  Close
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-[10px] font-black text-neutral-500 uppercase font-mono">Select Document Theme</label>
-                  <div className="grid grid-cols-2 gap-2 mt-2">
-                    {(['academic', 'modern', 'corporate', 'dark'] as const).map(t => (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => setSelectedPdfTheme(t)}
-                        className={`py-2 px-3 text-xs font-bold border rounded-lg cursor-pointer capitalize transition-all ${
-                          selectedPdfTheme === t 
-                            ? 'bg-indigo-600 border-indigo-500 text-white' 
-                            : theme === 'dark' ? 'border-neutral-800 text-neutral-400 hover:border-neutral-700' : 'border-gray-200 text-gray-700 hover:border-gray-300'
-                        }`}
-                      >
-                        {t} Style
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-2.5 pt-3">
-                  <button
-                    type="button"
-                    onClick={() => { setShowPdfModal(false); setPdfExportData(null); }}
-                    className="rounded-lg px-4 py-2 text-xs font-bold border border-neutral-800 text-neutral-400 cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      exportPDFFile(pdfExportData.title, pdfExportData.data, selectedPdfTheme);
-                      setShowPdfModal(false);
-                      setPdfExportData(null);
+                {/* 7. SLIDES TAB */}
+                {activeOutputTab === 'slides' && (
+                  <PresentationWorkspace
+                    theme={theme}
+                    apiKey={import.meta.env.VITE_GEMINI_API_KEY || ''}
+                    contentSourceText={activeLecture.transcript || activeLecture.summary || ''}
+                    initialBlueprint={activeLecture.presentationBlueprint}
+                    title={activeLecture.title}
+                    onUpdateSlides={async (updatedBlueprint) => {
+                      const uid = auth.currentUser?.uid;
+                      if (!uid) return;
+                      const docRef = doc(db, 'users', uid, 'lectures', activeLecture.id);
+                      await updateDoc(docRef, { presentationBlueprint: updatedBlueprint });
                     }}
-                    className="rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2 text-xs font-bold cursor-pointer"
+                  />
+                )}
+
+                {/* 8. HANDWRITTEN NOTES TAB */}
+                {activeOutputTab === 'handwritten' && (
+                  <HandwrittenNotesViewer
+                    lectureData={activeLecture}
+                    theme={theme}
+                    isCompiling={isGeneratingNotes || activeLecture?.status === 'transcribing'}
+                  />
+                )}
+
+                {/* 9. LECTURE CHAT TAB */}
+                {activeOutputTab === 'chat' && (
+                  <div className="flex flex-col h-[520px] border border-neutral-900 rounded-xl overflow-hidden bg-neutral-950/30 animate-fade-in">
+                    {/* Chat messages */}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                      {(!activeLecture.chatHistory || activeLecture.chatHistory.length === 0) ? (
+                        <div className="flex flex-col items-center justify-center h-full text-center p-6 space-y-3 select-none">
+                          <Brain className="h-8 w-8 text-indigo-500 animate-pulse" />
+                          <h4 className="text-xs font-bold text-neutral-300">Ask Lecture AI</h4>
+                          <p className="text-[10px] text-neutral-500 max-w-xs leading-relaxed font-semibold">
+                            Query the cognitive grounding engine about the details of this lecture. Ask questions, clarify concepts, or request summary bullets.
+                          </p>
+                        </div>
+                      ) : (
+                        activeLecture.chatHistory.map((msg: any, idx: number) => (
+                          <div key={idx} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                            <div className={`max-w-[85%] rounded-xl p-3 text-xs leading-relaxed shadow-sm ${msg.sender === 'user'
+                                ? 'bg-indigo-600 text-white rounded-br-none'
+                                : theme === 'dark'
+                                  ? 'bg-neutral-950 border border-neutral-800 text-neutral-200 rounded-bl-none'
+                                  : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none'
+                              }`}>
+                              <div className="text-[9px] font-bold font-mono text-indigo-400 mb-1">
+                                {msg.sender === 'user' ? 'STUDENT' : 'PROFESSOR AI'}
+                              </div>
+                              <div className="whitespace-pre-wrap">
+                                {renderTextWithCitations(msg.text)}
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                      {isChatLoading && (
+                        <div className="flex justify-start">
+                          <div className={`rounded-xl p-3 text-xs shadow-sm flex items-center gap-2 ${theme === 'dark' ? 'bg-neutral-950 border border-neutral-800' : 'bg-white border border-gray-200'
+                            }`}>
+                            <Cpu className="h-3.5 w-3.5 text-indigo-500 animate-spin" />
+                            <span className="text-neutral-500 font-mono text-[9px] animate-pulse">Thinking...</span>
+                          </div>
+                        </div>
+                      )}
+                      <div ref={chatEndRef} />
+                    </div>
+
+                    {/* Preset prompts for Ask Lecture AI */}
+                    <div className="flex gap-1.5 overflow-x-auto px-3 pb-2 scrollbar-none pt-2 border-t border-neutral-900/40">
+                      {[
+                        { label: 'Explain Chapter 2', prompt: 'Explain chapter 2' },
+                        { label: 'What formula was discussed?', prompt: 'What formula was discussed?' },
+                        { label: 'Give Revision Notes', prompt: 'Give revision notes' },
+                        { label: 'Create 5 Difficult Questions', prompt: 'Create 5 difficult questions' },
+                        { label: 'Translate in Hindi', prompt: 'Translate in Hindi' }
+                      ].map((p, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => sendMessageText(p.prompt)}
+                          disabled={isChatLoading}
+                          className={`px-2.5 py-1 rounded-full text-[9px] font-bold border transition-all whitespace-nowrap cursor-pointer ${theme === 'dark'
+                              ? 'border-neutral-800 bg-neutral-900 text-neutral-300 hover:bg-neutral-800 hover:text-white'
+                              : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                            }`}
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Input form */}
+                    <form onSubmit={handleSendChatMessage} className="p-3 border-t border-neutral-900 bg-neutral-950/70 flex gap-2">
+                      <input
+                        type="text"
+                        value={chatInput}
+                        onChange={(e) => setChatInput(e.target.value)}
+                        placeholder="Ask a question about this lecture..."
+                        className="flex-1 rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-xs text-white placeholder-neutral-600 focus:outline-none focus:border-indigo-500"
+                        disabled={isChatLoading}
+                      />
+                      <button
+                        type="submit"
+                        disabled={!chatInput.trim() || isChatLoading}
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white text-xs font-bold rounded-lg cursor-pointer transition-all"
+                      >
+                        Send
+                      </button>
+                    </form>
+                  </div>
+                )}
+
+              </div>
+            </div>
+
+          </div>
+
+          {/* PDF CUSTOMIZATION MODAL */}
+          {showPdfModal && pdfExportData && (
+            <div className="fixed inset-0 bg-neutral-950/65 backdrop-blur-xs flex items-center justify-center z-50 p-4 select-none animate-fade-in">
+              <div className={`rounded-2xl max-w-md w-full border p-6 space-y-4 shadow-2xl relative ${theme === 'dark' ? 'bg-[#0d0e12] border-neutral-800 text-white' : 'bg-white border-gray-200 text-gray-900'
+                }`}>
+                <div className="flex items-center justify-between pb-3 border-b border-neutral-900/40">
+                  <h3 className="font-sans font-black text-sm flex items-center gap-1.5">
+                    <FileText className="h-4 w-4 text-indigo-400" />
+                    <span>Configure PDF Document Theme</span>
+                  </h3>
+                  <button
+                    onClick={() => { setShowPdfModal(false); setPdfExportData(null); }}
+                    className="text-neutral-500 hover:text-white text-xs font-bold cursor-pointer"
                   >
-                    Export PDF
+                    Close
                   </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-[10px] font-black text-neutral-500 uppercase font-mono">Select Document Theme</label>
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      {(['academic', 'modern', 'corporate', 'dark'] as const).map(t => (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => setSelectedPdfTheme(t)}
+                          className={`py-2 px-3 text-xs font-bold border rounded-lg cursor-pointer capitalize transition-all ${selectedPdfTheme === t
+                              ? 'bg-indigo-600 border-indigo-500 text-white'
+                              : theme === 'dark' ? 'border-neutral-800 text-neutral-400 hover:border-neutral-700' : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                            }`}
+                        >
+                          {t} Style
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2.5 pt-3">
+                    <button
+                      type="button"
+                      onClick={() => { setShowPdfModal(false); setPdfExportData(null); }}
+                      className="rounded-lg px-4 py-2 text-xs font-bold border border-neutral-800 text-neutral-400 cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        exportPDFFile(pdfExportData.title, pdfExportData.data, selectedPdfTheme);
+                        setShowPdfModal(false);
+                        setPdfExportData(null);
+                      }}
+                      className="rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2 text-xs font-bold cursor-pointer"
+                    >
+                      Export PDF
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
 
         </div>
@@ -2780,10 +2766,9 @@ export default function LectureCaptureView({
   return (
     <React.Fragment>
       {/* STEALTH FOCUS AUTO-DIM SCREEN OVERLAY WHEN RECORDING AND UNTOUCHED */}
-      <div 
-        className={`fixed inset-0 z-[9999] bg-[#050508] transition-opacity duration-1000 ease-in-out flex flex-col items-center justify-center p-6 ${
-          isRecording && !isPaused && autoDimEnabled && isScreenDimmed ? 'opacity-95' : 'opacity-0 pointer-events-none'
-        }`}
+      <div
+        className={`fixed inset-0 z-[9999] bg-[#050508] transition-opacity duration-1000 ease-in-out flex flex-col items-center justify-center p-6 ${isRecording && !isPaused && autoDimEnabled && isScreenDimmed ? 'opacity-95' : 'opacity-0 pointer-events-none'
+          }`}
       >
         <div className="flex flex-col items-center space-y-4 text-center select-none">
           <div className="relative flex items-center justify-center">
@@ -2810,195 +2795,229 @@ export default function LectureCaptureView({
       </div>
 
       <div className="max-w-6xl mx-auto space-y-6 md:space-y-8 pb-16 bg-grid-paper p-4 md:p-8 select-none">
-      
-      {/* Upper header section */}
-      <div className="hero-banner rounded-[6px] border-2 border-[var(--border-main)] p-6 shadow-paper-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <span className="section-label text-[10px] font-bold uppercase tracking-[3px] block">
-            LIVE SYNTHESIS ENGINE
-          </span>
-          <h1 className="font-heading font-extrabold text-2xl md:text-4xl uppercase tracking-tight flex items-center gap-2 mt-1">
-            <Mic className="h-7 w-7" />
-            <span>SMART LECTURE CAPTURE</span>
-          </h1>
-          <p className="text-xs md:text-sm font-mono mt-1 border-l-4 border-[#FFC400] pl-3 py-1">
-            Unpack and index speech models effortlessly using Google's High-Intensity Synthesis Engine.
-          </p>
+
+        {/* Upper header section */}
+        <div className="hero-banner rounded-[6px] border-2 border-[var(--border-main)] p-6 shadow-paper-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <span className="section-label text-[10px] font-bold uppercase tracking-[3px] block">
+              LIVE SYNTHESIS ENGINE
+            </span>
+            <h1 className="font-heading font-extrabold text-2xl md:text-4xl uppercase tracking-tight flex items-center gap-2 mt-1">
+              <Mic className="h-7 w-7" />
+              <span>SMART LECTURE CAPTURE</span>
+            </h1>
+            <p className="text-xs md:text-sm font-mono mt-1 border-l-4 border-[#FFC400] pl-3 py-1">
+              Unpack and index speech models effortlessly using Google's High-Intensity Synthesis Engine.
+            </p>
+          </div>
+
+          {/* Sync AI Status indicator */}
+          <div className="flex items-center gap-2 shrink-0">
+            {aiStatus === 'idle' && (
+              <span className="inline-flex items-center gap-1.5 rounded-[4px] bg-[#F6F2EA] border-2 border-[#111111] px-3 py-1.5 text-xs font-bold text-[#111111] font-mono shadow-paper-sm">
+                <span className="h-2 w-2 rounded-full bg-[#666666]" />
+                SYSTEM SLEEP
+              </span>
+            )}
+            {aiStatus === 'recording_transcription' && (
+              <span className="inline-flex items-center gap-1.5 rounded-[4px] bg-[#FF4D4D]/20 border-2 border-[#111111] px-3 py-1.5 text-xs font-bold text-[#FF4D4D] font-mono shadow-paper-sm animate-pulse">
+                <span className="h-2 w-2 rounded-full bg-[#FF4D4D]" />
+                LIVE DECODING
+              </span>
+            )}
+            {aiStatus === 'synthesizing' && (
+              <span className="inline-flex items-center gap-1.5 rounded-[4px] bg-[#FFC400] border-2 border-[#111111] px-3 py-1.5 text-xs font-bold text-[#111111] font-mono shadow-paper-sm">
+                <Cpu className="h-3.5 w-3.5 animate-spin text-[#111111]" />
+                ALIGNING GRAPH...
+              </span>
+            )}
+            {aiStatus === 'completed' && (
+              <span className="inline-flex items-center gap-1.5 rounded-[4px] bg-[#19B56B]/20 border-2 border-[#111111] px-3 py-1.5 text-xs font-bold text-[#19B56B] font-mono shadow-paper-sm">
+                <CheckCircle className="h-3.5 w-3.5" />
+                RESOLVED!
+              </span>
+            )}
+          </div>
         </div>
 
-        {/* Sync AI Status indicator */}
-        <div className="flex items-center gap-2 shrink-0">
-          {aiStatus === 'idle' && (
-            <span className="inline-flex items-center gap-1.5 rounded-[4px] bg-[#F6F2EA] border-2 border-[#111111] px-3 py-1.5 text-xs font-bold text-[#111111] font-mono shadow-paper-sm">
-              <span className="h-2 w-2 rounded-full bg-[#666666]" />
-              SYSTEM SLEEP
-            </span>
-          )}
-          {aiStatus === 'recording_transcription' && (
-            <span className="inline-flex items-center gap-1.5 rounded-[4px] bg-[#FF4D4D]/20 border-2 border-[#111111] px-3 py-1.5 text-xs font-bold text-[#FF4D4D] font-mono shadow-paper-sm animate-pulse">
-              <span className="h-2 w-2 rounded-full bg-[#FF4D4D]" />
-              LIVE DECODING
-            </span>
-          )}
-          {aiStatus === 'synthesizing' && (
-            <span className="inline-flex items-center gap-1.5 rounded-[4px] bg-[#FFC400] border-2 border-[#111111] px-3 py-1.5 text-xs font-bold text-[#111111] font-mono shadow-paper-sm">
-              <Cpu className="h-3.5 w-3.5 animate-spin text-[#111111]" />
-              ALIGNING GRAPH...
-            </span>
-          )}
-          {aiStatus === 'completed' && (
-            <span className="inline-flex items-center gap-1.5 rounded-[4px] bg-[#19B56B]/20 border-2 border-[#111111] px-3 py-1.5 text-xs font-bold text-[#19B56B] font-mono shadow-paper-sm">
-              <CheckCircle className="h-3.5 w-3.5" />
-              RESOLVED!
-            </span>
-          )}
-        </div>
-      </div>
+        {micError && (
+          <div className="p-4 rounded-[6px] bg-[#FF4D4D]/10 border-2 border-[#111111] text-[#FF4D4D] text-xs font-mono font-bold flex items-center gap-2 shadow-paper-sm">
+            <MicOff className="h-4 w-4" />
+            <span>{micError}</span>
+          </div>
+        )}
 
-      {micError && (
-        <div className="p-4 rounded-[6px] bg-[#FF4D4D]/10 border-2 border-[#111111] text-[#FF4D4D] text-xs font-mono font-bold flex items-center gap-2 shadow-paper-sm">
-          <MicOff className="h-4 w-4" />
-          <span>{micError}</span>
-        </div>
-      )}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
-        
-        {/* LEFT COLUMN: Large animated Mic & Control panels */}
-        <div className="lg:col-span-1 flex flex-col gap-6">
-          
-          {/* Recoverable crash banner */}
-          {recoverableLecture && (
-            <div className="w-full rounded-[6px] border-2 border-[#111111] bg-[#FFC400] p-4 text-left space-y-3 text-[#111111] shadow-paper-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono font-extrabold uppercase tracking-widest text-[#111111]">
-                  ⚠️ CRASHED SESSION DISCOVERED
-                </span>
-                <button
-                  onClick={async () => {
-                    try {
-                      await deleteRecordingBackup(recoverableLecture.id);
-                      setRecoverableLecture(null);
-                    } catch (err) {
-                      console.error(err);
-                    }
-                  }}
-                  className="text-[#111111] hover:bg-white rounded p-0.5"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-              <p className="text-xs font-mono font-bold leading-normal">
-                Saved draft: <strong>"{recoverableLecture.title}"</strong>
-              </p>
-              <div className="flex gap-2">
-                <button
-                  onClick={async () => {
-                    try {
-                      const chunks = await getRecordingChunks(recoverableLecture.id);
-                      if (chunks && chunks.length > 0) {
-                        const audioBlob = new Blob(chunks, { type: 'audio/webm' });
-                        setAiStatus('synthesizing');
-                        await onSaveCapture(
-                          recoverableLecture.title,
-                          recoverableLecture.subject,
-                          recoverableLecture.duration,
-                          audioBlob,
-                          recoverableLecture.id
-                        );
+          {/* LEFT COLUMN: Large animated Mic & Control panels */}
+          <div className="lg:col-span-1 flex flex-col gap-6">
+
+            {/* Recoverable crash banner */}
+            {recoverableLecture && (
+              <div className="w-full rounded-[6px] border-2 border-[#111111] bg-[#FFC400] p-4 text-left space-y-3 text-[#111111] shadow-paper-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono font-extrabold uppercase tracking-widest text-[#111111]">
+                    ⚠️ CRASHED SESSION DISCOVERED
+                  </span>
+                  <button
+                    onClick={async () => {
+                      try {
                         await deleteRecordingBackup(recoverableLecture.id);
                         setRecoverableLecture(null);
-                      } else {
-                        alert("No backup recording chunks found.");
-                        await deleteRecordingBackup(recoverableLecture.id);
-                        setRecoverableLecture(null);
+                      } catch (err) {
+                        console.error(err);
                       }
-                    } catch (err) {
-                      console.error('Failed to recover recording:', err);
-                      setAiStatus('idle');
-                    }
-                  }}
-                  className="flex-1 py-1.5 px-3 rounded-[4px] bg-[#111111] text-white font-mono text-[10px] font-bold uppercase cursor-pointer"
-                >
-                  Recover
-                </button>
-                <button
-                  onClick={async () => {
-                    try {
-                      await deleteRecordingBackup(recoverableLecture.id);
-                      setRecoverableLecture(null);
-                    } catch (err) {
-                      console.error(err);
-                    }
-                  }}
-                  className="py-1.5 px-3 rounded-[4px] bg-white border border-[#111111] text-[#111111] font-mono text-[10px] font-bold uppercase cursor-pointer"
-                >
-                  Discard
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Standby & Active Control Card */}
-          <div className="rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--card-bg)] p-6 flex-1 flex flex-col justify-between shadow-paper-md text-[var(--text-primary)]">
-            <div className="flex flex-col items-center text-center space-y-6 flex-1 justify-between">
-              
-              {/* Lecture Title & Subject Settings Inputs */}
-              <div className="w-full space-y-4 text-left">
-                <div>
-                  <label className="block text-xs font-mono font-extrabold text-[var(--text-primary)] uppercase tracking-wider mb-1">
-                    LECTURE TITLE
-                  </label>
-                  <input
-                    type="text"
-                    disabled={isRecording}
-                    value={lectureTitle}
-                    onChange={(e) => setLectureTitle(e.target.value)}
-                    placeholder="Enter the lecture topic..."
-                    style={{ color: 'var(--text-primary)' }}
-                    className="w-full rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--card-bg)] text-xs font-mono font-bold p-3 outline-none shadow-paper-sm disabled:bg-[var(--panel-bg)] disabled:cursor-not-allowed"
-                  />
+                    }}
+                    className="text-[#111111] hover:bg-white rounded p-0.5"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
                 </div>
-                {/* Destination Selector vs Active Selection Display */}
-                {captureDestination === null ? (
+                <p className="text-xs font-mono font-bold leading-normal">
+                  Saved draft: <strong>"{recoverableLecture.title}"</strong>
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={async () => {
+                      try {
+                        const chunks = await getRecordingChunks(recoverableLecture.id);
+                        if (chunks && chunks.length > 0) {
+                          const audioBlob = new Blob(chunks, { type: 'audio/webm' });
+                          setAiStatus('synthesizing');
+                          await onSaveCapture(
+                            recoverableLecture.title,
+                            recoverableLecture.subject,
+                            recoverableLecture.duration,
+                            audioBlob,
+                            recoverableLecture.id
+                          );
+                          await deleteRecordingBackup(recoverableLecture.id);
+                          setRecoverableLecture(null);
+                        } else {
+                          alert("No backup recording chunks found.");
+                          await deleteRecordingBackup(recoverableLecture.id);
+                          setRecoverableLecture(null);
+                        }
+                      } catch (err) {
+                        console.error('Failed to recover recording:', err);
+                        setAiStatus('idle');
+                      }
+                    }}
+                    className="flex-1 py-1.5 px-3 rounded-[4px] bg-[#111111] text-white font-mono text-[10px] font-bold uppercase cursor-pointer"
+                  >
+                    Recover
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        await deleteRecordingBackup(recoverableLecture.id);
+                        setRecoverableLecture(null);
+                      } catch (err) {
+                        console.error(err);
+                      }
+                    }}
+                    className="py-1.5 px-3 rounded-[4px] bg-white border border-[#111111] text-[#111111] font-mono text-[10px] font-bold uppercase cursor-pointer"
+                  >
+                    Discard
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Standby & Active Control Card */}
+            <div className="rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--card-bg)] p-6 flex-1 flex flex-col justify-between shadow-paper-md text-[var(--text-primary)]">
+              <div className="flex flex-col items-center text-center space-y-6 flex-1 justify-between">
+
+                {/* Lecture Title & Subject Settings Inputs */}
+                <div className="w-full space-y-4 text-left">
                   <div>
-                    <label className="block text-xs font-mono font-extrabold text-[var(--text-primary)] uppercase tracking-wider mb-1.5">
-                      SELECT DESTINATION
+                    <label className="block text-xs font-mono font-extrabold text-[var(--text-primary)] uppercase tracking-wider mb-1">
+                      LECTURE TITLE
                     </label>
-                    <div className="grid grid-cols-2 gap-2 p-1 rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--panel-bg)]">
-                      <button
-                        type="button"
-                        disabled={isRecording}
-                        onClick={() => {
-                          setCaptureDestination('map');
-                          if (availableSubjects.length > 0 && !availableSubjects.some(s => s.name.toLowerCase() === lectureSubject.toLowerCase())) {
-                            setLectureSubject(availableSubjects[0].name);
-                          }
-                        }}
-                        className="py-2.5 px-3 rounded-[4px] text-xs font-mono font-extrabold transition-all flex items-center justify-center gap-1.5 bg-[var(--card-bg)] text-[var(--text-primary)] border-2 border-[var(--border-main)] hover:bg-[#FFC400] hover:text-black hover:border-black shadow-paper-xs cursor-pointer"
-                      >
-                        <span>🗺️</span> SUBJECT MAP
-                      </button>
-                      <button
-                        type="button"
-                        disabled={isRecording}
-                        onClick={() => {
-                          setCaptureDestination('saved');
-                          setLectureSubject('General');
-                        }}
-                        className="py-2.5 px-3 rounded-[4px] text-xs font-mono font-extrabold transition-all flex items-center justify-center gap-1.5 bg-[var(--card-bg)] text-[var(--text-primary)] border-2 border-[var(--border-main)] hover:bg-[#FFC400] hover:text-black hover:border-black shadow-paper-xs cursor-pointer"
-                      >
-                        <span>📁</span> ACADEMIC SAVED
-                      </button>
-                    </div>
+                    <input
+                      type="text"
+                      disabled={isRecording}
+                      value={lectureTitle}
+                      onChange={(e) => setLectureTitle(e.target.value)}
+                      placeholder="Enter the lecture topic..."
+                      style={{ color: 'var(--text-primary)' }}
+                      className="w-full rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--card-bg)] text-xs font-mono font-bold p-3 outline-none shadow-paper-sm disabled:bg-[var(--panel-bg)] disabled:cursor-not-allowed"
+                    />
                   </div>
-                ) : captureDestination === 'map' ? (
-                  /* Choice buttons disappear -> Subject selection appears directly */
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <label className="block text-xs font-mono font-extrabold text-[var(--text-primary)] uppercase tracking-wider">
-                        SELECT SUBJECT MAP
+                  {/* Destination Selector vs Active Selection Display */}
+                  {captureDestination === null ? (
+                    <div>
+                      <label className="block text-xs font-mono font-extrabold text-[var(--text-primary)] uppercase tracking-wider mb-1.5">
+                        SELECT DESTINATION
                       </label>
+                      <div className="grid grid-cols-2 gap-2 p-1 rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--panel-bg)]">
+                        <button
+                          type="button"
+                          disabled={isRecording}
+                          onClick={() => {
+                            setCaptureDestination('map');
+                            if (availableSubjects.length > 0 && !availableSubjects.some(s => s.name.toLowerCase() === lectureSubject.toLowerCase())) {
+                              setLectureSubject(availableSubjects[0].name);
+                            }
+                          }}
+                          className="py-2.5 px-3 rounded-[4px] text-xs font-mono font-extrabold transition-all flex items-center justify-center gap-1.5 bg-[var(--card-bg)] text-[var(--text-primary)] border-2 border-[var(--border-main)] hover:bg-[#FFC400] hover:text-black hover:border-black shadow-paper-xs cursor-pointer"
+                        >
+                          <span>🗺️</span> SUBJECT MAP
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isRecording}
+                          onClick={() => {
+                            setCaptureDestination('saved');
+                            setLectureSubject('General');
+                          }}
+                          className="py-2.5 px-3 rounded-[4px] text-xs font-mono font-extrabold transition-all flex items-center justify-center gap-1.5 bg-[var(--card-bg)] text-[var(--text-primary)] border-2 border-[var(--border-main)] hover:bg-[#FFC400] hover:text-black hover:border-black shadow-paper-xs cursor-pointer"
+                        >
+                          <span>📁</span> ACADEMIC SAVED
+                        </button>
+                      </div>
+                    </div>
+                  ) : captureDestination === 'map' ? (
+                    /* Choice buttons disappear -> Subject selection appears directly */
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-xs font-mono font-extrabold text-[var(--text-primary)] uppercase tracking-wider">
+                          SELECT SUBJECT MAP
+                        </label>
+                        <button
+                          type="button"
+                          disabled={isRecording}
+                          onClick={() => setCaptureDestination(null)}
+                          className="text-[10px] font-mono font-extrabold text-amber-500 hover:underline cursor-pointer"
+                        >
+                          Change
+                        </button>
+                      </div>
+                      <select
+                        disabled={isRecording}
+                        value={lectureSubject}
+                        onChange={(e) => setLectureSubject(e.target.value)}
+                        style={{ color: 'var(--text-primary)', backgroundColor: 'var(--card-bg)' }}
+                        className="w-full rounded-[6px] border-2 border-[var(--border-main)] text-xs font-mono font-bold p-3 outline-none shadow-paper-sm disabled:bg-[var(--panel-bg)] disabled:cursor-not-allowed cursor-pointer"
+                      >
+                        {availableSubjects.map(s => (
+                          <option
+                            key={s.id}
+                            value={s.name}
+                            className="bg-[#121212] text-white dark:bg-[#121212] dark:text-white font-mono font-bold py-1.5 px-2"
+                          >
+                            {s.name.toUpperCase()} {s.code ? `(${s.code})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    /* Choice buttons disappear -> Academic saved selected, nothing else appears */
+                    <div className="flex items-center justify-between p-2.5 rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--panel-bg)]">
+                      <div className="flex items-center gap-2 text-xs font-mono font-extrabold text-[var(--text-primary)]">
+                        <span className="text-base">📁</span>
+                        <span>DESTINATION: ACADEMIC SAVED</span>
+                      </div>
                       <button
                         type="button"
                         disabled={isRecording}
@@ -3008,394 +3027,343 @@ export default function LectureCaptureView({
                         Change
                       </button>
                     </div>
-                    <select
-                      disabled={isRecording}
-                      value={lectureSubject}
-                      onChange={(e) => setLectureSubject(e.target.value)}
-                      style={{ color: 'var(--text-primary)', backgroundColor: 'var(--card-bg)' }}
-                      className="w-full rounded-[6px] border-2 border-[var(--border-main)] text-xs font-mono font-bold p-3 outline-none shadow-paper-sm disabled:bg-[var(--panel-bg)] disabled:cursor-not-allowed cursor-pointer"
-                    >
-                      {availableSubjects.map(s => (
-                        <option 
-                          key={s.id} 
-                          value={s.name} 
-                          className="bg-[#121212] text-white dark:bg-[#121212] dark:text-white font-mono font-bold py-1.5 px-2"
-                        >
-                          {s.name.toUpperCase()} {s.code ? `(${s.code})` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ) : (
-                  /* Choice buttons disappear -> Academic saved selected, nothing else appears */
-                  <div className="flex items-center justify-between p-2.5 rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--panel-bg)]">
-                    <div className="flex items-center gap-2 text-xs font-mono font-extrabold text-[var(--text-primary)]">
-                      <span className="text-base">📁</span>
-                      <span>DESTINATION: ACADEMIC SAVED</span>
-                    </div>
+                  )}
+                </div>
+
+                {/* TRANSCRIPTION ENGINE SELECTION (Token Optimization) */}
+                <div className="w-full text-left space-y-1.5 pt-1">
+                  <label className="block text-xs font-mono font-extrabold text-[var(--text-primary)] uppercase tracking-wider">
+                    TRANSCRIPTION ENGINE
+                  </label>
+                  <div className="grid grid-cols-2 gap-2.5">
                     <button
                       type="button"
                       disabled={isRecording}
-                      onClick={() => setCaptureDestination(null)}
-                      className="text-[10px] font-mono font-extrabold text-amber-500 hover:underline cursor-pointer"
+                      onClick={() => setTranscriptionEngine('gemini')}
+                      className={`p-3 rounded-[6px] border-2 text-left transition-all cursor-pointer flex flex-col justify-between h-[72px] ${transcriptionEngine === 'gemini'
+                          ? 'bg-[#FFC400] text-[#111111] border-[#111111] shadow-paper-xs font-bold'
+                          : 'bg-[var(--card-bg)] text-[var(--text-primary)] border-[var(--border-main)] hover:border-[#111111]'
+                        }`}
                     >
-                      Change
+                      <div className="flex items-center justify-between w-full gap-1">
+                        <span className="text-xs font-mono font-black uppercase tracking-wide truncate">Gemini AI</span>
+                        <Sparkles className="h-3.5 w-3.5 shrink-0" />
+                      </div>
+                      <span className="text-[10px] font-mono opacity-80">Cloud AI precision</span>
                     </button>
-                  </div>
-                )}
-              </div>
 
-              {/* TRANSCRIPTION ENGINE SELECTION (Token Optimization) */}
-              <div className="w-full text-left space-y-1.5 pt-1">
-                <label className="block text-xs font-mono font-extrabold text-[var(--text-primary)] uppercase tracking-wider">
-                  TRANSCRIPTION ENGINE
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    disabled={isRecording}
-                    onClick={() => setTranscriptionEngine('gemini')}
-                    className={`p-2.5 rounded-[6px] border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
-                      transcriptionEngine === 'gemini'
-                        ? 'bg-[#FFC400] text-[#111111] border-[#111111] shadow-paper-xs font-bold'
-                        : 'bg-[var(--card-bg)] text-[var(--text-primary)] border-[var(--border-main)] hover:border-[#111111]'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <span className="text-xs font-mono font-black uppercase">Gemini AI</span>
-                      <Sparkles className="h-3.5 w-3.5" />
-                    </div>
-                    <span className="text-[9px] font-mono opacity-80 mt-1">Cloud AI precision</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={isRecording}
-                    onClick={() => setTranscriptionEngine('speechmatics')}
-                    className={`p-2.5 rounded-[6px] border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
-                      transcriptionEngine === 'speechmatics'
-                        ? 'bg-[#FFC400] text-[#111111] border-[#111111] shadow-paper-xs font-bold'
-                        : 'bg-[var(--card-bg)] text-[var(--text-primary)] border-[var(--border-main)] hover:border-[#111111]'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <span className="text-xs font-mono font-black uppercase">Speechmatics</span>
-                      <Cpu className="h-3.5 w-3.5" />
-                    </div>
-                    <span className="text-[9px] font-mono opacity-80 mt-1">Built-in engine</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={isRecording}
-                    onClick={() => setTranscriptionEngine('browser')}
-                    className={`p-2.5 rounded-[6px] border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
-                      transcriptionEngine === 'browser'
-                        ? 'bg-[#19B56B] text-white border-[#111111] shadow-paper-xs font-bold'
-                        : 'bg-[var(--card-bg)] text-[var(--text-primary)] border-[var(--border-main)] hover:border-[#111111]'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <span className="text-xs font-mono font-black uppercase">Browser STT</span>
-                      <span className="text-[9px] font-mono font-black bg-black/20 px-1 rounded">0 TOKENS</span>
-                    </div>
-                    <span className="text-[9px] font-mono opacity-90 mt-1">Zero token cost</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Dynamic mascot video / microphone container */}
-              <div className="relative my-4 flex flex-col items-center justify-center">
-                {isRecording ? (
-                  <div 
-                    onClick={handleStopCapture}
-                    className="relative cursor-pointer group flex flex-col items-center select-none"
-                    title="Click mascot to stop lecture recording"
-                  >
-                    {/* Transparent Floating Mascot with Green Screen Removed */}
-                    <ChromaKeyVideo
-                      src="/mascots/mascot-recording.mp4"
-                      fallbackSrc="/mascots/mascot-recording.mp4.mp4"
-                      fallbackImg="/mascots/mascot-celebrate.png"
-                      className="w-48 h-48 sm:w-60 sm:h-60 group-hover:scale-105 transition-transform"
-                    />
-                  </div>
-                ) : (
-                  <button
-                    disabled={aiStatus === 'synthesizing'}
-                    onClick={handleStartCapture}
-                    className="h-28 w-28 rounded-full flex flex-col items-center justify-center border-4 border-[var(--border-main)] bg-[#FFC400] text-[#111111] hover:bg-[#ffe066] hover:scale-105 shadow-paper-md transition-all cursor-pointer relative z-10"
-                    title="Click to Start Recording"
-                  >
-                    <Mic className="h-10 w-10 text-[#111111]" />
-                    <span className="text-[9px] font-mono font-black uppercase tracking-wider mt-0.5">START</span>
-                  </button>
-                )}
-              </div>
-
-              {/* Status and Clock time ticker */}
-              <div className="space-y-2">
-                <div className="text-xs font-mono font-extrabold uppercase tracking-widest text-[var(--text-primary)]">
-                  {isRecording ? (isPaused ? 'CAPTURE PAUSED' : 'ACTIVE TRANSMISSION') : 'STANDBY MODE'}
-                </div>
-                <div className="text-3xl font-heading font-extrabold font-mono tracking-tight text-[var(--text-primary)] flex items-center gap-2 justify-center">
-                  <Clock className="h-5 w-5 text-[var(--text-primary)]" />
-                  <span>{formatTimerDisplay(seconds)}</span>
-                </div>
-              </div>
-
-              {/* Action buttons controls Row */}
-              <div className="flex gap-3 justify-center w-full pt-2">
-                {!isRecording ? (
-                  <button
-                    onClick={handleStartCapture}
-                    className="flex items-center gap-2 bg-[#2F6BFF] text-white rounded-[6px] border-2 border-[var(--border-main)] py-3.5 px-6 text-xs font-mono font-extrabold uppercase hover:bg-[#255cd9] transition-all shadow-paper-md cursor-pointer w-full justify-center"
-                  >
-                    <Play className="h-4 w-4 fill-current text-white" />
-                    <span>START CAPTURING COURSE</span>
-                  </button>
-                ) : (
-                  <>
                     <button
-                      onClick={handlePauseCapture}
-                      className="flex-1 py-3 px-4 rounded-[6px] bg-[#FFC400] border-2 border-[var(--border-main)] text-xs font-mono font-bold text-[#111111] hover:bg-[#ffe066] transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-paper-sm uppercase"
+                      type="button"
+                      disabled={isRecording}
+                      onClick={() => setTranscriptionEngine('browser')}
+                      className={`p-3 rounded-[6px] border-2 text-left transition-all cursor-pointer flex flex-col justify-between h-[72px] ${transcriptionEngine === 'browser'
+                          ? 'bg-[#19B56B] text-white border-[#111111] shadow-paper-xs font-bold'
+                          : 'bg-[var(--card-bg)] text-[var(--text-primary)] border-[var(--border-main)] hover:border-[#111111]'
+                        }`}
                     >
-                      {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
-                      <span>{isPaused ? 'Resume' : 'Pause'}</span>
+                      <div className="flex items-center justify-between w-full gap-1">
+                        <span className="text-xs font-mono font-black uppercase tracking-wide truncate">Browser STT</span>
+                        <span className={`text-[9px] font-mono font-black px-1.5 py-0.5 rounded shrink-0 ${transcriptionEngine === 'browser'
+                            ? 'bg-black/20 text-white'
+                            : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                          }`}>
+                          0 TOKENS
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-mono opacity-90">Zero token cost</span>
                     </button>
-                    <button
-                      onClick={handleStopCapture}
-                      className="flex-1 py-3 px-4 rounded-[6px] bg-[#FF4D4D] border-2 border-[var(--border-main)] text-xs font-mono font-bold text-white hover:bg-[#ff3333] transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-paper-sm uppercase"
-                    >
-                      <Square className="h-3.5 w-3.5 fill-current" />
-                      <span>Stop & Sync</span>
-                    </button>
-                  </>
-                )}
-              </div>
-
-            </div>
-          </div>
-
-          {/* Past captured sessions list panel */}
-          <div className="rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--card-bg)] p-5 space-y-4 shadow-paper-md text-[var(--text-primary)]">
-            <div className="flex items-center justify-between border-b-2 border-[var(--border-main)] pb-2">
-              <span className="text-[10px] font-mono font-extrabold uppercase tracking-wider text-[var(--text-primary)]">
-                CAPTURE SESSION HISTORY
-              </span>
-              <span className="text-[10px] font-mono font-extrabold text-[#38BDF8] uppercase">
-                {pastLectures.length} SESSIONS
-              </span>
-            </div>
-
-            <div className="space-y-3 max-h-[190px] overflow-y-auto">
-              {pastLectures.map((lec) => (
-                <div 
-                  key={lec.id} 
-                  className="flex items-center justify-between p-3 rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--panel-bg)] hover:bg-[#FFC400] transition-colors cursor-pointer"
-                  onClick={() => setActiveLectureId && setActiveLectureId(lec.id)}
-                >
-                  <div className="flex items-start gap-2.5 min-w-0">
-                    <div className="rounded-[4px] bg-[var(--card-bg)] p-1.5 border border-[var(--border-main)] shrink-0">
-                      <Bookmark className="h-3.5 w-3.5" style={{ color: 'var(--text-primary)' }} />
-                    </div>
-                    <div className="min-w-0">
-                      <h4 className="text-xs font-heading font-extrabold uppercase truncate" style={{ color: 'var(--text-primary)' }}>{lec.title}</h4>
-                      <p className="text-[10px] font-mono font-bold mt-0.5" style={{ color: 'var(--text-secondary)' }}>{lec.date} • {lec.duration}</p>
-                    </div>
                   </div>
-                  <ArrowRight className="h-4 w-4 shrink-0" style={{ color: 'var(--text-primary)' }} />
-                </div>
-              ))}
-            </div>
-          </div>
-
-        </div>
-
-        {/* RIGHT COLUMNS: Live Speech Decipher column */}
-        <div className="lg:col-span-2 flex flex-col">
-          <div className="flex-1 flex flex-col min-h-[460px]">
-            
-            {/* Audio Input Monitor */}
-            <div className="rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--card-bg)] p-6 flex-1 flex flex-col justify-between relative shadow-paper-md text-[var(--text-primary)]">
-              <div className="space-y-4 flex-1 flex flex-col justify-between overflow-hidden">
-                <div className="flex items-center justify-between border-b-2 border-[var(--border-main)] pb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="relative flex h-2.5 w-2.5">
-                      <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isRecording && !isPaused ? 'bg-[#FF4D4D]' : 'bg-[var(--text-secondary)]'}`} />
-                      <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isRecording && !isPaused ? 'bg-[#FF4D4D]' : 'bg-[var(--text-secondary)]'}`} />
-                    </span>
-                    <span className="section-label text-xs font-bold uppercase tracking-[2px] text-[var(--text-primary)]">
-                      AUDIO INPUT MONITOR
-                    </span>
-                  </div>
-                  
-                  {isRecording && !isPaused && (
-                    <div className="flex items-center gap-1 font-mono text-[10px] font-bold text-[#FF4D4D] animate-pulse">
-                      <ListRestart className="h-3.5 w-3.5 text-[#FF4D4D] animate-spin" />
-                      <span>LIVE RECORDING</span>
-                    </div>
-                  )}
                 </div>
 
-                {/* Real-time Audio Visualizer container */}
-                <div 
-                  ref={visualizerRef}
-                  className="h-12 flex items-center justify-center gap-1.5 px-3 border-2 border-[var(--border-main)] rounded-[6px] bg-[var(--panel-bg)] my-2"
-                >
-                  {Array.from({ length: 25 }).map((_, i) => (
+                {/* Dynamic mascot video / microphone container */}
+                <div className="relative my-4 flex flex-col items-center justify-center">
+                  {isRecording ? (
                     <div
-                      key={i}
-                      style={{ height: '10px' }}
-                      className={`waveform-bar w-1 rounded-[2px] transition-all duration-75 ${
-                        isRecording && !isPaused
-                          ? 'bg-[#FFC400] border border-[var(--border-main)]'
-                          : 'bg-[var(--card-bg)] border border-[var(--border-main)]'
-                      }`}
-                    />
-                  ))}
-                </div>
-
-                {/* Mode Selector Tabs for Live Microphone vs Manual Transcript Entry */}
-                <div className="flex items-center gap-2 my-2">
-                  <button
-                    type="button"
-                    onClick={() => setCaptureInputMode('audio')}
-                    className={`flex-1 py-1.5 px-3 rounded-[4px] border-2 border-[var(--border-main)] font-mono text-xs font-extrabold uppercase transition-all cursor-pointer ${
-                      captureInputMode === 'audio'
-                        ? 'bg-[#FFC400] text-[#111111] shadow-paper-sm'
-                        : 'bg-[var(--card-bg)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                    }`}
-                  >
-                    🎙️ Microphone Live
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCaptureInputMode('manual')}
-                    className={`flex-1 py-1.5 px-3 rounded-[4px] border-2 border-[var(--border-main)] font-mono text-xs font-extrabold uppercase transition-all cursor-pointer ${
-                      captureInputMode === 'manual'
-                        ? 'bg-[#FFC400] text-[#111111] shadow-paper-sm'
-                        : 'bg-[var(--card-bg)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                    }`}
-                  >
-                    ✍️ Write / Paste Transcript
-                  </button>
-                </div>
-
-                {/* Live Input message box */}
-                <div className="flex-1 flex flex-col items-center justify-center rounded-[6px] bg-[var(--panel-bg)] border-2 border-[var(--border-main)] p-4 text-[var(--text-primary)]">
-                  {captureInputMode === 'manual' ? (
-                    <div className="flex flex-col h-full w-full space-y-3">
-                      <div className="flex items-center justify-between border-b-2 border-[var(--border-main)] pb-2">
-                        <span className="text-xs font-mono font-extrabold uppercase text-[var(--text-primary)] flex items-center gap-1.5">
-                          <FileText className="h-4 w-4 text-[#2563EB]" />
-                          Lecture Transcript Input
-                        </span>
-                        <span className="text-[10px] font-mono font-bold text-[var(--text-secondary)] bg-[var(--card-bg)] px-2 py-0.5 rounded border border-[var(--border-main)]">
-                          {manualTranscriptInput.trim().split(/\s+/).filter(Boolean).length} WORDS | {manualTranscriptInput.length} CHARS
-                        </span>
-                      </div>
-                      <textarea
-                        value={manualTranscriptInput}
-                        onChange={(e) => setManualTranscriptInput(e.target.value)}
-                        placeholder="Type or paste your raw lecture transcript, notes, or spoken lecture text here. NoteIT AI will automatically analyze the text, log it to the console, and generate comprehensive study notes, flashcards, quizzes, and mind maps..."
-                        className="w-full h-40 p-3 rounded-[4px] border-2 border-[var(--border-main)] bg-[var(--card-bg)] text-xs font-mono text-[var(--text-primary)] placeholder-[var(--text-secondary)] resize-none focus:outline-none focus:ring-2 focus:ring-[#FFC400]"
+                      onClick={handleStopCapture}
+                      className="relative cursor-pointer group flex flex-col items-center select-none"
+                      title="Click mascot to stop lecture recording"
+                    >
+                      {/* Transparent Floating Mascot with Green Screen Removed */}
+                      <ChromaKeyVideo
+                        src="/mascots/mascot-recording.mp4"
+                        fallbackSrc="/mascots/mascot-recording.mp4.mp4"
+                        fallbackImg="/mascots/mascot-celebrate.png"
+                        className="w-48 h-48 sm:w-60 sm:h-60 group-hover:scale-105 transition-transform"
                       />
-                      <button
-                        type="button"
-                        onClick={handleProcessManualTranscript}
-                        disabled={isSubmittingManual || !manualTranscriptInput.trim()}
-                        className="w-full py-2.5 rounded-[4px] border-2 border-[var(--border-main)] bg-[#FFC400] text-[#111111] text-xs font-mono font-extrabold uppercase shadow-paper-sm hover:bg-[#ffe066] disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
-                      >
-                        {isSubmittingManual ? (
-                          <BruteLoader size="sm" message="Processing transcript & generating AI study notes..." />
-                        ) : (
-                          <>
-                            <Sparkles className="h-4 w-4 text-[#111111]" />
-                            <span>Process Transcript & Generate AI Study Notes</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  ) : !isRecording ? (
-                    <div className="flex flex-col items-center justify-center text-center h-full space-y-2">
-                      <MicOff className="h-8 w-8 text-[var(--text-secondary)]" />
-                      <p className="text-xs font-heading font-extrabold uppercase text-[var(--text-primary)]">Microphone Standby</p>
-                      <p className="text-[11px] text-[var(--text-secondary)] font-mono max-w-[200px]">
-                        Press 'Start Capturing Course' to begin recording speech.
-                      </p>
-                    </div>
-                  ) : isPaused ? (
-                    <div className="flex flex-col items-center justify-center text-center h-full space-y-2 animate-fade-in">
-                      <Pause className="h-8 w-8 text-[#FFC400]" />
-                      <div>
-                        <p className="text-xs font-heading font-extrabold uppercase text-[var(--text-primary)]">Capture Paused</p>
-                        <p className="text-[11px] text-[var(--text-secondary)] font-mono max-w-[200px]">
-                          Audio input suspended. Press 'Resume' to continue.
-                        </p>
-                      </div>
-                    </div>
-                  ) : aiStatus === 'synthesizing' ? (
-                    <div className="flex flex-col items-center justify-center text-center h-full space-y-2">
-                      <Cpu className="h-8 w-8 text-[var(--text-primary)] animate-spin" />
-                      <div>
-                        <p className="text-xs font-heading font-extrabold uppercase text-[var(--text-primary)]">Processing Workspace...</p>
-                        <p className="text-[11px] text-[var(--text-secondary)] font-mono max-w-[200px]">
-                          Synthesizing lecture audio into study notes.
-                        </p>
-                      </div>
                     </div>
                   ) : (
-                    <div className="flex flex-col h-full w-full justify-between items-stretch text-left overflow-hidden">
-                      {liveTranscript ? (
-                        <div className="flex flex-col h-full w-full justify-between items-stretch text-left overflow-hidden">
-                          <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-[var(--border-main)] shrink-0">
-                            <div className="flex items-center gap-2">
-                              <span className="h-2 w-2 rounded-full bg-[#FF4D4D] animate-ping" />
-                              <span className="text-[10px] font-mono font-bold uppercase text-[var(--text-primary)]">
-                                Live Speech Transcription
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <span className="text-[9px] font-mono font-bold bg-[#FFC400] text-[#111111] px-2 py-0.5 rounded-[4px] border border-[var(--border-main)] uppercase">
-                                LIVE AUTO-TRANSCRIPTION
-                              </span>
-                            </div>
-                          </div>
-                          
-                          <div className="flex-1 overflow-y-auto pr-1 text-xs leading-relaxed font-mono text-[var(--text-primary)] select-text">
-                            <p className="whitespace-pre-wrap">{liveTranscript}</p>
-                            <div ref={transcriptEndRef} />
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center text-center h-full space-y-2">
-                          <div className="h-10 w-10 rounded-full bg-[#FFC400] border-2 border-[var(--border-main)] flex items-center justify-center text-[#111111]">
-                            <Mic className="h-5 w-5 animate-pulse" />
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-xs font-heading font-extrabold uppercase text-[var(--text-primary)]">Listening...</p>
-                            <p className="text-[11px] text-[var(--text-secondary)] font-mono max-w-[200px]">
-                              Speak now to see real-time speech-to-text decoding.
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    <button
+                      disabled={aiStatus === 'synthesizing'}
+                      onClick={handleStartCapture}
+                      className="h-28 w-28 rounded-full flex flex-col items-center justify-center border-4 border-[var(--border-main)] bg-[#FFC400] text-[#111111] hover:bg-[#ffe066] hover:scale-105 shadow-paper-md transition-all cursor-pointer relative z-10"
+                      title="Click to Start Recording"
+                    >
+                      <Mic className="h-10 w-10 text-[#111111]" />
+                      <span className="text-[9px] font-mono font-black uppercase tracking-wider mt-0.5">START</span>
+                    </button>
                   )}
                 </div>
+
+                {/* Status and Clock time ticker */}
+                <div className="space-y-2">
+                  <div className="text-xs font-mono font-extrabold uppercase tracking-widest text-[var(--text-primary)]">
+                    {isRecording ? (isPaused ? 'CAPTURE PAUSED' : 'ACTIVE TRANSMISSION') : 'STANDBY MODE'}
+                  </div>
+                  <div className="text-3xl font-heading font-extrabold font-mono tracking-tight text-[var(--text-primary)] flex items-center gap-2 justify-center">
+                    <Clock className="h-5 w-5 text-[var(--text-primary)]" />
+                    <span>{formatTimerDisplay(seconds)}</span>
+                  </div>
+                </div>
+
+                {/* Action buttons controls Row */}
+                <div className="flex gap-3 justify-center w-full pt-2">
+                  {!isRecording ? (
+                    <button
+                      onClick={handleStartCapture}
+                      className="flex items-center gap-2 bg-[#2F6BFF] text-white rounded-[6px] border-2 border-[var(--border-main)] py-3.5 px-6 text-xs font-mono font-extrabold uppercase hover:bg-[#255cd9] transition-all shadow-paper-md cursor-pointer w-full justify-center"
+                    >
+                      <Play className="h-4 w-4 fill-current text-white" />
+                      <span>START CAPTURING COURSE</span>
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={handlePauseCapture}
+                        className="flex-1 py-3 px-4 rounded-[6px] bg-[#FFC400] border-2 border-[var(--border-main)] text-xs font-mono font-bold text-[#111111] hover:bg-[#ffe066] transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-paper-sm uppercase"
+                      >
+                        {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+                        <span>{isPaused ? 'Resume' : 'Pause'}</span>
+                      </button>
+                      <button
+                        onClick={handleStopCapture}
+                        className="flex-1 py-3 px-4 rounded-[6px] bg-[#FF4D4D] border-2 border-[var(--border-main)] text-xs font-mono font-bold text-white hover:bg-[#ff3333] transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-paper-sm uppercase"
+                      >
+                        <Square className="h-3.5 w-3.5 fill-current" />
+                        <span>Stop & Sync</span>
+                      </button>
+                    </>
+                  )}
+                </div>
+
+              </div>
+            </div>
+
+            {/* Past captured sessions list panel */}
+            <div className="rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--card-bg)] p-5 space-y-4 shadow-paper-md text-[var(--text-primary)]">
+              <div className="flex items-center justify-between border-b-2 border-[var(--border-main)] pb-2">
+                <span className="text-[10px] font-mono font-extrabold uppercase tracking-wider text-[var(--text-primary)]">
+                  CAPTURE SESSION HISTORY
+                </span>
+                <span className="text-[10px] font-mono font-extrabold text-[#38BDF8] uppercase">
+                  {pastLectures.length} SESSIONS
+                </span>
               </div>
 
-              {/* Live Info parameters */}
-              <div className="border-t-2 border-[var(--border-main)] pt-3 mt-3 flex items-center justify-between text-[10px] font-mono font-bold text-[var(--text-secondary)]">
-                <span>CODEC: WEBM/AUDIO</span>
-                <span>SAMPLE RATE: 48KHZ</span>
+              <div className="space-y-3 max-h-[190px] overflow-y-auto">
+                {pastLectures.map((lec) => (
+                  <div
+                    key={lec.id}
+                    className="flex items-center justify-between p-3 rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--panel-bg)] hover:bg-[#FFC400] transition-colors cursor-pointer"
+                    onClick={() => setActiveLectureId && setActiveLectureId(lec.id)}
+                  >
+                    <div className="flex items-start gap-2.5 min-w-0">
+                      <div className="rounded-[4px] bg-[var(--card-bg)] p-1.5 border border-[var(--border-main)] shrink-0">
+                        <Bookmark className="h-3.5 w-3.5" style={{ color: 'var(--text-primary)' }} />
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="text-xs font-heading font-extrabold uppercase truncate" style={{ color: 'var(--text-primary)' }}>{lec.title}</h4>
+                        <p className="text-[10px] font-mono font-bold mt-0.5" style={{ color: 'var(--text-secondary)' }}>{lec.date} • {lec.duration}</p>
+                      </div>
+                    </div>
+                    <ArrowRight className="h-4 w-4 shrink-0" style={{ color: 'var(--text-primary)' }} />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+          </div>
+
+          {/* RIGHT COLUMNS: Live Speech Decipher column */}
+          <div className="lg:col-span-2 flex flex-col">
+            <div className="flex-1 flex flex-col min-h-[460px]">
+
+              {/* Audio Input Monitor */}
+              <div className="rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--card-bg)] p-6 flex-1 flex flex-col justify-between relative shadow-paper-md text-[var(--text-primary)]">
+                <div className="space-y-4 flex-1 flex flex-col justify-between overflow-hidden">
+                  <div className="flex items-center justify-between border-b-2 border-[var(--border-main)] pb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="relative flex h-2.5 w-2.5">
+                        <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isRecording && !isPaused ? 'bg-[#FF4D4D]' : 'bg-[var(--text-secondary)]'}`} />
+                        <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isRecording && !isPaused ? 'bg-[#FF4D4D]' : 'bg-[var(--text-secondary)]'}`} />
+                      </span>
+                      <span className="section-label text-xs font-bold uppercase tracking-[2px] text-[var(--text-primary)]">
+                        AUDIO INPUT MONITOR
+                      </span>
+                    </div>
+
+                    {isRecording && !isPaused && (
+                      <div className="flex items-center gap-1 font-mono text-[10px] font-bold text-[#FF4D4D] animate-pulse">
+                        <ListRestart className="h-3.5 w-3.5 text-[#FF4D4D] animate-spin" />
+                        <span>LIVE RECORDING</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Real-time Audio Visualizer container */}
+                  <div
+                    ref={visualizerRef}
+                    className="h-12 flex items-center justify-center gap-1.5 px-3 border-2 border-[var(--border-main)] rounded-[6px] bg-[var(--panel-bg)] my-2"
+                  >
+                    {Array.from({ length: 25 }).map((_, i) => (
+                      <div
+                        key={i}
+                        style={{ height: '10px' }}
+                        className={`waveform-bar w-1 rounded-[2px] transition-all duration-75 ${isRecording && !isPaused
+                            ? 'bg-[#FFC400] border border-[var(--border-main)]'
+                            : 'bg-[var(--card-bg)] border border-[var(--border-main)]'
+                          }`}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Mode Selector Tabs for Live Microphone vs Manual Transcript Entry */}
+                  <div className="flex items-center gap-2 my-2">
+                    <button
+                      type="button"
+                      onClick={() => setCaptureInputMode('audio')}
+                      className={`flex-1 py-1.5 px-3 rounded-[4px] border-2 border-[var(--border-main)] font-mono text-xs font-extrabold uppercase transition-all cursor-pointer ${captureInputMode === 'audio'
+                          ? 'bg-[#FFC400] text-[#111111] shadow-paper-sm'
+                          : 'bg-[var(--card-bg)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                        }`}
+                    >
+                      🎙️ Microphone Live
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCaptureInputMode('manual')}
+                      className={`flex-1 py-1.5 px-3 rounded-[4px] border-2 border-[var(--border-main)] font-mono text-xs font-extrabold uppercase transition-all cursor-pointer ${captureInputMode === 'manual'
+                          ? 'bg-[#FFC400] text-[#111111] shadow-paper-sm'
+                          : 'bg-[var(--card-bg)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                        }`}
+                    >
+                      ✍️ Write / Paste Transcript
+                    </button>
+                  </div>
+
+                  {/* Live Input message box */}
+                  <div className="flex-1 flex flex-col items-center justify-center rounded-[6px] bg-[var(--panel-bg)] border-2 border-[var(--border-main)] p-4 text-[var(--text-primary)]">
+                    {captureInputMode === 'manual' ? (
+                      <div className="flex flex-col h-full w-full space-y-3">
+                        <div className="flex items-center justify-between border-b-2 border-[var(--border-main)] pb-2">
+                          <span className="text-xs font-mono font-extrabold uppercase text-[var(--text-primary)] flex items-center gap-1.5">
+                            <FileText className="h-4 w-4 text-[#2563EB]" />
+                            Lecture Transcript Input
+                          </span>
+                          <span className="text-[10px] font-mono font-bold text-[var(--text-secondary)] bg-[var(--card-bg)] px-2 py-0.5 rounded border border-[var(--border-main)]">
+                            {manualTranscriptInput.trim().split(/\s+/).filter(Boolean).length} WORDS | {manualTranscriptInput.length} CHARS
+                          </span>
+                        </div>
+                        <textarea
+                          value={manualTranscriptInput}
+                          onChange={(e) => setManualTranscriptInput(e.target.value)}
+                          placeholder="Type or paste your raw lecture transcript, notes, or spoken lecture text here. NoteIT AI will automatically analyze the text, log it to the console, and generate comprehensive study notes, flashcards, quizzes, and mind maps..."
+                          className="w-full h-40 p-3 rounded-[4px] border-2 border-[var(--border-main)] bg-[var(--card-bg)] text-xs font-mono text-[var(--text-primary)] placeholder-[var(--text-secondary)] resize-none focus:outline-none focus:ring-2 focus:ring-[#FFC400]"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleProcessManualTranscript}
+                          disabled={isSubmittingManual || !manualTranscriptInput.trim()}
+                          className="w-full py-2.5 rounded-[4px] border-2 border-[var(--border-main)] bg-[#FFC400] text-[#111111] text-xs font-mono font-extrabold uppercase shadow-paper-sm hover:bg-[#ffe066] disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+                        >
+                          {isSubmittingManual ? (
+                            <BruteLoader size="sm" message="Processing transcript & generating AI study notes..." />
+                          ) : (
+                            <>
+                              <Sparkles className="h-4 w-4 text-[#111111]" />
+                              <span>Process Transcript & Generate AI Study Notes</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    ) : !isRecording ? (
+                      <div className="flex flex-col items-center justify-center text-center h-full space-y-2">
+                        <MicOff className="h-8 w-8 text-[var(--text-secondary)]" />
+                        <p className="text-xs font-heading font-extrabold uppercase text-[var(--text-primary)]">Microphone Standby</p>
+                        <p className="text-[11px] text-[var(--text-secondary)] font-mono max-w-[200px]">
+                          Press 'Start Capturing Course' to begin recording speech.
+                        </p>
+                      </div>
+                    ) : isPaused ? (
+                      <div className="flex flex-col items-center justify-center text-center h-full space-y-2 animate-fade-in">
+                        <Pause className="h-8 w-8 text-[#FFC400]" />
+                        <div>
+                          <p className="text-xs font-heading font-extrabold uppercase text-[var(--text-primary)]">Capture Paused</p>
+                          <p className="text-[11px] text-[var(--text-secondary)] font-mono max-w-[200px]">
+                            Audio input suspended. Press 'Resume' to continue.
+                          </p>
+                        </div>
+                      </div>
+                    ) : aiStatus === 'synthesizing' ? (
+                      <div className="flex flex-col items-center justify-center text-center h-full space-y-2">
+                        <Cpu className="h-8 w-8 text-[var(--text-primary)] animate-spin" />
+                        <div>
+                          <p className="text-xs font-heading font-extrabold uppercase text-[var(--text-primary)]">Processing Workspace...</p>
+                          <p className="text-[11px] text-[var(--text-secondary)] font-mono max-w-[200px]">
+                            Synthesizing lecture audio into study notes.
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col h-full w-full justify-between items-stretch text-left overflow-hidden">
+                        {liveTranscript ? (
+                          <div className="flex flex-col h-full w-full justify-between items-stretch text-left overflow-hidden">
+                            <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-[var(--border-main)] shrink-0">
+                              <div className="flex items-center gap-2">
+                                <span className="h-2 w-2 rounded-full bg-[#FF4D4D] animate-ping" />
+                                <span className="text-[10px] font-mono font-bold uppercase text-[var(--text-primary)]">
+                                  Live Speech Transcription
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <span className="text-[9px] font-mono font-bold bg-[#FFC400] text-[#111111] px-2 py-0.5 rounded-[4px] border border-[var(--border-main)] uppercase">
+                                  LIVE AUTO-TRANSCRIPTION
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto pr-1 text-xs leading-relaxed font-mono text-[var(--text-primary)] select-text">
+                              <p className="whitespace-pre-wrap">{liveTranscript}</p>
+                              <div ref={transcriptEndRef} />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center text-center h-full space-y-2">
+                            <div className="h-10 w-10 rounded-full bg-[#FFC400] border-2 border-[var(--border-main)] flex items-center justify-center text-[#111111]">
+                              <Mic className="h-5 w-5 animate-pulse" />
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-xs font-heading font-extrabold uppercase text-[var(--text-primary)]">Listening...</p>
+                              <p className="text-[11px] text-[var(--text-secondary)] font-mono max-w-[200px]">
+                                Speak now to see real-time speech-to-text decoding.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Live Info parameters */}
+                <div className="border-t-2 border-[var(--border-main)] pt-3 mt-3 flex items-center justify-between text-[10px] font-mono font-bold text-[var(--text-secondary)]">
+                  <span>CODEC: WEBM/AUDIO</span>
+                  <span>SAMPLE RATE: 48KHZ</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  </React.Fragment>
+    </React.Fragment>
   );
 }
