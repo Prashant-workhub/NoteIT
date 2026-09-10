@@ -361,13 +361,13 @@ export default function ResearchHubView({
       
       const resolveUrl = async () => {
         if (selectedLecture.audioUrl) {
-          if (selectedLecture.storageProvider === 'azure' && selectedLecture.blobPath) {
+          if ((selectedLecture.storageProvider === 'azure' || selectedLecture.storageProvider === 'local') && selectedLecture.blobPath) {
             try {
-              const { getAzureReadSasUrl } = await import('../services/azure');
+              const { getAzureReadSasUrl } = await import('../services/storageService');
               const sasUrl = await getAzureReadSasUrl(selectedLecture.blobPath);
               setResolvedAudioUrl(sasUrl);
             } catch (err) {
-              console.error("Failed to fetch read SAS URL, falling back to original:", err);
+              console.error("Failed to fetch read URL, falling back to original:", err);
               setResolvedAudioUrl(selectedLecture.audioUrl);
             }
           } else {

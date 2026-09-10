@@ -535,10 +535,6 @@ async function runHttpTests() {
       body: JSON.stringify({ blobPath: sasJson.blobPath }),
     });
     const extractJson = await readJsonSafely(extractRes);
-    if (!sasJson.isLocalFallback) {
-      // Real Azure Blob Storage is configured — extraction depends on that infra actually working.
-      if (extractRes.status !== 200) warn(`Azure-backed extract-text returned ${extractRes.status}: ${JSON.stringify(extractJson)}`);
-    }
     assert(extractRes.status === 200, `extract-text failed (${extractRes.status}): ${JSON.stringify(extractJson)}`);
     assert(extractJson?.text === fileContents, 'extracted text does not match what was uploaded');
 
@@ -552,10 +548,8 @@ async function runHttpTests() {
     if (staticRes.status === 200) {
       const staticText = await staticRes.text();
       assert(staticText === fileContents, 'statically served file content does not match upload');
-    } else if (sasJson.isLocalFallback) {
-      throw new Error(`expected the locally-uploaded file to be served, got ${staticRes.status}`);
     } else {
-      warn(`could not fetch back from Azure read URL directly (status ${staticRes.status}) — SAS token/network dependent`);
+      throw new Error(`expected the locally-uploaded file to be served, got ${staticRes.status}`);
     }
 
     return `round-tripped "${fileName}" through upload, SAS, extract-text and static serving`;

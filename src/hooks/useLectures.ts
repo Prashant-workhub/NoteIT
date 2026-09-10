@@ -123,18 +123,18 @@ export function useLectures(userId: string | undefined) {
     const timestamp = Math.floor(Date.now() / 1000);
     const fileName = `${timestamp}.webm`;
 
-    // 1. Get Azure SAS URL from Express Backend
+    // 1. Get Upload Target URL from Backend
     const sasData = await getAzureUploadSasUrl(fileName);
 
-    // 2. Upload file directly to Azure Blob Storage
-    await uploadBlobToAzure(sasData.uploadUrl, audioBlob, onProgress);
+    // 2. Upload binary file
+    await uploadBlobToAzure(sasData.uploadUrl, audioBlob, onProgress, { fileName });
 
     // 3. Update the Firestore lecture document
     await updateLecture(lectureId, {
       status: 'uploaded',
       audioUrl: sasData.audioUrl,
       blobPath: sasData.blobPath,
-      storageProvider: 'azure',
+      storageProvider: 'local',
       storageVersion: 1,
       uploadedAt: serverTimestamp()
     });
@@ -153,18 +153,18 @@ export function useLectures(userId: string | undefined) {
     const fileExtension = file.name.split('.').pop() || 'pdf';
     const fileName = `${timestamp}.${fileExtension}`;
 
-    // 1. Get Azure SAS URL from Express Backend
+    // 1. Get Upload Target URL from Backend
     const sasData = await getAzureUploadSasUrl(fileName);
 
-    // 2. Upload file directly to Azure Blob Storage
-    await uploadBlobToAzure(sasData.uploadUrl, file, onProgress);
+    // 2. Upload binary file
+    await uploadBlobToAzure(sasData.uploadUrl, file, onProgress, { fileName });
 
     // 3. Update the Firestore lecture document
     await updateLecture(lectureId, {
       status: 'uploaded',
       audioUrl: sasData.audioUrl,
       blobPath: sasData.blobPath,
-      storageProvider: 'azure',
+      storageProvider: 'local',
       storageVersion: 1,
       uploadedAt: serverTimestamp()
     });

@@ -23,7 +23,7 @@ import {
   Paperclip
 } from 'lucide-react';
 import { searchCanonicalSubjects, CanonicalSubject, resolveCanonicalSubject } from '../../utils/subjectCanonicalizer';
-import { extractTextFromUrl } from '../../services/azure';
+import { extractTextFromUrl } from '../../services/storageService';
 
 import { GeneratedAcademicNotes } from '../../services/academicNotesEngine';
 
@@ -147,13 +147,13 @@ export function ExamRushSetup({ onStartExamRush, theme = 'light' }: ExamRushSetu
     }
 
     try {
-      const { getAzureUploadSasUrl, uploadBlobToAzure, extractTextFromDocument } = await import('../../services/azure');
+      const { getAzureUploadSasUrl, uploadBlobToAzure, extractTextFromDocument } = await import('../../services/storageService');
       const sas = await getAzureUploadSasUrl(file.name);
-      await uploadBlobToAzure(sas.uploadUrl, file, () => {});
+      await uploadBlobToAzure(sas.uploadUrl, file, () => {}, { fileName: file.name });
       const extractedText = await extractTextFromDocument(sas.blobPath);
       if (extractedText && extractedText.trim()) return extractedText;
     } catch (err) {
-      console.warn('[File Extraction] Azure extraction unavailable, using fallback text parsing:', err);
+      console.warn('[File Extraction] Backend text extraction unavailable, using fallback text parsing:', err);
     }
 
     return new Promise((resolve) => {

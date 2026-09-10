@@ -35,7 +35,7 @@ interface LectureProcessingViewProps {
 }
 
 const COMPILATION_STEPS = [
-  { label: "Uploading Audio", description: "Saving raw audio bytes to Azure Blob Storage." },
+  { label: "Uploading Audio", description: "Saving raw audio bytes to Local Storage." },
   { label: "Deciphering Speech", description: "Trying Gemini transcription first, with automatic Speechmatics fallback." },
   { label: "Cleaning Transcript", description: "Removing stutters, filler words, and converting to professional academic prose." },
   { label: "Generating Study Assets", description: "Segmenting chapters, writing study notes, flashcards, quizzes & mindmaps." },
@@ -43,7 +43,7 @@ const COMPILATION_STEPS = [
 ];
 
 const DOCUMENT_COMPILATION_STEPS = [
-  { label: "Uploading Document", description: "Uploading document file payload to Azure Storage." },
+  { label: "Uploading Document", description: "Uploading document file payload to Local Storage." },
   { label: "Extracting Content", description: "Extracting structural text data from file format (PDF/DOCX/PPTX)." },
   { label: "Cleaning Transcript", description: "Formatting text and generating transcript lines." },
   { label: "Generating Study Assets", description: "Segmenting chapters, writing study notes, flashcards, quizzes & mindmaps." },
@@ -208,7 +208,7 @@ export default function LectureProcessingView({
               uploadFinishedAt: serverTimestamp()
             });
           } else {
-            console.log('Skipping document upload, file already exists in Azure:', blobPath);
+            console.log('Skipping document upload, file already exists in local storage:', blobPath);
             setUploadProgress(100);
             setUploadStatus('uploaded');
           }
@@ -222,7 +222,7 @@ export default function LectureProcessingView({
             processingStartedAt: serverTimestamp()
           });
 
-          const { extractTextFromDocument } = await import('../services/azure');
+          const { extractTextFromDocument } = await import('../services/storageService');
           const extractedText = await extractTextFromDocument(uploadResult.blobPath);
           if (!isSubscribed) return;
 
@@ -394,7 +394,7 @@ export default function LectureProcessingView({
               uploadFinishedAt: serverTimestamp()
             });
           } else {
-            console.log('Skipping audio upload, file already exists in Azure:', blobPath);
+            console.log('Skipping audio upload, file already exists in local storage:', blobPath);
             setUploadProgress(100);
             setUploadStatus('uploaded');
           }

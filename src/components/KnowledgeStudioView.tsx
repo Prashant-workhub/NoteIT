@@ -48,7 +48,7 @@ import { db, auth } from '../firebaseConfig';
 import { API_BASE_URL } from '../config';
 import { collection, addDoc, getDocs, deleteDoc, doc, setDoc, updateDoc, serverTimestamp, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { generateLectureContentFromText, generateFastDocumentAssets, generateStructuredNotes, generateSummary, generateFlashcards, generateQuiz, generateMoreQuestions, generateMindmap, getAIConfig } from '../services/gemini';
-import { getAzureUploadSasUrl, uploadBlobToAzure, extractTextFromDocument, extractTextFromUrl } from '../services/azure';
+import { getAzureUploadSasUrl, uploadBlobToAzure, extractTextFromDocument, extractTextFromUrl } from '../services/storageService';
 import pptxgen from 'pptxgenjs';
 import BruteLoader from './BruteLoader';
 import PresentationWorkspace from './PresentationWorkspace';

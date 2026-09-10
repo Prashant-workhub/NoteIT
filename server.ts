@@ -16,13 +16,6 @@ import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import { runNotificationSchedulerCycle } from './src/server/notificationScheduler';
-import { 
-  BlobServiceClient, 
-  StorageSharedKeyCredential, 
-  generateBlobSASQueryParameters, 
-  BlobSASPermissions,
-  SASProtocol
-} from '@azure/storage-blob';
 import path from 'path';
 import fs from 'fs';
 import { createRequire } from 'module';
@@ -1298,125 +1291,34 @@ try {
 
 // Using imported authenticateFirebaseUser middleware from ./src/middleware/authFirebase
 
-// Azure storage configuration
-const accountName = process.env.AZURE_STORAGE_ACCOUNT_NAME || '';
-const accountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY || '';
-const containerName = process.env.AZURE_STORAGE_CONTAINER || 'recordings';
+// Local storage configuration and optimization cleanup
 
-let blobServiceClient: BlobServiceClient | null = null;
-let credential: StorageSharedKeyCredential | null = null;
 
-if (accountName && accountKey) {
-  try {
-    credential = new StorageSharedKeyCredential(accountName, accountKey);
-    blobServiceClient = new BlobServiceClient(
-      `https://${accountName}.blob.core.windows.net`,
-      credential
-    );
-    console.log('Azure Blob Service Client initialized successfully.');
-
-    // Programmatically configure CORS rules for the Azure Storage Account
-    blobServiceClient.setProperties({
-      cors: [
-        {
-          allowedOrigins: "*",
-          allowedMethods: "GET,POST,PUT,OPTIONS,HEAD,DELETE",
-          allowedHeaders: "*",
-          exposedHeaders: "*",
-          maxAgeInSeconds: 86400
-        }
-      ]
-    }).then(() => {
-      console.log('Azure Storage CORS rules configured successfully.');
-    }).catch((corsError) => {
-      console.error('Failed to configure Azure Storage CORS rules:', corsError);
-    });
-  } catch (error) {
-    console.error('Failed to initialize Azure Blob Service Client:', error);
-  }
-} else {
-  console.warn('Azure storage credentials missing. SAS generation will be unavailable.');
-}
-
-// Endpoint to generate Upload SAS URL
+// Endpoint to generate Upload Target URL for local backend storage
 app.get('/api/storage/sas', authenticateFirebaseUser, async (req, res) => {
-  console.log('[SAS ROUTE] Route execution entered');
-  console.log(`- Request headers: ${JSON.stringify(req.headers)}`);
   const fileName = req.query.fileName as string;
-  console.log(`- Filename: ${fileName}`);
-  const user = req.body?.user;
-  console.log(`- User UID: ${user?.uid}`);
-
   if (!fileName) {
     res.status(400).json({ error: 'Missing required query parameter: fileName' });
-    return;
-  }
-
-  if (!blobServiceClient || !credential) {
-    // Local workspace fallback when Azure credentials are not set
-    try {
-      const user = req.body.user;
-      const uid = user.uid;
-      const localFileName = `${uid}-${fileName}`;
-      const backendUrl = getBackendUrl(req);
-      res.json({
-        uploadUrl: `${backendUrl}/api/storage/local-upload?fileName=${encodeURIComponent(localFileName)}`,
-        audioUrl: `${backendUrl}/uploads/${localFileName}`,
-        blobPath: `users/${uid}/recordings/${fileName}`,
-        isLocalFallback: true
-      });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message || 'Local fallback setup failed.' });
-    }
     return;
   }
 
   try {
     const user = req.body.user;
     const uid = user.uid;
-
-    // Define target blob path inside container: users/{uid}/recordings/{fileName}
-    const blobName = `users/${uid}/recordings/${fileName}`;
-    const containerClient = blobServiceClient.getContainerClient(containerName);
-    const blockBlobClient = containerClient.getBlockBlobClient(blobName);
-
-    // Create write and create permissions for the SAS token
-    const sasPermissions = new BlobSASPermissions();
-    sasPermissions.write = true;
-    sasPermissions.create = true;
-    sasPermissions.read = true; // allow reading back directly
-
-    const startsOn = new Date();
-    // Allow small clock skew
-    startsOn.setMinutes(startsOn.getMinutes() - 5);
-
-    const expiresOn = new Date();
-    expiresOn.setMinutes(expiresOn.getMinutes() + 15); // token valid for 15 minutes
-
-    const sasToken = generateBlobSASQueryParameters({
-      containerName,
-      blobName,
-      permissions: sasPermissions,
-      startsOn,
-      expiresOn,
-      protocol: SASProtocol.HttpsAndHttp
-    }, credential).toString();
-
-    const uploadUrl = `${blockBlobClient.url}?${sasToken}`;
-    const audioUrl = blockBlobClient.url; // base URL without SAS parameters for public/authenticated read
-
+    const localFileName = `${uid}-${fileName}`;
+    const backendUrl = getBackendUrl(req);
     res.json({
-      uploadUrl,
-      audioUrl,
-      blobPath: blobName
+      uploadUrl: `${backendUrl}/api/storage/local-upload?fileName=${encodeURIComponent(localFileName)}`,
+      audioUrl: `${backendUrl}/uploads/${localFileName}`,
+      blobPath: `users/${uid}/recordings/${fileName}`,
+      isLocal: true
     });
-  } catch (error: any) {
-    console.error('Error generating Azure SAS token:', error);
-    res.status(500).json({ error: error.message || 'Failed to generate SAS token.' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Local upload setup failed.' });
   }
 });
 
-// Endpoint to generate Read SAS URL
+// Endpoint to generate Read URL
 app.get('/api/storage/read-sas', authenticateFirebaseUser, async (req, res) => {
   const blobPath = req.query.blobPath as string;
   if (!blobPath) {
@@ -1424,87 +1326,59 @@ app.get('/api/storage/read-sas', authenticateFirebaseUser, async (req, res) => {
     return;
   }
 
-  if (!blobServiceClient || !credential) {
-    // If local fallback, return the public local URL directly
-    try {
-      const backendUrl = getBackendUrl(req);
-      const fileName = blobPath.split('/').pop() || '';
-      const user = req.body.user;
-      const uid = user.uid;
-      res.json({
-        readUrl: `${backendUrl}/uploads/${uid}-${fileName}`
-      });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message || 'Local fallback read setup failed.' });
-    }
+  try {
+    const backendUrl = getBackendUrl(req);
+    const fileName = blobPath.split('/').pop() || '';
+    const user = req.body.user;
+    const uid = user.uid;
+    res.json({
+      readUrl: `${backendUrl}/uploads/${uid}-${fileName}`
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Local read URL resolution failed.' });
+  }
+});
+
+// Endpoint to clean up temporary upload files to optimize storage usage
+app.post('/api/storage/cleanup', authenticateFirebaseUser, async (req, res) => {
+  const { blobPath } = req.body;
+  if (!blobPath) {
+    res.status(400).json({ error: 'Missing blobPath in body' });
     return;
   }
 
   try {
-    const containerClient = blobServiceClient.getContainerClient(containerName);
-    const blockBlobClient = containerClient.getBlockBlobClient(blobPath);
+    const user = req.body.user;
+    const uid = user.uid;
+    const fileName = blobPath.split('/').pop() || '';
+    const localFilePath = path.join(uploadsDir, `${uid}-${fileName}`);
 
-    const sasPermissions = new BlobSASPermissions();
-    sasPermissions.read = true;
-
-    const startsOn = new Date();
-    startsOn.setMinutes(startsOn.getMinutes() - 5);
-
-    const expiresOn = new Date();
-    expiresOn.setHours(expiresOn.getHours() + 24); // read token valid for 24 hours
-
-    const sasToken = generateBlobSASQueryParameters({
-      containerName,
-      blobName: blobPath,
-      permissions: sasPermissions,
-      startsOn,
-      expiresOn,
-      protocol: SASProtocol.HttpsAndHttp
-    }, credential).toString();
-
-    res.json({
-      readUrl: `${blockBlobClient.url}?${sasToken}`
-    });
-  } catch (error: any) {
-    console.error('Error generating read SAS token:', error);
-    res.status(500).json({ error: error.message || 'Failed to generate read SAS token.' });
+    if (fs.existsSync(localFilePath)) {
+      await fs.promises.unlink(localFilePath);
+      console.log(`[Storage Cleanup] Purged temporary upload file: ${localFilePath}`);
+    }
+    res.json({ success: true, message: 'Temporary storage cleaned up.' });
+  } catch (err: any) {
+    console.warn('[Storage Cleanup] Cleanup error:', err?.message || err);
+    res.status(500).json({ error: 'Cleanup failed.' });
   }
 });
 
-// Helper to read storage files to buffer
+// Helper to read local storage files to buffer
 async function getFileBuffer(blobPath: string, uid: string): Promise<Buffer> {
-  if (!blobServiceClient || !credential) {
-    // Local fallback
-    const fileName = blobPath.split('/').pop() || '';
-    const localFilePath = path.join(uploadsDir, `${uid}-${fileName}`);
-    if (fs.existsSync(localFilePath)) {
-      return await fs.promises.readFile(localFilePath);
-    }
-    throw new Error(`Local file not found at ${localFilePath}`);
-  } else {
-    // Azure blob storage
-    const containerClient = blobServiceClient.getContainerClient(containerName);
-    const blockBlobClient = containerClient.getBlockBlobClient(blobPath);
-    const downloadResponse = await blockBlobClient.download(0);
-    if (!downloadResponse.readableStreamBody) {
-      throw new Error('Azure download returned empty stream.');
-    }
-    return await streamToBuffer(downloadResponse.readableStreamBody);
+  const fileName = blobPath.split('/').pop() || '';
+  const localFilePath = path.join(uploadsDir, `${uid}-${fileName}`);
+  if (fs.existsSync(localFilePath)) {
+    return await fs.promises.readFile(localFilePath);
   }
+  // Check direct filename in uploads
+  const directPath = path.join(uploadsDir, fileName);
+  if (fs.existsSync(directPath)) {
+    return await fs.promises.readFile(directPath);
+  }
+  throw new Error(`Local file not found at ${localFilePath}`);
 }
 
-async function streamToBuffer(readableStream: any): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    readableStream.on('data', (data: any) => {
-      chunks.push(Buffer.isBuffer(data) ? data : Buffer.from(data));
-    });
-    readableStream.on('end', () => {
-      resolve(Buffer.concat(chunks));
-    });
-    readableStream.on('error', reject);
-  });
-}
 
 // In-memory cache for dynamic image search results
 const imageCache = new Map<string, string[]>();
