@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Zap, 
   BookOpen, 
@@ -6,13 +6,17 @@ import {
   Sparkles, 
   Layers, 
   Check, 
-  ArrowRight, 
-  Target,
-  GraduationCap
+  ArrowRight,
+  RefreshCw
 } from 'lucide-react';
 import { CanonicalSubject, searchCanonicalSubjects, CANONICAL_SUBJECTS } from '../../utils/subjectCanonicalizer';
-import { Lecture, Quiz, Note } from '../../types';
+import { Lecture, Quiz, Note, QuizQuestion } from '../../types';
 import QuizView from '../QuizView';
+import { ConceptMasteryMode } from './ConceptMasteryMode';
+import { SubjectivePracticeMode } from './SubjectivePracticeMode';
+import { ApplicationMode } from './ApplicationMode';
+import { MixedBlitzMode } from './MixedBlitzMode';
+import { WeakTopicMode } from './WeakTopicMode';
 
 interface PracticeBlitzWorkspaceProps {
   lectures?: Lecture[];
@@ -51,29 +55,83 @@ export function PracticeBlitzWorkspace({
     );
   };
 
-  if (activeSession && practiceType === 'quiz') {
-    return (
-      <div className="space-y-4">
-        <button
-          type="button"
-          onClick={() => setActiveSession(false)}
-          className="px-3.5 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono font-bold hover:bg-slate-100 cursor-pointer flex items-center gap-1.5"
-        >
-          ← Back to Practice Blitz Setup
-        </button>
+  const selectedLectures = lectures.filter(l => selectedLectureIds.includes(l.id));
 
-        <QuizView
-          quizzes={quizzes}
-          selectedQuizId={selectedQuizId}
-          setSelectedQuizId={setSelectedQuizId}
-          onUpdateQuizScore={onUpdateQuizScore}
-          onAddQuestions={onAddQuestions}
+  if (activeSession) {
+    if (practiceType === 'quiz') {
+      return (
+        <div className="space-y-4">
+          <button
+            type="button"
+            onClick={() => setActiveSession(false)}
+            className="px-3.5 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono font-bold hover:bg-slate-100 cursor-pointer flex items-center gap-1.5"
+          >
+            ← Back to Practice Blitz Setup
+          </button>
+
+          <QuizView
+            quizzes={quizzes}
+            selectedQuizId={selectedQuizId}
+            setSelectedQuizId={setSelectedQuizId}
+            onUpdateQuizScore={onUpdateQuizScore}
+            onAddQuestions={onAddQuestions}
+            theme={theme}
+            lectures={lectures}
+            notes={notes}
+          />
+        </div>
+      );
+    }
+    if (practiceType === 'concept') {
+      return (
+        <ConceptMasteryMode
+          selectedSubject={selectedSubject}
+          selectedLectures={selectedLectures.length > 0 ? selectedLectures : filteredLectures.slice(0, 2)}
+          onBack={() => setActiveSession(false)}
           theme={theme}
-          lectures={lectures}
-          notes={notes}
         />
-      </div>
-    );
+      );
+    }
+    if (practiceType === 'subjective') {
+      return (
+        <SubjectivePracticeMode
+          selectedSubject={selectedSubject}
+          selectedLectures={selectedLectures.length > 0 ? selectedLectures : filteredLectures.slice(0, 2)}
+          onBack={() => setActiveSession(false)}
+          theme={theme}
+        />
+      );
+    }
+    if (practiceType === 'application') {
+      return (
+        <ApplicationMode
+          selectedSubject={selectedSubject}
+          selectedLectures={selectedLectures.length > 0 ? selectedLectures : filteredLectures.slice(0, 2)}
+          onBack={() => setActiveSession(false)}
+          theme={theme}
+        />
+      );
+    }
+    if (practiceType === 'mixed') {
+      return (
+        <MixedBlitzMode
+          selectedSubject={selectedSubject}
+          selectedLectures={selectedLectures.length > 0 ? selectedLectures : filteredLectures.slice(0, 2)}
+          onBack={() => setActiveSession(false)}
+          theme={theme}
+        />
+      );
+    }
+    if (practiceType === 'weak') {
+      return (
+        <WeakTopicMode
+          selectedSubject={selectedSubject}
+          selectedLectures={selectedLectures.length > 0 ? selectedLectures : filteredLectures.slice(0, 2)}
+          onBack={() => setActiveSession(false)}
+          theme={theme}
+        />
+      );
+    }
   }
 
   return (
