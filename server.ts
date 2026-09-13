@@ -967,15 +967,26 @@ app.post(['/api/lectures/:lectureId/generate-resources', '/api/lectures/generate
     const needsSourceIntelligence = modeType === 'all' || !lectureData.sourceIntelligence;
 
     const prompt = `
-      You are an elite university professor and textbook author. Generate premium study resources for the provided lecture content.
+      You are an elite university professor, learning designer, and textbook author. Generate accurate, exam-useful study resources from the provided lecture content.
       Active Mode: ${mode}
-      
+
+      NON-NEGOTIABLE QUALITY STANDARD:
+      The output must let a student who missed the lecture learn, understand, and revise the material. Prefer clear explanations over vague labels, preserve every taught definition, condition, formula, procedure, comparison, and worked example, and remove only filler, repetition, greetings, and administration.
+
       RULES FOR NOTES:
       - Do NOT include any timestamp tags or source chips (such as [Source: Timestamp 00:08] or [00:08]).
-      - Structure notes like a university textbook with # Topic Name, ## Brief Overview, ## Key Points, ## 01 — Concept Name, ## 🧠 Remember, and ## 🎯 Exam Focus.
-      - Eliminate speech noise, stutters, and filler words.
+      - Return one notes array item per genuinely distinct major concept, in the same logical order as the lecture. Do not create a generic item called "Notes", "Introduction", or "Key Points".
+      - Each notes item title must be a precise student-facing concept name. Each notes item content must be substantial Markdown, normally 120–350 words when source coverage permits, with short paragraphs and bullets—not a transcript rewrite or a one-line summary.
+      - Within each concept, use only applicable Markdown subsections such as "Definition", "Explanation", "How it works" or "Process / Steps", "Example", "Formula", "Comparison", and "Common confusion". Explain the relationship between ideas, not just their names.
+      - For a process, give ordered, complete steps. For a formula, include the equation, define each symbol, and explain when it is used. For a comparison, use a Markdown table only when two or more approaches are actually contrasted. For an example, preserve the lecture's given values and reasoning; never fabricate one.
+      - End the final concept's content with a "Revision checklist" subsection followed by 3–6 compact recall prompts only if the source supports them.
+      - Eliminate speech noise, stutters, filler words, repeated claims, and administrative content.
       - Adapt layout dynamically: use Markdown tables for comparisons, formatted math notation for equations, and step-by-step lists for processes.
       - Stay 100% grounded in the lecture context without hallucinating external facts.
+      - Do not leave a concept underexplained merely to make the answer shorter. If the lecture is thin or unclear, state only what it establishes rather than guessing.
+
+      RULES FOR SUMMARY:
+      - Write a compact but information-dense overview (3–6 sentences) that connects the main concepts and names the learning outcome. It must add value beyond repeating headings.
 
       Content to process:
       ${sourceText}

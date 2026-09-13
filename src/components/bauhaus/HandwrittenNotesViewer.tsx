@@ -23,6 +23,39 @@ function cleanMarkdownText(str: string): string {
     .trim();
 }
 
+/**
+ * The resource API stores notes as `{ title, content }[]`, while older
+ * lectures store one Markdown document.  Convert the structured form back to
+ * Markdown before parsing it so both formats keep headings, lists, tables and
+ * line breaks instead of being rendered as a single dense paragraph.
+ */
+function notesToMarkdown(notes: unknown, fallbackTitle = 'Lecture Study Notes'): string {
+  if (typeof notes === 'string') return notes;
+  if (!Array.isArray(notes)) return '';
+
+  const topics = notes
+    .map((note: any) => {
+      if (typeof note === 'string') return note.trim();
+      if (!note || typeof note !== 'object') return '';
+
+      const heading = cleanMarkdownText(note.title || note.heading || 'Key Concept');
+      const content = typeof note.content === 'string'
+        ? note.content
+        : typeof note.text === 'string'
+          ? note.text
+          : typeof note.explanation === 'string'
+            ? note.explanation
+            : Array.isArray(note.details)
+              ? note.details.filter((item: unknown) => typeof item === 'string').map(item => `- ${item}`).join('\n')
+              : '';
+
+      return content.trim() ? `## ${heading}\n${content.trim()}` : '';
+    })
+    .filter(Boolean);
+
+  return topics.length ? `# ${fallbackTitle}\n\n${topics.join('\n\n')}` : '';
+}
+
 function parseMarkdownToHandwrittenSections(rawMarkdown: string) {
   if (!rawMarkdown || typeof rawMarkdown !== 'string') {
     return { title: '', overview: '', keyPoints: [], sections: [], remember: '', examFocus: '' };
@@ -170,8 +203,8 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
     lectureData?.status === 'processing';
 
   // Extract raw text sources
-  const rawNotesString = 
-    (typeof lectureData?.notes === 'string' ? lectureData.notes : '') ||
+  const rawNotesString =
+    notesToMarkdown(lectureData?.notes, lectureData?.title || 'Lecture Study Notes') ||
     lectureData?.notes?.academic ||
     lectureData?.notes?.detailed ||
     (typeof lectureData?.content === 'string' ? lectureData.content : '') ||
@@ -193,11 +226,6 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
     sections = lectureData.sections.map((s: any) => ({
       title: cleanMarkdownText(s.title || s.heading || 'Topic Section'),
       content: cleanMarkdownText(s.content || s.explanation || s.summary || '')
-    }));
-  } else if (Array.isArray(lectureData?.notes) && lectureData.notes.length > 0) {
-    sections = lectureData.notes.map((n: any) => ({
-      title: cleanMarkdownText(n.title || n.heading || 'Topic Section'),
-      content: typeof n.content === 'string' ? cleanMarkdownText(n.content) : (Array.isArray(n.details) ? n.details.map(cleanMarkdownText).join('. ') : JSON.stringify(n.content))
     }));
   } else if (overview) {
     sections = [{ title: 'Overview & Foundations', content: overview }];
@@ -378,7 +406,7 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
   };
 
   return (
-    <div className="handwritten-workspace space-y-6 select-none">
+    <div className="handwritten-workspace space-y-6 select-text">
       {/* TOOLBAR CONTROLS */}
       <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-[6px] border-2 border-[#111111] bg-[#F6F2EA] shadow-paper-sm print:hidden">
         <div className="flex items-center gap-2">
@@ -408,13 +436,36 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
         </div>
       </div>
 
-      {/* PRINT-SPECIFIC CSS STYLES */}
+      {/* HANDWRITTEN QUALITY + PRINT/PDF-SPECIFIC CSS */}
       <style>{`
-        @font-face {
-          font-family: 'HandwrittenPen';
-          src: local('Kalam'), local('Caveat'), cursive;
+        /* Authentic handwriting font stack with sane local fallbacks */
+        .a4-page {
+          font-family: 'Kalam', 'Caveat', 'Patrick Hand', 'Segoe Print', 'Comic Sans MS', cursive !important;
+          font-synthesis: none !important;              /* NEVER fake-bold handwriting fonts (looks blurry) */
+          text-rendering: optimizeLegibility;
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+          letter-spacing: 0.015em;
+        }
+        /* Snap all paragraph / list / table text exactly onto the 28px ruled-line grid */
+        .a4-page p,
+        .a4-page li,
+        .a4-page td,
+        .a4-page th {
+          line-height: 28px !important;
         }
         @media print {
+          @page {
+            size: A4 portrait;
+            margin: 0;
+          }
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          html, body {
+            background: #FFFFFF !important;
+          }
           body * {
             visibility: hidden;
           }
@@ -426,12 +477,24 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
             left: 0;
             top: 0;
             width: 100%;
+            margin: 0 !important;
+            padding: 0 !important;
+            gap: 0 !important;
+          }
+          .handwritten-a4-stack > * + * {
+            margin-top: 0 !important;
           }
           .a4-page {
             page-break-after: always;
             box-shadow: none !important;
             margin: 0 !important;
             border: none !important;
+            border-radius: 0 !important;
+            width: 210mm !important;
+            min-height: 297mm !important;
+          }
+          .a4-page:last-child {
+            page-break-after: auto !important;
           }
           .print\\:hidden {
             display: none !important;
@@ -444,9 +507,9 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
         {pages.map((pg) => (
           <div
             key={pg.pageNumber}
-            className="a4-page relative w-[210mm] min-h-[297mm] !bg-white !text-slate-900 p-[16mm] rounded-[2px] border-[5px] border-[#2563EB] shadow-2xl overflow-hidden font-handwritten select-text"
+            className="a4-page relative w-[210mm] min-h-[297mm] !bg-white !text-slate-900 p-[16mm] rounded-[2px] border-[5px] border-[#2563EB] shadow-2xl font-handwritten select-text"
             style={{
-              fontFamily: "'Kalam', 'Caveat', cursive",
+              fontFamily: "'Kalam', 'Caveat', 'Patrick Hand', 'Segoe Print', 'Comic Sans MS', cursive",
               backgroundColor: '#FFFFFF',
               backgroundImage: 'linear-gradient(#FFFFFF 27px, #CBD5E1 28px)',
               backgroundSize: '100% 28px',
@@ -457,7 +520,7 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
             {/* HEADER METADATA */}
             <div className="flex justify-between items-center pb-2 border-b-2 border-[#2563EB] mb-6 text-sm font-bold tracking-wide">
               <div>
-                <span className="text-[#0F294A] uppercase tracking-wider text-xs font-mono font-black">{pg.header}</span>
+                <span className="text-[#0F294A] uppercase tracking-wider text-xs font-mono font-bold">{pg.header}</span>
               </div>
               <div className="text-xs font-mono font-bold text-[#475569]">
                 PAGE {String(pg.pageNumber).padStart(2, '0')} OF {String(pages.length).padStart(2, '0')}
@@ -467,7 +530,7 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
             {/* DOCUMENT TITLE (ON PAGE 1) */}
             {pg.pageNumber === 1 && (
               <div className="mb-6">
-                <h1 className="text-3xl sm:text-4xl font-extrabold uppercase tracking-tight text-[#0F294A] leading-none mb-2 decoration-wavy underline underline-offset-8">
+                <h1 className="text-3xl sm:text-4xl font-bold uppercase tracking-tight text-[#0F294A] leading-none mb-2 decoration-wavy underline underline-offset-8">
                   {title}
                 </h1>
                 <div className="text-xs font-mono font-bold text-[#334155] mt-2 italic flex items-center gap-2">
@@ -483,17 +546,17 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
                 <div key={idx} className="space-y-2">
                   {/* SECTION TITLE WITH HANDWRITTEN HIGHLIGHT */}
                   <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-0.5 rounded bg-[#FFD54F] text-[#0F294A] text-lg font-extrabold shadow-sm border border-amber-400">
+                    <span className="px-2.5 py-0.5 rounded bg-[#FFD54F] text-[#0F294A] text-lg font-bold shadow-sm border border-amber-400">
                       ✏ {item.title}
                     </span>
                   </div>
 
                   {/* ITEM CONTENT BASED ON TYPE */}
                   {(item.type === 'text' || item.type === 'concept') && (
-                    <div className="pl-2 space-y-2 text-lg font-bold leading-snug text-[#0F294A]">
+                    <div className="pl-2 space-y-2 text-lg font-bold leading-[28px] text-[#0F294A]">
                       {Array.isArray(item.content) ? (
                         item.content.map((pLine: string, pIdx: number) => (
-                          <p key={pIdx} className="leading-snug">
+                          <p key={pIdx} className="leading-[28px]">
                             {pLine.startsWith('- ') || pLine.startsWith('* ') ? (
                               <span className="flex items-start gap-2">
                                 <span className="text-amber-500 font-extrabold">•</span>
@@ -512,11 +575,11 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
                       {item.table && item.table.length > 0 && (
                         <div className="my-4 overflow-hidden rounded-[6px] border-2 border-[#2563EB] bg-[#FAF8F5] p-3 shadow-sm">
                           <div className="text-xs font-mono font-bold uppercase text-[#2563EB] mb-2">Structured Reference Table</div>
-                          <table className="w-full text-left border-collapse text-base font-extrabold">
+                          <table className="w-full text-left border-collapse text-base font-bold">
                             <thead>
                               <tr className="border-b-2 border-[#2563EB] bg-[#E2E8F0] text-[#0F294A]">
-                                <th className="p-2 border-r border-[#CBD5E1] font-black">{item.table[0]?.col1 || 'Field'}</th>
-                                <th className="p-2 font-black">{item.table[0]?.col2 || 'Value'}</th>
+                                <th className="p-2 border-r border-[#CBD5E1] font-bold">{item.table[0]?.col1 || 'Field'}</th>
+                                <th className="p-2 font-bold">{item.table[0]?.col2 || 'Value'}</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -535,15 +598,15 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
 
                   {item.type === 'remember' && (
                     <div className="my-3 p-4 rounded-[6px] border-2 border-amber-400 bg-[#FEF3C7] text-[#78350F] shadow-sm space-y-1">
-                      <div className="text-xs font-mono font-black uppercase text-amber-800 tracking-wider">🧠 REMEMBER FOR EXAMS</div>
-                      <p className="text-lg font-extrabold leading-snug">{item.content}</p>
+                      <div className="text-xs font-mono font-bold uppercase text-amber-800 tracking-wider">REMEMBER FOR EXAMS</div>
+                      <p className="text-lg font-bold leading-[28px]">{item.content}</p>
                     </div>
                   )}
 
                   {item.type === 'examFocus' && (
                     <div className="my-3 p-4 rounded-[6px] border-2 border-blue-400 bg-[#EFF6FF] text-[#1E3A8A] shadow-sm space-y-1">
-                      <div className="text-xs font-mono font-black uppercase text-blue-800 tracking-wider">🎯 EXAM FOCUS & HIGHLIGHT</div>
-                      <p className="text-lg font-extrabold leading-snug">{item.content}</p>
+                      <div className="text-xs font-mono font-bold uppercase text-blue-800 tracking-wider">EXAM FOCUS & HIGHLIGHT</div>
+                      <p className="text-lg font-bold leading-[28px]">{item.content}</p>
                     </div>
                   )}
 
@@ -554,7 +617,7 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
                         {Array.isArray(item.content) && item.content.map((step: string, sIdx: number) => (
                           <React.Fragment key={sIdx}>
                             <div 
-                              className="p-2.5 bg-white rounded-md border-2 border-[#2563EB] shadow-sm font-extrabold text-sm flex-1 text-center"
+                              className="p-2.5 bg-white rounded-md border-2 border-[#2563EB] shadow-sm font-bold text-sm flex-1 text-center"
                               style={{ backgroundColor: '#FFFFFF', color: '#0F294A' }}
                             >
                               {step}
@@ -573,7 +636,7 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
                       {Array.isArray(item.content) && item.content.map((f: string, fIdx: number) => (
                         <div key={fIdx} className="p-3 rounded-[6px] border-2 border-[#2563EB] bg-[#F1F5F9] shadow-sm relative">
                           <span className="absolute top-1 right-2 text-[10px] font-mono text-blue-700 uppercase font-bold">Equation Box</span>
-                          <div className="text-xl font-black text-[#0F294A] tracking-wider font-mono">
+                          <div className="text-xl font-bold text-[#0F294A] tracking-wider font-mono">
                             {f}
                           </div>
                         </div>
@@ -596,7 +659,7 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
                       {Array.isArray(item.content) && item.content.map((bullet: string, bIdx: number) => (
                         <li key={bIdx} className="flex items-start gap-2">
                           <span className="text-amber-500 font-extrabold">•</span>
-                          <span className="font-bold text-[#0F294A] leading-snug">{bullet}</span>
+                          <span className="font-bold text-[#0F294A] leading-[28px]">{bullet}</span>
                         </li>
                       ))}
                     </ul>
