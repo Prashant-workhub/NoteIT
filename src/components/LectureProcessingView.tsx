@@ -136,14 +136,33 @@ export default function LectureProcessingView({
         let audioUrl = existingData?.audioUrl || '';
         let blobPath = existingData?.blobPath || '';
 
-        // RECOVERY ROUTE: If transcript ALREADY exists in Firestore, skip upload & transcription!
+        // RECOVERY ROUTE: If transcript & resources ALREADY exist in Firestore, skip regeneration!
         if (existingTranscript && existingTranscript.trim().length > 20) {
-          console.log('[LectureProcessingView] Found saved transcript in Firestore. Fast-tracking to resource generation...');
+          const hasExistingResources = existingData?.status === 'generated' || 
+            existingData?.resourceGenerationStatus === 'completed' ||
+            (existingData?.sections && existingData.sections.length > 0);
+
+          if (hasExistingResources) {
+            console.log('[LectureProcessingView] Found saved transcript and completed resources. Fast-tracking to workspace...');
+            setUploadStatus('completed');
+            setCurrentStepIndex(steps.length);
+            if (setActiveLectureId && lectureId) {
+              setActiveLectureId(lectureId);
+            }
+            setTimeout(() => {
+              if (isSubscribed) {
+                setActivePage('lecture-capture');
+              }
+            }, 1000);
+            return;
+          }
+
+          console.log('[LectureProcessingView] Found saved transcript in Firestore. Generating missing resources...');
           setUploadStatus('analyzing');
           setCurrentStepIndex(3);
 
           try {
-            await generateResourcesFromTranscript(lectureId, existingTranscript, { mode: 'academic', modeType: 'all' });
+            await generateResourcesFromTranscript(lectureId, existingTranscript, { mode: 'academic', modeType: 'missing' });
             
             await updateLecture(lectureId, {
               resourceGenerationStatus: 'completed',
@@ -163,7 +182,7 @@ export default function LectureProcessingView({
               if (isSubscribed) {
                 setActivePage('lecture-capture');
               }
-            }, 2000);
+            }, 1500);
             return;
           } catch (resErr: any) {
             console.error("Resource generation stage failed from saved transcript:", resErr);

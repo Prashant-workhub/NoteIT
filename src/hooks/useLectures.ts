@@ -6,11 +6,13 @@ import {
   updateDoc, 
   deleteDoc, 
   doc, 
+  getDoc,
   serverTimestamp, 
   query, 
   orderBy 
 } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
+import { db, auth } from '../firebaseConfig';
+import { API_BASE_URL } from '../config';
 import { Lecture } from '../types';
 import { getAzureUploadSasUrl, uploadBlobToAzure } from '../services/azure';
 
@@ -110,6 +112,33 @@ export function useLectures(userId: string | undefined) {
   const deleteLecture = async (id: string) => {
     if (!userId) throw new Error('User not authenticated');
     const lectureRef = doc(db, 'users', userId, 'lectures', id);
+    
+    try {
+      const snap = await getDoc(lectureRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        const blobPath = data?.blobPath || data?.audioUrl;
+        if (blobPath) {
+          const currentUser = auth.currentUser;
+          if (currentUser) {
+            const idToken = await currentUser.getIdToken(true).catch(() => null);
+            if (idToken) {
+              await fetch(`${API_BASE_URL}/api/storage/cleanup`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${idToken}`
+                },
+                body: JSON.stringify({ blobPath })
+              }).catch((e) => console.warn('Storage cleanup warning:', e));
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Pre-deletion snapshot read warning:', e);
+    }
+
     await deleteDoc(lectureRef);
   };
 

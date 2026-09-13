@@ -400,7 +400,7 @@ export const transcribeAudio = async (
   const prompt = `You are an expert bilingual transcriber proficient in English and Hindi. Transcribe the provided audio lecture word-for-word accurately using English Roman script (Hinglish / Romanized Hindi).
 Whenever the teacher speaks in Hindi or a mix of Hindi and English, capture every word and concept spoken in English text (Roman script, e.g. "bhai iska matlab ye hai ki...", "kitne components hain...").
 Ensure NO Hindi information given by the teacher is lost or dropped; write all Hindi spoken content using the English alphabet.
-Format the transcript text by prepending bracketed timestamps at fixed 2-minute interval checkpoints (e.g. [00:00], [02:00], [04:00], [06:00]) at the beginning of each major statement or logical paragraph based on the audio timeline.`;
+Format the transcript text by preserving actual audio timestamps (e.g. [00:15], [01:42], [05:10]) from spoken audio cues or speech segment boundaries. If exact timestamps are unavailable in the audio feed, label estimated chapter checkpoints with approximate timestamps (e.g. [~02:00]) clearly demarcating topic transitions.`;
   return executeGeminiCall(prompt, apiKey, { mimeType, data: base64Audio }, undefined, onBusy);
 };
 
