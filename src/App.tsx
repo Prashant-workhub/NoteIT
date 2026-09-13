@@ -4,6 +4,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { pageIdToPath, pathToPageId } from './routes';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth, db } from './firebaseConfig';
 import { doc, getDoc, setDoc, serverTimestamp, collection, query, orderBy, onSnapshot } from 'firebase/firestore';
@@ -466,8 +468,18 @@ export default function App() {
     });
   }, [combinedLectures]);
 
-  // High-level dashboard states defaulting to landing page
-  const [activePage, setActivePage] = useState<PageId>('landing');
+  // React Router integration for browser history, page redirection, and Back button support
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const activePage = pathToPageId(location.pathname);
+
+  const setActivePage = (page: PageId) => {
+    const targetPath = pageIdToPath(page);
+    if (location.pathname !== targetPath) {
+      navigate(targetPath);
+    }
+  };
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [isOpenMobile, setIsOpenMobile] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1062,7 +1074,7 @@ export default function App() {
               try {
                 window.close();
               } catch (e) {}
-              window.location.href = window.location.origin + window.location.pathname;
+              navigate('/quiz-mode');
             }}
           />
         </div>

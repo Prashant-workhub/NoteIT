@@ -36,6 +36,7 @@
     "pptxgenjs": "^1.1.5",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
+    "react-router-dom": "^7.18.3",
     "tsx": "^4.22.4",
     "vite": "^6.2.3",
     "web-push": "^3.6.7",

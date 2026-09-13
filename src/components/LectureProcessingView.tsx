@@ -192,6 +192,7 @@ export default function LectureProcessingView({
           if (!audioUrl || !blobPath) {
             setUploadStatus('uploading');
             setCurrentStepIndex(0);
+            setProcessingMessage('Uploading document payload...');
             await updateLecture(lectureId, { 
               status: 'uploading',
               uploadStartedAt: serverTimestamp()
@@ -199,7 +200,9 @@ export default function LectureProcessingView({
 
             uploadResult = await uploadLectureDocument(lectureId, documentFile, (progress) => {
               if (isSubscribed) {
-                setUploadProgress(Math.round(progress));
+                const p = Math.round(progress);
+                setUploadProgress(p);
+                setProcessingMessage(`Uploading document payload (${p}%)...`);
               }
             });
             if (!isSubscribed) return;
@@ -216,6 +219,7 @@ export default function LectureProcessingView({
           // 2. EXTRACTING CONTENT
           setUploadStatus('extracting');
           setCurrentStepIndex(1);
+          setProcessingMessage('Extracting text and structure from document...');
           await updateLecture(lectureId, { 
             status: 'extracting',
             transcriptionStartedAt: serverTimestamp(),
@@ -233,6 +237,7 @@ export default function LectureProcessingView({
           // 3. AI ANALYSIS & SYNTHESIS
           setUploadStatus('analyzing');
           setCurrentStepIndex(2);
+          setProcessingMessage('Analyzing concepts and generating study assets...');
           await updateLecture(lectureId, { 
             status: 'analyzing',
             generationStartedAt: serverTimestamp()
@@ -251,6 +256,7 @@ export default function LectureProcessingView({
             'academic',
             (stepNum, msg) => {
               if (isSubscribed) {
+                if (msg) setProcessingMessage(msg);
                 if (stepNum === 1) setCurrentStepIndex(2); // Cleaning Transcript
               }
             }
@@ -260,12 +266,14 @@ export default function LectureProcessingView({
           const processingTimeMs = Date.now() - startTime;
 
           if (isSubscribed) {
-            setCurrentStepIndex(3); // Detecting Chapters
+            setCurrentStepIndex(3); // Generating Study Assets
+            setProcessingMessage('Generating study notes, flashcards & quizzes...');
             await new Promise(r => setTimeout(r, 1200));
           }
           if (isSubscribed) {
             setCurrentStepIndex(4); // Saving Results
             setUploadStatus('saving');
+            setProcessingMessage('Persisting academic workspace to database...');
             await updateLecture(lectureId, { status: 'saving' });
           }
 
@@ -376,6 +384,7 @@ export default function LectureProcessingView({
           if (!audioUrl || !blobPath) {
             setUploadStatus('uploading');
             setCurrentStepIndex(0);
+            setProcessingMessage('Uploading audio recording...');
             await updateLecture(lectureId, { 
               status: 'uploading',
               recordingStatus: 'recording',
@@ -384,7 +393,9 @@ export default function LectureProcessingView({
 
             await uploadLectureAudio(lectureId, audioBlob!, (progress) => {
               if (isSubscribed) {
-                setUploadProgress(Math.round(progress));
+                const p = Math.round(progress);
+                setUploadProgress(p);
+                setProcessingMessage(`Uploading audio recording (${p}%)...`);
               }
             });
             if (!isSubscribed) return;
@@ -401,7 +412,7 @@ export default function LectureProcessingView({
 
           setUploadStatus('transcribing');
           setCurrentStepIndex(1);
-          setProcessingMessage('Preparing secure audio transcription…');
+          setProcessingMessage('Deciphering speech & generating academic transcript...');
           await updateLecture(lectureId, { 
             status: 'transcribing',
             transcriptionStatus: 'processing',
@@ -428,12 +439,12 @@ export default function LectureProcessingView({
             'academic',
             (stepNum, msg) => {
               if (isSubscribed) {
-                setProcessingMessage(msg);
+                if (msg) setProcessingMessage(msg);
                 if (stepNum === 1) {
                   setCurrentStepIndex(1); // Deciphering Speech
                 }
                 else if (stepNum === 2) {
-                  setCurrentStepIndex(3); // Detecting Chapters
+                  setCurrentStepIndex(3); // Generating Study Assets
                   updateLecture(lectureId, { transcriptionFinishedAt: serverTimestamp() }).catch(console.error);
                 }
               }
@@ -448,6 +459,7 @@ export default function LectureProcessingView({
           if (isSubscribed) {
             setCurrentStepIndex(4); // Saving Results
             setUploadStatus('saving');
+            setProcessingMessage('Persisting academic workspace to database...');
             await updateLecture(lectureId, { status: 'saving' });
           }
 
@@ -584,7 +596,7 @@ export default function LectureProcessingView({
             {uploadStatus === 'failed' && (
               <span className="inline-flex items-center gap-1.5 rounded-[4px] bg-[#FF4D4D] border-2 border-[#111111] px-3.5 py-2 text-xs font-mono font-bold text-white shadow-paper-sm uppercase">
                 <AlertCircle className="h-4 w-4" />
-                PIPELINE ABORTED
+                PIPELINE PAUSED
               </span>
             )}
             {uploadStatus === 'uploading' && (
@@ -602,7 +614,7 @@ export default function LectureProcessingView({
             {uploadStatus === 'transcribing' && (
               <span className="inline-flex items-center gap-1.5 rounded-[4px] bg-[#2F6BFF] border-2 border-[#111111] px-3.5 py-2 text-xs font-mono font-bold text-white shadow-paper-sm uppercase animate-pulse">
                 <Brain className="h-4 w-4 animate-bounce text-white" />
-                {isGeminiBusy ? 'RETRYING SYNTHESIS...' : 'TRANSCRIBING LECTURE'}
+                TRANSCRIBING LECTURE
               </span>
             )}
             {uploadStatus === 'extracting' && (
@@ -614,13 +626,13 @@ export default function LectureProcessingView({
             {uploadStatus === 'analyzing' && (
               <span className="inline-flex items-center gap-1.5 rounded-[4px] bg-[#FFC400] border-2 border-[#111111] px-3.5 py-2 text-xs font-mono font-bold text-[#111111] shadow-paper-sm uppercase animate-pulse">
                 <Brain className="h-4 w-4 animate-bounce text-[#111111]" />
-                {isGeminiBusy ? 'RETRYING SYNTHESIS...' : 'AI ANALYZING'}
+                AI SYNTHESIZING
               </span>
             )}
             {uploadStatus === 'generating_notes' && (
               <span className="inline-flex items-center gap-1.5 rounded-[4px] bg-[#FFC400] border-2 border-[#111111] px-3.5 py-2 text-xs font-mono font-bold text-[#111111] shadow-paper-sm uppercase animate-pulse">
                 <Cpu className="h-4 w-4 animate-spin text-[#111111]" />
-                GENERATING NOTES
+                GENERATING ASSETS
               </span>
             )}
             {uploadStatus === 'saving' && (
@@ -647,7 +659,9 @@ export default function LectureProcessingView({
                   ? '100%' 
                   : uploadStatus === 'failed'
                     ? '0%'
-                    : `${Math.max(5, (currentStepIndex / steps.length) * 100)}%` 
+                    : uploadStatus === 'uploading'
+                      ? `${Math.max(5, uploadProgress)}%`
+                      : `${Math.max(5, Math.round(((currentStepIndex + 1) / steps.length) * 100))}%` 
               }}
               className={`h-full transition-all duration-500 ease-out ${
                 uploadStatus === 'failed' 

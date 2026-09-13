@@ -1,6 +1,6 @@
 import { auth, storage } from '../firebaseConfig';
 import { API_BASE_URL } from '../config';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 export interface StorageResponse {
   uploadUrl: string;
@@ -85,13 +85,30 @@ export const uploadBlobStorage = async (
   if (isSmallAndSecure && options?.fileName && storage) {
     try {
       console.log('[Storage] Storing small/secure file to Firebase Storage...');
-      onProgress(20);
+      onProgress(5);
       const fileRef = ref(storage, `users/${currentUser.uid}/secure_files/${Date.now()}_${options.fileName}`);
-      onProgress(50);
-      const snapshot = await uploadBytes(fileRef, blob);
-      const downloadUrl = await getDownloadURL(snapshot.ref);
-      onProgress(100);
-      return { storageUrl: downloadUrl };
+      const uploadTask = uploadBytesResumable(fileRef, blob);
+
+      return await new Promise((resolve, reject) => {
+        uploadTask.on(
+          'state_changed',
+          (snapshot) => {
+            if (snapshot.totalBytes > 0) {
+              const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+              onProgress(Math.min(99, Math.max(5, progress)));
+            }
+          },
+          (error) => {
+            console.warn('[Storage] Firebase upload task error:', error);
+            reject(error);
+          },
+          async () => {
+            const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+            onProgress(100);
+            resolve({ storageUrl: downloadUrl });
+          }
+        );
+      });
     } catch (firebaseErr) {
       console.warn('[Storage] Firebase upload failed, falling back to local backend disk:', firebaseErr);
     }
@@ -111,9 +128,9 @@ export const uploadBlobStorage = async (
     xhr.setRequestHeader('Content-Type', blob.type || 'application/octet-stream');
 
     xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) {
-        const progress = (event.loaded / event.total) * 100;
-        onProgress(progress);
+      if (event.lengthComputable && event.total > 0) {
+        const progress = Math.round((event.loaded / event.total) * 100);
+        onProgress(Math.min(99, Math.max(5, progress)));
       }
     };
 
