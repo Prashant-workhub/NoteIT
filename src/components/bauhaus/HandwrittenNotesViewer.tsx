@@ -596,15 +596,15 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
   const handlePrint = () => {
     try {
       if (typeof window !== 'undefined') {
-        if (Capacitor.isNativePlatform()) {
-          // Native Capacitor webview fallback hint for PDF/Print export
-          window.print();
+        if ((window as any).AndroidPrint && typeof (window as any).AndroidPrint.printDocument === 'function') {
+          (window as any).AndroidPrint.printDocument(title || "NoteIT_Handwritten_Notes");
         } else {
           window.print();
         }
       }
     } catch (err) {
       console.warn('Print exception:', err);
+      try { window.print(); } catch (_) {}
     }
   };
 

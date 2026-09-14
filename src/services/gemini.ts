@@ -111,7 +111,8 @@ export const executeOpenAICall = async (
   }
 };
 
-import { auth } from '../firebaseConfig';
+import { auth, db } from '../firebaseConfig';
+import { doc, getDoc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { API_BASE_URL } from '../config';
 
 export const executeGeminiCall = async (
@@ -151,33 +152,81 @@ export const executeGeminiCall = async (
       })
     });
 
-    if (onBusy) onBusy(false);
+    if (response.ok) {
+      if (onBusy) onBusy(false);
+      const data = await response.json();
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const errorMsg = errorData.error || `AI proxy call failed with status ${response.status}`;
-      throw new Error(errorMsg);
-    }
-
-    const data = await response.json();
-
-    if (responseSchema) {
-      if (typeof data === 'string') {
-        try {
-          const cleanedText = extractJsonObject(data);
-          return JSON.parse(cleanedText);
-        } catch (err) {
-          console.error('Failed to parse response text as JSON:', data, err);
-          throw new Error('Invalid JSON format returned from AI API.');
+      if (responseSchema) {
+        if (typeof data === 'string') {
+          try {
+            const cleanedText = extractJsonObject(data);
+            return JSON.parse(cleanedText);
+          } catch (err) {
+            console.error('Failed to parse response text as JSON:', data, err);
+            throw new Error('Invalid JSON format returned from AI API.');
+          }
         }
+        return data;
       }
       return data;
     }
-    return data;
-  } catch (error: any) {
-    if (onBusy) onBusy(false);
-    throw error;
+  } catch (proxyErr) {
+    console.warn('[executeGeminiCall] Server proxy fetch failed or unreachable. Trying direct Gemini client API call:', proxyErr);
   }
+
+  // DIRECT CLIENT-SIDE GEMINI REST FALLBACK (for mobile or server unreachable)
+  const geminiKey = apiKey || getAIConfig().geminiKey;
+  if (geminiKey) {
+    try {
+      const directModel = model || 'gemini-2.5-flash';
+      const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/${directModel}:generateContent?key=${geminiKey}`;
+      
+      const contentsParts: any[] = [];
+      if (inlineData) {
+        contentsParts.push({ inline_data: { mime_type: inlineData.mimeType, data: inlineData.data } });
+      }
+      contentsParts.push({ text: prompt });
+
+      const requestBody: any = {
+        contents: [{ parts: contentsParts }]
+      };
+
+      if (responseSchema) {
+        requestBody.generationConfig = {
+          response_mime_type: 'application/json'
+        };
+      }
+
+      const directRes = await fetch(directUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (onBusy) onBusy(false);
+
+      if (!directRes.ok) {
+        const errText = await directRes.text().catch(() => '');
+        throw new Error(`Direct Gemini API call failed (${directRes.status}): ${errText}`);
+      }
+
+      const directData = await directRes.json();
+      const rawText = directData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      
+      if (responseSchema) {
+        const cleanedText = extractJsonObject(rawText);
+        return JSON.parse(cleanedText);
+      }
+      return rawText;
+    } catch (directErr: any) {
+      if (onBusy) onBusy(false);
+      console.error('[executeGeminiCall] Direct Gemini API call failed:', directErr);
+      throw directErr;
+    }
+  }
+
+  if (onBusy) onBusy(false);
+  throw new Error('Unable to reach server and no direct Gemini API key configured in Settings.');
 };
 
 export const generateResourcesFromTranscript = async (
@@ -199,6 +248,7 @@ export const generateResourcesFromTranscript = async (
 
   if (onBusy) onBusy(true);
 
+  // Try server endpoint first
   try {
     const idToken = await currentUser.getIdToken(true);
     const endpointUrl = `${API_BASE_URL}/api/lectures/${lectureId}/generate-resources`;
@@ -216,22 +266,72 @@ export const generateResourcesFromTranscript = async (
       })
     });
 
-    if (onBusy) onBusy(false);
+    if (response.ok) {
+      if (onBusy) onBusy(false);
+      return await response.json();
+    }
+  } catch (serverErr) {
+    console.warn('[generateResourcesFromTranscript] Server endpoint unreachable. Switching to client-side resource generation:', serverErr);
+  }
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const errorMsg = errorData.error || `Resource generation failed with status ${response.status}`;
-      const errObj: any = new Error(errorMsg);
-      errObj.status = response.status;
-      errObj.code = errorData.code || String(response.status);
-      errObj.provider = errorData.provider;
-      throw errObj;
+  // DIRECT CLIENT-SIDE RESOURCE GENERATION FALLBACK (For Android mobile app)
+  try {
+    const uid = currentUser.uid;
+    let transcriptText = transcript || '';
+
+    if (!transcriptText || transcriptText.trim().length === 0) {
+      const lectureDocRef = doc(db, 'users', uid, 'lectures', lectureId);
+      const lectureSnap = await getDoc(lectureDocRef);
+      if (lectureSnap.exists()) {
+        const data = lectureSnap.data();
+        transcriptText = data?.cleanTranscript || data?.transcript || '';
+      }
     }
 
-    return await response.json();
-  } catch (error: any) {
+    if (!transcriptText || transcriptText.trim().length === 0) {
+      throw new Error('Transcript text is empty. Cannot generate study resources.');
+    }
+
+    const apiKey = getAIConfig().geminiKey;
+    const mode = options?.mode || 'academic';
+
+    const generatedAssets = await generateIngestedAssetsFromText(transcriptText, apiKey, mode, onBusy);
+
+    const lectureDocRef = doc(db, 'users', uid, 'lectures', lectureId);
+    await updateDoc(lectureDocRef, {
+      summary: generatedAssets.summary || '',
+      notes: generatedAssets.notes || [],
+      quizzes: generatedAssets.quiz || [],
+      flashcards: generatedAssets.flashcards || [],
+      keyConcepts: generatedAssets.keyConcepts || [],
+      timeline: generatedAssets.timeline || [],
+      sections: generatedAssets.sections || [],
+      sourceIntelligence: generatedAssets.sourceIntelligence || null,
+      resourceGenerationStatus: 'completed',
+      status: 'generated',
+      generationFinishedAt: serverTimestamp(),
+      processingCompletedAt: serverTimestamp()
+    }).catch(async () => {
+      await setDoc(lectureDocRef, {
+        summary: generatedAssets.summary || '',
+        notes: generatedAssets.notes || [],
+        quizzes: generatedAssets.quiz || [],
+        flashcards: generatedAssets.flashcards || [],
+        keyConcepts: generatedAssets.keyConcepts || [],
+        timeline: generatedAssets.timeline || [],
+        sections: generatedAssets.sections || [],
+        sourceIntelligence: generatedAssets.sourceIntelligence || null,
+        resourceGenerationStatus: 'completed',
+        status: 'generated'
+      }, { merge: true });
+    });
+
     if (onBusy) onBusy(false);
-    throw error;
+    return generatedAssets;
+  } catch (clientGenErr: any) {
+    if (onBusy) onBusy(false);
+    console.error('[generateResourcesFromTranscript] Client-side resource generation error:', clientGenErr);
+    throw clientGenErr;
   }
 };
 
@@ -475,6 +575,25 @@ export const transcribeAudioWithFallback = async (
       provider: result.provider,
       fallback: Boolean(result.fallback)
     };
+  } catch (err: any) {
+    console.warn('[transcribeAudioWithFallback] Server transcription endpoint unreachable. Attempting direct client-side audio transcription:', err);
+    const apiKey = getAIConfig().geminiKey;
+    if (apiKey && base64Audio) {
+      try {
+        onProgress?.({ provider: 'gemini', message: 'Transcribing audio via direct Gemini AI fallback…', fallback: true });
+        const directTranscript = await transcribeAudio(base64Audio, mimeType, apiKey, onBusy);
+        if (directTranscript && directTranscript.trim().length > 0) {
+          return {
+            transcript: directTranscript.trim(),
+            provider: 'gemini',
+            fallback: true
+          };
+        }
+      } catch (directErr) {
+        console.error('[transcribeAudioWithFallback] Direct client-side audio transcription failed:', directErr);
+      }
+    }
+    throw err;
   } finally {
     if (onBusy) onBusy(false);
   }

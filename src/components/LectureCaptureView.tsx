@@ -1258,8 +1258,14 @@ export default function LectureCaptureView({
           </div>
           <script>
             window.onload = function() {
-              window.print();
-              setTimeout(function() { window.close(); }, 500);
+              if (window.AndroidPrint && typeof window.AndroidPrint.printDocument === 'function') {
+                window.AndroidPrint.printDocument('${title ? title.replace(/'/g, "\\'") : 'NoteIT_Document'}');
+              } else if (window.opener && window.opener.AndroidPrint && typeof window.opener.AndroidPrint.printDocument === 'function') {
+                window.opener.AndroidPrint.printDocument('${title ? title.replace(/'/g, "\\'") : 'NoteIT_Document'}');
+              } else {
+                window.print();
+              }
+              setTimeout(function() { window.close(); }, 800);
             };
           </script>
         </body>
