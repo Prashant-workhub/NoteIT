@@ -42,12 +42,17 @@ export const getUploadSasUrl = async (fileName: string): Promise<StorageResponse
         }).catch(() => null);
 
         if (response && response.ok) {
-          const responseBody = await response.json();
-          return {
-            ...responseBody,
-            uploadUrl: sanitizeStorageUrl(responseBody.uploadUrl),
-            audioUrl: sanitizeStorageUrl(responseBody.audioUrl)
-          };
+          const contentType = response.headers.get('content-type') || '';
+          if (contentType.includes('text/html')) {
+            console.error('[Storage] SAS request returned HTML instead of JSON. Check that VITE_API_URL points to the Render backend service URL.');
+          } else {
+            const responseBody = await response.json();
+            return {
+              ...responseBody,
+              uploadUrl: sanitizeStorageUrl(responseBody.uploadUrl),
+              audioUrl: sanitizeStorageUrl(responseBody.audioUrl)
+            };
+          }
         }
       }
     }
@@ -69,8 +74,8 @@ export const getAzureUploadSasUrl = getUploadSasUrl;
 
 /**
  * Upload binary blob using optimal strategy:
- * - Firebase Storage for small & secure files (< 5MB)
- * - Local backend disk storage for large files (audio recordings)
+ * - Firebase Storage for sensitive files
+ * - Azure Blob Storage / Server Disk for audio recordings & documents
  */
 export const uploadBlobStorage = async (
   uploadUrl: string,
@@ -137,9 +142,10 @@ export const uploadBlobStorage = async (
 
   const isAzureSasUrl = sanitizedUrl.includes('.blob.core.windows.net') || sanitizedUrl.includes('sig=');
 
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('PUT', sanitizedUrl, true);
+    xhr.timeout = 120000; // 2-minute timeout for large audio/document uploads
     xhr.setRequestHeader('Content-Type', blob.type || 'application/octet-stream');
 
     if (isAzureSasUrl) {
@@ -158,20 +164,38 @@ export const uploadBlobStorage = async (
     };
 
     xhr.onload = () => {
+      const contentType = xhr.getResponseHeader('content-type') || '';
+      const responseText = xhr.responseText || '';
+      const isHtmlResponse = contentType.includes('text/html') || responseText.trim().startsWith('<!DOCTYPE html');
+
+      if (isHtmlResponse) {
+        const err = new Error('API deployment error: Storage upload endpoint returned HTML instead of API response. Please configure VITE_API_URL in your Vercel deployment settings to point to your Render backend API URL.');
+        console.error('[Storage]', err.message);
+        reject(err);
+        return;
+      }
+
       if (xhr.status >= 200 && xhr.status < 300) {
         onProgress(100);
         resolve({});
       } else {
-        console.warn(`[Storage] Upload completed with HTTP status ${xhr.status}. Continuing process...`);
-        onProgress(100);
-        resolve({});
+        const statusText = xhr.statusText ? ` (${xhr.statusText})` : '';
+        const err = new Error(`Storage upload failed with HTTP status ${xhr.status}${statusText}. Check server logs or file size limits.`);
+        console.error('[Storage]', err.message);
+        reject(err);
       }
     };
 
     xhr.onerror = () => {
-      console.warn('[Storage] Network error during storage upload. Proceeding with inline fallback...');
-      onProgress(100);
-      resolve({});
+      const err = new Error('Network error occurred during storage upload. Please check your internet connection or backend server status.');
+      console.error('[Storage]', err.message);
+      reject(err);
+    };
+
+    xhr.ontimeout = () => {
+      const err = new Error('Storage upload request timed out after 120 seconds. Please try a smaller audio file or retry.');
+      console.error('[Storage]', err.message);
+      reject(err);
     };
 
     xhr.send(blob);

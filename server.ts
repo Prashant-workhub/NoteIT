@@ -1029,10 +1029,26 @@ app.post(['/api/lectures/:lectureId/generate-resources', '/api/lectures/generate
       updatedAt: new Date()
     };
 
-    if (needsSummary && generated.summary) updatedFields.summary = generated.summary;
-    if (needsNotes && generated.notes) updatedFields.notes = generated.notes;
+    if (needsSummary && generated.summary) {
+      updatedFields.summary = generated.summary;
+      updatedFields.summaries = {
+        ...(lectureData?.summaries || {}),
+        quick_revision: generated.summary,
+        academic_format: generated.summary,
+        detailed_notes: generated.summary
+      };
+    }
+    if (needsNotes && generated.notes) {
+      updatedFields.notes = generated.notes;
+      if (Array.isArray(generated.notes)) {
+        updatedFields.sections = generated.notes;
+      }
+    }
     if (needsFlashcards && generated.flashcards) updatedFields.flashcards = generated.flashcards;
-    if (needsQuiz && generated.quiz) updatedFields.quiz = generated.quiz;
+    if (needsQuiz && generated.quiz) {
+      updatedFields.quiz = generated.quiz;
+      updatedFields.quizzes = generated.quiz;
+    }
     if (needsKeyConcepts && generated.keyConcepts) updatedFields.keyConcepts = generated.keyConcepts;
     if (needsWeakTopics && generated.weakTopics) updatedFields.weakTopics = generated.weakTopics;
     if (needsTimeline && generated.timeline) updatedFields.timeline = generated.timeline;
@@ -1285,20 +1301,30 @@ app.get('/api/storage/sas', authenticateFirebaseUser, async (req, res) => {
   }
 });
 
-// Endpoint to receive binary uploads for local disk fallback
-app.put('/api/storage/local-upload', express.raw({ type: '*/*', limit: '100mb' }), async (req, res) => {
-  const fileName = req.query.fileName as string;
-  if (!fileName) {
-    res.status(400).json({ error: 'Missing fileName query parameter' });
+// Endpoint to receive binary uploads for local disk fallback (protected, 150MB limit)
+app.put('/api/storage/local-upload', authenticateFirebaseUser, express.raw({ type: '*/*', limit: '150mb' }), async (req, res) => {
+  const rawFileName = req.query.fileName as string;
+  if (!rawFileName) {
+    res.status(400).json({ error: 'Missing required query parameter: fileName' });
     return;
   }
 
   try {
-    const safeName = sanitizeUploadFileName(fileName);
-    const targetPath = path.join(uploadsDir, safeName);
-    await fs.promises.writeFile(targetPath, req.body);
-    console.log(`[Local Upload] Saved upload payload to: ${targetPath}`);
-    res.json({ success: true, path: targetPath });
+    const fileName = sanitizeUploadFileName(rawFileName);
+    const resolvedFilePath = path.resolve(uploadsDir, fileName);
+    if (path.resolve(uploadsDir) !== path.dirname(resolvedFilePath)) {
+      res.status(400).json({ error: 'Invalid file name.' });
+      return;
+    }
+
+    if (!req.body || !Buffer.isBuffer(req.body)) {
+      res.status(400).json({ error: 'Invalid or missing file binary payload.' });
+      return;
+    }
+
+    await fs.promises.writeFile(resolvedFilePath, req.body);
+    console.log(`[Local Upload] Saved upload payload to: ${resolvedFilePath} (${req.body.length} bytes)`);
+    res.json({ success: true, path: resolvedFilePath });
   } catch (err: any) {
     console.error('[Local Upload] Failed to write file to disk:', err);
     res.status(500).json({ error: 'Failed to write upload payload to disk.' });
@@ -1990,40 +2016,7 @@ app.get('/api/debug/logs', authenticateFirebaseUser, requireAdminSecret, (req, r
   res.json({ logs: logBuffer });
 });
 
-// Endpoint to save upload locally (mimics Azure Storage PUT block blob).
-// Requires a valid Firebase ID token and sanitizes the file name so uploads
-// can never escape the uploads directory (arbitrary-file-write protection).
-app.put('/api/storage/local-upload', authenticateFirebaseUser, express.raw({ type: '*/*', limit: '150mb' }), async (req, res) => {
-  const rawFileName = req.query.fileName as string;
-  if (!rawFileName) {
-    res.status(400).json({ error: 'Missing required query parameter: fileName' });
-    return;
-  }
 
-  try {
-    // Strip any directory components and unsafe characters from the name.
-    const fileName = sanitizeUploadFileName(rawFileName);
-    const resolvedFilePath = path.resolve(uploadsDir, fileName);
-    if (path.resolve(uploadsDir) !== path.dirname(resolvedFilePath)) {
-      res.status(400).json({ error: 'Invalid file name.' });
-      return;
-    }
-
-    if (!req.body || !Buffer.isBuffer(req.body)) {
-      res.status(400).json({ error: 'Invalid or missing file binary payload.' });
-      return;
-    }
-
-    await fs.promises.writeFile(resolvedFilePath, req.body);
-    console.log(`Local file saved successfully at: ${resolvedFilePath}`);
-
-    // Azure Block Blob upload returns 201 Created on success
-    res.status(201).send();
-  } catch (error: any) {
-    console.error('Error saving local upload:', error);
-    res.status(500).json({ error: error.message || 'Failed to save upload locally.' });
-  }
-});
 
 // ==================================================
 // FCM WEB PUSH NOTIFICATION BACKEND ENDPOINTS & SCHEDULER

@@ -20,28 +20,43 @@ export async function fetchGeminiApi(apiKey: string, requestedModel: string, bod
     const maxAttempts = 3;
     while (attempts < maxAttempts) {
       attempts++;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: typeof bodyObj === 'string' ? bodyObj : JSON.stringify(bodyObj)
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 90000); // 90 second timeout per request
 
-      if (response.ok) {
-        return response;
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: typeof bodyObj === 'string' ? bodyObj : JSON.stringify(bodyObj),
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          return response;
+        }
+
+        const status = response.status;
+        if ((status === 429 || status === 503) && attempts < maxAttempts) {
+          const backoffMs = attempts * 1500;
+          console.warn(`[Gemini API] Status ${status} encountered. Retrying attempt ${attempts + 1}/${maxAttempts} in ${backoffMs}ms...`);
+          await new Promise(resolve => setTimeout(resolve, backoffMs));
+          continue;
+        }
+
+        const errText = await response.text().catch(() => '');
+        const errObj: any = new Error(`Gemini API error: ${status} - ${errText}`);
+        errObj.status = status;
+        throw errObj;
+      } catch (fetchErr: any) {
+        clearTimeout(timeoutId);
+        if (fetchErr.name === 'AbortError') {
+          const errObj: any = new Error('Gemini API call timed out after 90 seconds. Please try again.');
+          errObj.status = 504;
+          throw errObj;
+        }
+        throw fetchErr;
       }
-
-      const status = response.status;
-      if ((status === 429 || status === 503) && attempts < maxAttempts) {
-        const backoffMs = attempts * 1500;
-        console.warn(`[Gemini API] Status ${status} encountered. Retrying attempt ${attempts + 1}/${maxAttempts} in ${backoffMs}ms...`);
-        await new Promise(resolve => setTimeout(resolve, backoffMs));
-        continue;
-      }
-
-      const errText = await response.text().catch(() => '');
-      const errObj: any = new Error(`Gemini API error: ${status} - ${errText}`);
-      errObj.status = status;
-      throw errObj;
     }
     throw new Error(`Gemini API error: Max retries reached for ${model}`);
   };

@@ -1620,8 +1620,8 @@ export default function LectureCaptureView({
     const resStatus = (activeLec as any).resourceGenerationStatus;
     if (resStatus === 'processing' || resStatus === 'failed') return;
 
-    const hasNotes = activeLec.notes?.academic || activeLec.notes?.quick || activeLec.notes?.detailed;
-    const hasSummary = activeLec.summaries?.quick_revision || activeLec.summaries?.academic_format;
+    const hasNotes = activeLec.notes?.academic || activeLec.notes?.quick || activeLec.notes?.detailed || (Array.isArray(activeLec.notes) && activeLec.notes.length > 0) || (Array.isArray(activeLec.sections) && activeLec.sections.length > 0);
+    const hasSummary = Boolean(activeLec.summary) || activeLec.summaries?.quick_revision || activeLec.summaries?.academic_format;
     const transcriptText = activeLec.cleanTranscript || activeLec.transcript;
 
     if (!hasNotes && !hasSummary && transcriptText && transcriptText.trim().length > 20) {
@@ -1634,16 +1634,14 @@ export default function LectureCaptureView({
           console.log('[LectureCaptureView] Notes & assets auto-compiled successfully!');
         })
         .catch((err) => {
-          console.error('[LectureCaptureView] Auto note compilation failed:', err);
-          const friendlyMsg = formatUserFriendlyErrorMessage(err, "Auto note compilation failed");
-          setUiError(friendlyMsg);
+          console.error('[LectureCaptureView] Notes auto-compilation error:', err);
         })
         .finally(() => {
           setIsGeneratingNotes(false);
           setIsGeneratingSummary(false);
         });
     }
-  }, [activeLectureId, lectures]);
+  }, [activeLectureId, lectures, isGeneratingNotes, isGeneratingSummary]);
 
   // ----------------------------------------------------
   // MAIN ROUTING
@@ -1666,8 +1664,8 @@ export default function LectureCaptureView({
     }
 
     const filteredNotes = notes.filter((n: any) => n.lectureId === activeLectureId);
-    const hasExistingNotes = activeLecture.notes?.academic || activeLecture.notes?.quick || activeLecture.notes?.detailed;
-    const hasExistingSummary = activeLecture.summaries?.quick_revision || activeLecture.summaries?.academic_format;
+    const hasExistingNotes = activeLecture.notes?.academic || activeLecture.notes?.quick || activeLecture.notes?.detailed || (Array.isArray(activeLecture.notes) && activeLecture.notes.length > 0) || (Array.isArray(activeLecture.sections) && activeLecture.sections.length > 0);
+    const hasExistingSummary = Boolean(activeLecture.summary) || activeLecture.summaries?.quick_revision || activeLecture.summaries?.academic_format;
 
     return (
       <React.Fragment>
