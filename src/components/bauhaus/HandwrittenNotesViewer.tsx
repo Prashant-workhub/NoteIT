@@ -4,7 +4,7 @@
  */
 
 import React, { useRef } from 'react';
-import { Download, Printer, ArrowRight, Sparkles, BookOpen, CheckCircle, FileText, PenTool } from 'lucide-react';
+import { Download, ArrowRight, Sparkles, BookOpen, CheckCircle, FileText, PenTool } from 'lucide-react';
 
 interface HandwrittenNotesViewerProps {
   lectureData: any;
@@ -597,10 +597,6 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
     window.print();
   };
 
-  const handleDownloadPdf = () => {
-    window.print();
-  };
-
   return (
     <div className="handwritten-workspace space-y-6 select-text">
       {/* TOOLBAR CONTROLS */}
@@ -616,18 +612,11 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
 
         <div className="flex items-center gap-2">
           <button
-            onClick={handleDownloadPdf}
+            onClick={handlePrint}
             className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#FFC400] text-[#111111] text-xs font-mono font-bold uppercase rounded-[4px] border border-[#111111] shadow-paper-sm hover:bg-[#ffe066] cursor-pointer transition-all"
           >
             <Download className="h-3.5 w-3.5" />
-            <span>Download A4 PDF</span>
-          </button>
-          <button
-            onClick={handlePrint}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white text-[#111111] text-xs font-mono font-bold uppercase rounded-[4px] border border-[#111111] shadow-paper-sm hover:bg-gray-100 cursor-pointer transition-all"
-          >
-            <Printer className="h-3.5 w-3.5" />
-            <span>Print A4</span>
+            <span>DOWNLOAD / PRINT A4 PDF</span>
           </button>
         </div>
       </div>
