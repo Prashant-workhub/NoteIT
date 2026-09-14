@@ -4,7 +4,7 @@
  */
 
 import React, { useRef } from 'react';
-import { Download, Printer, ArrowRight, Sparkles, BookOpen, CheckCircle, FileText } from 'lucide-react';
+import { Download, Printer, ArrowRight, Sparkles, BookOpen, CheckCircle, FileText, PenTool } from 'lucide-react';
 
 interface HandwrittenNotesViewerProps {
   lectureData: any;
@@ -59,7 +59,7 @@ interface HandwrittenItem {
   type: 'text' | 'concept' | 'diagram' | 'formula' | 'terms' | 'bullets' | 'table' | 'remember' | 'examFocus' | 'definition' | 'example';
   content: any;
   table?: Array<{ col1: string; col2: string }>;
-  weight: number; // Height budget weight units
+  weight: number; // Height budget weight units for A4 bin-packing
 }
 
 interface HandwrittenSectionData {
@@ -95,32 +95,33 @@ function parseMarkdownToHandwrittenSections(rawMarkdown: string) {
 
       // Separate definitions, examples, formulas, and general text
       const textLines: string[] = [];
-      let currentExampleText = '';
-      let currentDefText = '';
 
       linesArr.forEach((line) => {
-        if (/^(definition|defined as|principle):/i.test(line)) {
-          definitions.push(line.replace(/^(definition|defined as|principle):\s*/i, ''));
+        if (/^(definition|defined as|principle|concept):/i.test(line) || /^definition\s*\d*:/i.test(line)) {
+          const cleaned = line.replace(/^(definition|defined as|principle|concept)\s*\d*:\s*/i, '');
+          definitions.push(cleaned);
           items.push({
             type: 'definition',
             title: 'CORE DEFINITION & PRINCIPLE',
-            content: line.replace(/^(definition|defined as|principle):\s*/i, ''),
+            content: cleaned,
             weight: 3.5
           });
-        } else if (/^(example|e\.g\.|worked example|sample problem):/i.test(line)) {
-          examples.push(line.replace(/^(example|e\.g\.|worked example|sample problem):\s*/i, ''));
+        } else if (/^(example|e\.g\.|worked example|sample problem|practical application):/i.test(line)) {
+          const cleaned = line.replace(/^(example|e\.g\.|worked example|sample problem|practical application):\s*/i, '');
+          examples.push(cleaned);
           items.push({
             type: 'example',
             title: 'WORKED EXAMPLE & APPLICATION',
-            content: line.replace(/^(example|e\.g\.|worked example|sample problem):\s*/i, ''),
+            content: cleaned,
             weight: 3.5
           });
         } else if (/^(formula|equation|math|expression):/i.test(line) || /^[A-Z][a-z0-9_\s]*\s*=\s*[\w\d\s\+\-\*\/\(\)\^\.]+/i.test(line)) {
-          formulas.push(line.replace(/^(formula|equation|math|expression):\s*/i, ''));
+          const cleaned = line.replace(/^(formula|equation|math|expression):\s*/i, '');
+          formulas.push(cleaned);
           items.push({
             type: 'formula',
             title: 'EQUATION & FORMULA BOX',
-            content: [line.replace(/^(formula|equation|math|expression):\s*/i, '')],
+            content: [cleaned],
             weight: 2.5
           });
         } else {
@@ -129,7 +130,6 @@ function parseMarkdownToHandwrittenSections(rawMarkdown: string) {
       });
 
       if (textLines.length > 0 || currentTable.length > 0) {
-        // Estimate line units: 1 unit per line plus table height
         const lineUnits = Math.ceil(textLines.length * 0.9);
         const tableUnits = currentTable.length > 0 ? (2.5 + currentTable.length * 0.8) : 0;
         
@@ -163,8 +163,8 @@ function parseMarkdownToHandwrittenSections(rawMarkdown: string) {
       continue;
     }
 
-    if (line.startsWith('## ')) {
-      const h2Text = line.replace(/^##\s+/, '').trim();
+    if (line.startsWith('## ') || line.startsWith('### ')) {
+      const h2Text = line.replace(/^#{2,3}\s+/, '').trim();
 
       if (/brief overview|overview|introduction/i.test(h2Text)) {
         flushSection();
@@ -210,8 +210,8 @@ function parseMarkdownToHandwrittenSections(rawMarkdown: string) {
         let j = i + 1;
         while (j < lines.length && !lines[j].trim().startsWith('#')) {
           const kpLine = lines[j].trim();
-          if (kpLine.startsWith('- ') || kpLine.startsWith('* ')) {
-            keyPoints.push(cleanMarkdownText(kpLine.replace(/^[-*]\s+/, '')));
+          if (kpLine.startsWith('- ') || kpLine.startsWith('* ') || /^\d+\.\s+/.test(kpLine)) {
+            keyPoints.push(cleanMarkdownText(kpLine.replace(/^([-*]|\d+\.)\s+/, '')));
           }
           j++;
         }
@@ -332,7 +332,7 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
       }
     ];
 
-    // Target height units budget per A4 page (at 28px ruled line height, ~26 units max)
+    // Target height units budget per A4 page (at 28px ruled line height, ~25 units max)
     const MAX_PAGE_UNITS = 25;
 
     // Collect all discrete items to be rendered across pages
@@ -442,7 +442,6 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
         : MAX_PAGE_UNITS;
 
       if (currentUnits + item.weight > effectiveMaxUnits && currentPageItems.length > 0) {
-        // Check if we can fit a supplementary item into remaining page space before committing page
         if (supplementaryItems.length > 0) {
           const spaceRemaining = effectiveMaxUnits - currentUnits;
           const fitIndex = supplementaryItems.findIndex(supp => supp.weight <= spaceRemaining);
@@ -459,7 +458,6 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
       currentUnits += item.weight;
     });
 
-    // Append any leftover supplementary revision callout boxes into the last page or create final page if needed
     supplementaryItems.forEach(suppItem => {
       const effectiveMaxUnits = (pagesResult.length === 0 && currentPageItems.length === 0)
         ? (MAX_PAGE_UNITS - 4)
@@ -490,13 +488,13 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
           </div>
           <div className="space-y-2">
             <span className="px-3 py-1 rounded-[4px] bg-[#1E3A8A] text-white text-[10px] font-mono font-bold uppercase tracking-wider border border-[#111111] shadow-paper-sm">
-              COMPILING REVISION SHEET
+              COMPILING A4 REVISION SHEET
             </span>
             <h3 className="text-lg font-heading font-bold text-[#111111] uppercase tracking-tight">
-              AI IS COMPILING HANDWRITTEN REVISION NOTES...
+              AI IS COMPILING HANDWRITTEN A4 REVISION NOTES...
             </h3>
             <p className="text-xs font-mono font-bold text-[#475569] max-w-md mx-auto leading-relaxed">
-              Synthesizing A4 handwritten study sheets, concept boxes, formulas & terminology. 
+              Synthesizing A4 handwritten study sheets, red-line notebook canvas, formulas & terminology. 
               Preview will automatically display when note compilation is 100% complete.
             </p>
           </div>
@@ -542,10 +540,10 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-[6px] border-2 border-[#111111] bg-[#F6F2EA] shadow-paper-sm print:hidden">
         <div className="flex items-center gap-2">
           <span className="px-2.5 py-1 rounded-[4px] bg-[#1E3A8A] text-white text-[10px] font-mono font-bold uppercase tracking-wider border border-[#111111] shadow-paper-sm">
-            📝 A4 HANDWRITTEN REVISION SHEET
+            📝 A4 HANDWRITTEN REVISION CANVAS
           </span>
           <span className="text-xs font-mono font-bold text-[#666666]">
-            ({pages.length} {pages.length === 1 ? 'Page' : 'Pages'} • 210mm × 297mm A4 Canvas)
+            ({pages.length} {pages.length === 1 ? 'Page' : 'Pages'} • 210mm × 297mm Standard A4 Notebook)
           </span>
         </div>
 
@@ -555,14 +553,14 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
             className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#FFC400] text-[#111111] text-xs font-mono font-bold uppercase rounded-[4px] border border-[#111111] shadow-paper-sm hover:bg-[#ffe066] cursor-pointer transition-all"
           >
             <Download className="h-3.5 w-3.5" />
-            <span>Download PDF</span>
+            <span>Download A4 PDF</span>
           </button>
           <button
             onClick={handlePrint}
             className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white text-[#111111] text-xs font-mono font-bold uppercase rounded-[4px] border border-[#111111] shadow-paper-sm hover:bg-gray-100 cursor-pointer transition-all"
           >
             <Printer className="h-3.5 w-3.5" />
-            <span>Print</span>
+            <span>Print A4</span>
           </button>
         </div>
       </div>
@@ -636,7 +634,7 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
         {pages.map((pg) => (
           <div
             key={pg.pageNumber}
-            className="a4-page relative w-[210mm] min-h-[297mm] !bg-white !text-slate-900 p-[16mm] rounded-[2px] border-[5px] border-[#2563EB] shadow-2xl font-handwritten select-text flex flex-col justify-between"
+            className="a4-page relative w-[210mm] min-h-[297mm] !bg-white !text-slate-900 pt-[16mm] pb-[16mm] pr-[16mm] pl-[26mm] rounded-[3px] border-2 border-slate-300 shadow-2xl font-handwritten select-text flex flex-col justify-between overflow-hidden"
             style={{
               fontFamily: "'Kalam', 'Caveat', 'Patrick Hand', 'Segoe Print', 'Comic Sans MS', cursive",
               backgroundColor: '#FFFFFF',
@@ -646,26 +644,38 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
               color: '#0F294A'
             }}
           >
+            {/* ICONIC RED NOTEBOOK MARGIN LINE */}
+            <div className="absolute top-0 bottom-0 left-[20mm] w-[1.5px] bg-red-400 opacity-85 z-10 pointer-events-none" />
+
+            {/* RING BINDER HOLE PUNCH MARKS */}
+            <div className="absolute top-[35mm] left-[8mm] w-3.5 h-3.5 rounded-full bg-slate-200 border border-slate-300 shadow-inner z-10 pointer-events-none" />
+            <div className="absolute top-[148mm] left-[8mm] w-3.5 h-3.5 rounded-full bg-slate-200 border border-slate-300 shadow-inner z-10 pointer-events-none" />
+            <div className="absolute top-[260mm] left-[8mm] w-3.5 h-3.5 rounded-full bg-slate-200 border border-slate-300 shadow-inner z-10 pointer-events-none" />
+
             <div>
-              {/* HEADER METADATA */}
-              <div className="flex justify-between items-center pb-2 border-b-2 border-[#2563EB] mb-6 text-sm font-bold tracking-wide">
-                <div>
+              {/* TOP NOTEBOOK HEADER BOX */}
+              <div className="flex justify-between items-center pb-2 border-b-2 border-[#2563EB] mb-5 text-sm font-bold tracking-wide">
+                <div className="flex items-center gap-2">
+                  <PenTool className="h-4 w-4 text-[#2563EB]" />
                   <span className="text-[#0F294A] uppercase tracking-wider text-xs font-mono font-bold">{pg.header}</span>
                 </div>
-                <div className="text-xs font-mono font-bold text-[#475569]">
-                  PAGE {String(pg.pageNumber).padStart(2, '0')} OF {String(pages.length).padStart(2, '0')}
+                <div className="flex items-center gap-3 text-xs font-mono font-bold text-[#475569]">
+                  <span>DATE: {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                  <span className="px-2 py-0.5 rounded bg-[#2563EB] text-white text-[10px]">
+                    PAGE {String(pg.pageNumber).padStart(2, '0')} / {String(pages.length).padStart(2, '0')}
+                  </span>
                 </div>
               </div>
 
-              {/* DOCUMENT TITLE (ON PAGE 1) */}
+              {/* DOCUMENT TITLE BANNER (PAGE 1) */}
               {pg.pageNumber === 1 && (
-                <div className="mb-6">
-                  <h1 className="text-3xl sm:text-4xl font-bold uppercase tracking-tight text-[#0F294A] leading-none mb-2 decoration-wavy underline underline-offset-8">
+                <div className="mb-6 pb-3 border-b-2 border-slate-300">
+                  <h1 className="text-3xl sm:text-4xl font-bold uppercase tracking-tight text-[#0F294A] leading-tight mb-2 decoration-wavy underline underline-offset-8">
                     {title}
                   </h1>
                   <div className="text-xs font-mono font-bold text-[#334155] mt-2 italic flex items-center gap-2">
                     <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#2563EB]" />
-                    <span>University Revision Sheet • Hand-annotated Study Notes</span>
+                    <span>Academic Lecture Notes • A4 Student Notebook Sheet</span>
                   </div>
                 </div>
               )}
@@ -674,7 +684,7 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
               <div className="space-y-6 text-base leading-relaxed text-[#0F294A]">
                 {pg.items.map((item, idx) => (
                   <div key={idx} className="space-y-2">
-                    {/* SECTION TITLE WITH HIGHLIGHTER BADGE */}
+                    {/* SECTION TITLE HIGHLIGHTER BADGE */}
                     {item.title && (
                       <div className="flex items-center gap-2">
                         <span className="px-2.5 py-0.5 rounded bg-[#FFD54F] text-[#0F294A] text-lg font-bold shadow-sm border border-amber-400 inline-block">
@@ -691,8 +701,13 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
                             <p key={pIdx} className="leading-[28px]">
                               {pLine.startsWith('- ') || pLine.startsWith('* ') ? (
                                 <span className="flex items-start gap-2">
-                                  <span className="text-amber-500 font-bold">•</span>
+                                  <span className="text-amber-600 font-bold">•</span>
                                   <span>{pLine.replace(/^[-*]\s+/, '')}</span>
+                                </span>
+                              ) : /^\d+\.\s+/.test(pLine) ? (
+                                <span className="flex items-start gap-2">
+                                  <span className="text-[#2563EB] font-bold">{pLine.match(/^\d+\./)?.[0]}</span>
+                                  <span>{pLine.replace(/^\d+\.\s+/, '')}</span>
                                 </span>
                               ) : (
                                 pLine
@@ -710,8 +725,8 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
                             <table className="w-full text-left border-collapse text-base font-bold">
                               <thead>
                                 <tr className="border-b-2 border-[#2563EB] bg-[#E2E8F0] text-[#0F294A]">
-                                  <th className="p-2 border-r border-[#CBD5E1] font-bold">{item.table[0]?.col1 || 'Field'}</th>
-                                  <th className="p-2 font-bold">{item.table[0]?.col2 || 'Value'}</th>
+                                  <th className="p-2 border-r border-[#CBD5E1] font-bold">{item.table[0]?.col1 || 'Concept / Parameter'}</th>
+                                  <th className="p-2 font-bold">{item.table[0]?.col2 || 'Description / Value'}</th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -812,7 +827,7 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
                       <ul className="space-y-1.5 pl-2 text-lg">
                         {Array.isArray(item.content) && item.content.map((bullet: string, bIdx: number) => (
                           <li key={bIdx} className="flex items-start gap-2">
-                            <span className="text-amber-500 font-bold">•</span>
+                            <span className="text-amber-600 font-bold">•</span>
                             <span className="font-bold text-[#0F294A] leading-[28px]">{bullet}</span>
                           </li>
                         ))}
@@ -825,8 +840,8 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
 
             {/* PAGE FOOTER */}
             <div className="mt-8 pt-3 border-t border-slate-300 flex justify-between items-center text-xs font-mono font-bold text-slate-600">
-              <span>NOTEIT — HANDWRITTEN REVISION ENGINE</span>
-              <span>A4 PORTRAIT (210mm × 297mm) • PAGE {pg.pageNumber} OF {pages.length}</span>
+              <span>NOTEIT — HANDWRITTEN A4 REVISION ENGINE</span>
+              <span>STANDARD A4 PORTRAIT (210mm × 297mm) • PAGE {pg.pageNumber} OF {pages.length}</span>
             </div>
           </div>
         ))}
