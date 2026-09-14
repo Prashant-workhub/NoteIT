@@ -40,8 +40,8 @@ export const DEFAULT_NOTIFICATIONS: NotificationPrefs = {
 /** Prefill used by setup preview. */
 export const DEMO_SETUP: FacultySetupInput = {
   title: 'Prof.',
-  firstName: 'Kishan',
-  surname: 'Verma',
+  firstName: 'Alex',
+  surname: 'Morgan',
   phone: '+91 98765 43210',
   university: 'Indira Institute of Technology',
   department: 'Computer Science & Engineering',
@@ -231,8 +231,8 @@ export const TAKEAWAYS: CognitiveTakeaway[] = [
 
 /* ----------------------------- announcements (2 demo announcements) ---------------------------- */
 export const ANNOUNCEMENTS: Announcement[] = [
-  { id: 'an1', title: 'DSA mid-term moved to Sep 12', body: 'The Data Structures mid-term is now on Friday, Sep 12, 10:00 AM, Hall B. Syllabus up to Unit 4 (Heaps).', audience: ['CS301'], postedAt: daysAgo(1), author: 'Prof. Kishan Verma', pinned: true, reach: 82 },
-  { id: 'an2', title: 'DBMS assignment 3 posted', body: 'Normalization + indexing set is live on the portal. Due next Monday, submit as a single PDF.', audience: ['CS210'], postedAt: daysAgo(4), author: 'Prof. Kishan Verma', pinned: false, reach: 74 },
+  { id: 'an1', title: 'DSA mid-term moved to Sep 12', body: 'The Data Structures mid-term is now on Friday, Sep 12, 10:00 AM, Hall B. Syllabus up to Unit 4 (Heaps).', audience: ['CS301'], postedAt: daysAgo(1), author: 'Prof. Alex Morgan', pinned: true, reach: 82 },
+  { id: 'an2', title: 'DBMS assignment 3 posted', body: 'Normalization + indexing set is live on the portal. Due next Monday, submit as a single PDF.', audience: ['CS210'], postedAt: daysAgo(4), author: 'Prof. Alex Morgan', pinned: false, reach: 74 },
 ]
 
 /* ------------------------------- activity (3 demo activity events) ------------------------------- */

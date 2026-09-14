@@ -4,17 +4,17 @@
  */
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { 
-  Grid, 
-  List, 
-  Search, 
-  Filter, 
-  Volume2, 
-  FileText, 
+import {
+  Grid,
+  List,
+  Search,
+  Filter,
+  Volume2,
+  FileText,
   Edit,
-  Trash2, 
-  Sparkles, 
-  Clock, 
+  Trash2,
+  Sparkles,
+  Clock,
   ArrowUpRight,
   ExternalLink,
   CheckCircle,
@@ -87,7 +87,7 @@ export default function LibraryView({
   onUpdateLecture,
   setActiveLectureId
 }: LibraryViewProps) {
-  
+
   // High-level navigation state: SUBJECT MAP vs ACADEMIC SAVED
   const [libraryTab, setLibraryTab] = useState<'map' | 'saved'>('map');
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
@@ -176,7 +176,7 @@ export default function LibraryView({
   // Academic Saved Tab States
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [activeSubjectFilter, setActiveSubjectFilter] = useState<string>('All');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showSyncModal, setShowSyncModal] = useState(false);
@@ -185,9 +185,9 @@ export default function LibraryView({
   const [newType, setNewType] = useState<'recording' | 'pdf' | 'ppt' | 'text'>('pdf');
 
   // Folder Organization
-  const { 
-    folders, 
-    addFolder, 
+  const {
+    folders,
+    addFolder,
     deleteFolder
   } = useFolders(auth.currentUser?.uid);
 
@@ -214,12 +214,12 @@ export default function LibraryView({
   // Active Subject Lectures List (Sorted by lectureNumber)
   const currentSubjectLectures = useMemo(() => {
     if (!currentSubject) return [];
-    
+
     const matched = lectures.filter(l => {
       if (l.subjectId) return l.subjectId === currentSubject.id;
       if (l.subject) {
         return l.subject.toLowerCase() === currentSubject.name.toLowerCase() ||
-               (currentSubject.code && l.subject.toLowerCase().includes(currentSubject.code.toLowerCase()));
+          (currentSubject.code && l.subject.toLowerCase().includes(currentSubject.code.toLowerCase()));
       }
       return false;
     });
@@ -376,7 +376,7 @@ export default function LibraryView({
     if (setActiveLectureId) {
       setActiveLectureId(newLectureObj.id);
     }
-    
+
     setNewLectureTitle('');
     setShowCreateLectureModal(false);
     setActivePage('lecture-capture');
@@ -416,10 +416,10 @@ export default function LibraryView({
   // Filtered lectures for ACADEMIC SAVED tab
   const filteredSavedLectures = useMemo(() => {
     return lectures.filter((lecture) => {
-      const matchesSearch = 
+      const matchesSearch =
         lecture.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         lecture.subject.toLowerCase().includes(searchQuery.toLowerCase());
-      
+
       const matchesSubject = activeSubjectFilter === 'All' || lecture.subject.toLowerCase() === activeSubjectFilter.toLowerCase();
       const matchesFolder = activeFolderId ? lecture.folderId === activeFolderId : true;
 
@@ -455,14 +455,14 @@ export default function LibraryView({
 
       {/* TOP BAUHAUS HEADER BAR */}
       <header className="bg-white dark:bg-[#161B22] border-b-4 border-black px-8 py-4 flex flex-col lg:flex-row justify-between items-center gap-4 relative z-30">
-        
+
         {/* Left: Breadcrumbs & Subject Selector Dropdown */}
         <div className="flex items-center gap-4 font-bold uppercase tracking-wide">
           <span className="text-black dark:text-white text-sm font-black">Library</span>
           <ChevronRight className="w-5 h-5 text-black dark:text-white stroke-[3]" />
-          
+
           <div className="relative z-50" ref={dropdownRef}>
-            <button 
+            <button
               onClick={() => setShowSubjectDropdown(!showSubjectDropdown)}
               onContextMenu={(e) => {
                 e.preventDefault();
@@ -507,11 +507,10 @@ export default function LibraryView({
                       setSelectedSubjectId(sub.id);
                       setShowSubjectDropdown(false);
                     }}
-                    className={`w-full text-left px-3 py-2 text-xs font-black uppercase flex items-center justify-between border-2 transition-all cursor-pointer group ${
-                      selectedSubjectId === sub.id
+                    className={`w-full text-left px-3 py-2 text-xs font-black uppercase flex items-center justify-between border-2 transition-all cursor-pointer group ${selectedSubjectId === sub.id
                         ? 'bg-[#FFC107] text-black border-black shadow-[2px_2px_0px_#000]'
                         : 'border-transparent text-black dark:text-white hover:border-black hover:bg-[#F4F1EA] dark:hover:bg-[#21262D]'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center gap-1.5 truncate pr-2">
                       <span className="truncate">{sub.name}</span>
@@ -559,21 +558,19 @@ export default function LibraryView({
           <div className="flex items-center gap-1 border-2 border-black p-1 bg-black">
             <button
               onClick={() => setLibraryTab('map')}
-              className={`px-3 py-1.5 font-black text-xs uppercase transition-all ${
-                libraryTab === 'map'
+              className={`px-3 py-1.5 font-black text-xs uppercase transition-all ${libraryTab === 'map'
                   ? 'bg-[#FFC107] text-black border-2 border-black shadow-[2px_2px_0px_#000]'
                   : 'bg-white text-black hover:bg-[#FFC107] hover:text-black border-2 border-black'
-              }`}
+                }`}
             >
               SUBJECT MAP
             </button>
             <button
               onClick={() => setLibraryTab('saved')}
-              className={`px-3 py-1.5 font-black text-xs uppercase transition-all ${
-                libraryTab === 'saved'
+              className={`px-3 py-1.5 font-black text-xs uppercase transition-all ${libraryTab === 'saved'
                   ? 'bg-[#FFC107] text-black border-2 border-black shadow-[2px_2px_0px_#000]'
                   : 'bg-white text-black hover:bg-[#FFC107] hover:text-black border-2 border-black'
-              }`}
+                }`}
             >
               ACADEMIC SAVED
             </button>
@@ -599,7 +596,7 @@ export default function LibraryView({
           <div className="hidden xl:flex items-center gap-3 bg-white dark:bg-[#161B22] px-4 py-2 brutal-border text-black dark:text-white">
             <span className="text-xs font-black uppercase tracking-widest">Progress</span>
             <div className="w-24 h-4 bg-[#F4F1EA] dark:bg-[#21262D] border-2 border-black relative overflow-hidden">
-              <div 
+              <div
                 className="absolute top-0 left-0 h-full bg-[#FFC107] border-r-2 border-black transition-all duration-500"
                 style={{ width: `${subjectProgress}%` }}
               />
@@ -623,10 +620,10 @@ export default function LibraryView({
         {/* TAB 1: BAUHAUS SUBJECT MAP CANVAS VIEW (Full Width 100%) */}
         {libraryTab === 'map' && (
           <div className="flex-1 flex overflow-hidden relative w-full">
-            
+
             {/* MAP AREA CANVAS (Full Width) */}
             <div className="flex-1 relative overflow-y-auto overflow-x-hidden w-full bg-[#F4F1EA] dark:bg-[#0D1117]">
-              
+
               {/* Grid Background Overlay */}
               <div className="absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.08)_2px,transparent_2px),linear-gradient(90deg,rgba(0,0,0,0.08)_2px,transparent_2px)] dark:bg-[linear-gradient(rgba(255,255,255,0.05)_2px,transparent_2px),linear-gradient(90deg,rgba(255,255,255,0.05)_2px,transparent_2px)] bg-[size:40px_40px] pointer-events-none" />
 
@@ -685,11 +682,11 @@ export default function LibraryView({
                   <>
                     {/* SVG Animated Connection Line */}
                     <svg className="absolute top-0 w-full h-full pointer-events-none z-0" preserveAspectRatio="none" viewBox="0 0 1000 1800">
-                      <path 
-                        className="path-line-bauhaus" 
-                        d="M 500,1800 L 400,1400 L 600,1000 L 400,600 L 600,200 L 500,0" 
-                        fill="none" 
-                        stroke="#000000" 
+                      <path
+                        className="path-line-bauhaus"
+                        d="M 500,1800 L 400,1400 L 600,1000 L 400,600 L 600,200 L 500,0"
+                        fill="none"
+                        stroke="#000000"
                         strokeWidth="8"
                       />
                     </svg>
@@ -753,15 +750,14 @@ export default function LibraryView({
                                 e.stopPropagation();
                                 handleDropReorder(idx);
                               }}
-                              className={`brutal-border p-4 sm:p-6 w-64 sm:w-72 max-w-[85vw] transition-transform select-none cursor-grab active:cursor-grabbing ${
-                                lec.isShared
+                              className={`brutal-border p-4 sm:p-6 w-64 sm:w-72 max-w-[85vw] transition-transform select-none cursor-grab active:cursor-grabbing ${lec.isShared
                                   ? 'bg-[#10B981] text-black border-black shadow-[10px_10px_0px_#000]'
                                   : isSelected
                                     ? 'shadow-[12px_12px_0px_#000] rotate-0 bg-[#FFC107]/20 border-black bg-white dark:bg-[#161B22]'
                                     : idx % 2 === 0
                                       ? 'bg-white dark:bg-[#161B22] transform -rotate-2 hover:rotate-0'
                                       : 'bg-white dark:bg-[#161B22] transform rotate-2 hover:rotate-0'
-                              }`}
+                                }`}
                             >
                               {/* Shared Note Badge Header */}
                               {lec.isShared && (
@@ -771,16 +767,15 @@ export default function LibraryView({
                               )}
 
                               <div className="flex justify-between items-center mb-3 border-b-4 border-black pb-2">
-                                <p className={`text-xs font-black uppercase tracking-widest px-2 py-0.5 border-2 border-black ${
-                                  lec.isShared ? 'bg-black text-[#10B981]' : 'bg-[#FFC107] text-black'
-                                }`}>
+                                <p className={`text-xs font-black uppercase tracking-widest px-2 py-0.5 border-2 border-black ${lec.isShared ? 'bg-black text-[#10B981]' : 'bg-[#FFC107] text-black'
+                                  }`}>
                                   LECTURE {lec.lectureNumber < 10 ? `0${lec.lectureNumber}` : lec.lectureNumber}
                                 </p>
                                 <div className="flex items-center gap-1">
                                   <span className="text-xs font-extrabold flex items-center gap-1 border-2 border-black px-2 py-0.5 bg-black text-white dark:bg-[#FFC107] dark:text-black">
                                     <Timer className="w-3.5 h-3.5" /> {lec.duration || '45m'}
                                   </span>
-                                  
+
                                   {/* Share Button */}
                                   <button
                                     onClick={(e) => {
@@ -812,9 +807,8 @@ export default function LibraryView({
                                 </div>
                               </div>
 
-                              <h3 className={`text-base font-black uppercase leading-tight mb-4 ${
-                                lec.isShared ? 'text-black font-black' : 'text-black dark:text-white'
-                              }`}>
+                              <h3 className={`text-base font-black uppercase leading-tight mb-4 ${lec.isShared ? 'text-black font-black' : 'text-black dark:text-white'
+                                }`}>
                                 {lec.title}
                               </h3>
 
@@ -835,7 +829,7 @@ export default function LibraryView({
 
                       {/* End Node with Mascot Avatar & Add Button */}
                       <div className="relative mt-16 flex flex-col items-center z-20">
-                        <div 
+                        <div
                           onClick={() => setShowCreateLectureModal(true)}
                           className="w-20 h-20 bg-white dark:bg-[#161B22] brutal-border rounded-full flex items-center justify-center mb-4 hover:bg-[#FFC107] transition-colors cursor-pointer group"
                         >
@@ -843,9 +837,9 @@ export default function LibraryView({
                         </div>
 
                         <div className="p-2 bg-[#FFC107] brutal-border transform rotate-6 flex items-center gap-3">
-                          <img 
-                            src="/mascots/mascot-owl.jpg" 
-                            alt="Mascot" 
+                          <img
+                            src="/mascots/mascot-owl.jpg"
+                            alt="Mascot"
                             className="w-20 h-20 object-cover border-2 border-black grayscale contrast-125"
                             onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
                           />
@@ -867,14 +861,14 @@ export default function LibraryView({
             {selectedLectureDetail && (
               <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
                 {/* Backdrop Overlay */}
-                <div 
-                  onClick={() => setSelectedLectureDetail(null)} 
-                  className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" 
+                <div
+                  onClick={() => setSelectedLectureDetail(null)}
+                  className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
                 />
-                
+
                 {/* Slide-over Drawer Panel */}
                 <aside className="relative w-full sm:w-96 max-w-full bg-white dark:bg-[#161B22] border-l-4 border-black flex flex-col shadow-2xl z-50 h-full overflow-y-auto animate-in slide-in-from-right duration-300">
-                  
+
                   {/* Panel Header */}
                   <div className="p-6 border-b-4 border-black bg-white dark:bg-[#161B22] relative">
                     <button
@@ -1070,17 +1064,16 @@ export default function LibraryView({
         {/* TAB 2: ACADEMIC SAVED SECTION */}
         {libraryTab === 'saved' && (
           <div className="flex-1 p-8 overflow-y-auto bg-[#F4F1EA] dark:bg-[#0D1117] flex flex-col gap-6 w-full">
-            
+
             {/* Folder Bar */}
             <div className="bg-white dark:bg-[#161B22] p-4 brutal-border flex items-center justify-between gap-4">
               <div className="flex items-center gap-2 overflow-x-auto">
                 <button
                   onClick={() => setActiveFolderId(null)}
-                  className={`px-3.5 py-1.5 font-black text-xs uppercase transition-all ${
-                    activeFolderId === null
+                  className={`px-3.5 py-1.5 font-black text-xs uppercase transition-all ${activeFolderId === null
                       ? 'bg-[#FFC107] text-black border-2 border-black shadow-[2px_2px_0px_#000]'
                       : 'bg-[#F4F1EA] dark:bg-[#21262D] text-black dark:text-white border-2 border-black'
-                  }`}
+                    }`}
                 >
                   All Materials ({lectures.length})
                 </button>
@@ -1089,11 +1082,10 @@ export default function LibraryView({
                   <button
                     key={f.id}
                     onClick={() => setActiveFolderId(f.id)}
-                    className={`px-3.5 py-1.5 font-black text-xs uppercase transition-all ${
-                      activeFolderId === f.id
+                    className={`px-3.5 py-1.5 font-black text-xs uppercase transition-all ${activeFolderId === f.id
                         ? 'bg-[#FFC107] text-black border-2 border-black shadow-[2px_2px_0px_#000]'
                         : 'bg-[#F4F1EA] dark:bg-[#21262D] text-black dark:text-white border-2 border-black'
-                    }`}
+                      }`}
                   >
                     {f.name}
                   </button>
@@ -1143,7 +1135,7 @@ export default function LibraryView({
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredSavedLectures.map((lec) => (
-                  <div 
+                  <div
                     key={lec.id}
                     onContextMenu={(e) => {
                       e.preventDefault();
@@ -1155,11 +1147,10 @@ export default function LibraryView({
                         item: lec
                       });
                     }}
-                    className={`brutal-border p-6 flex flex-col justify-between ${
-                      lec.isShared 
-                        ? 'bg-[#10B981] text-black border-black shadow-[8px_8px_0px_#000]' 
+                    className={`brutal-border p-6 flex flex-col justify-between ${lec.isShared
+                        ? 'bg-[#10B981] text-black border-black shadow-[8px_8px_0px_#000]'
                         : 'bg-white dark:bg-[#161B22]'
-                    }`}
+                      }`}
                   >
                     <div>
                       {lec.isShared && (
@@ -1168,9 +1159,8 @@ export default function LibraryView({
                         </div>
                       )}
                       <div className="flex items-center justify-between mb-2">
-                        <span className={`text-[10px] font-black uppercase px-2 py-0.5 border border-black ${
-                          lec.isShared ? 'bg-black text-[#10B981]' : 'bg-[#FFC107] text-black'
-                        }`}>
+                        <span className={`text-[10px] font-black uppercase px-2 py-0.5 border border-black ${lec.isShared ? 'bg-black text-[#10B981]' : 'bg-[#FFC107] text-black'
+                          }`}>
                           {lec.subject || 'GENERAL'}
                         </span>
                         <div className="flex items-center gap-1">
@@ -1181,12 +1171,12 @@ export default function LibraryView({
                           >
                             <Share2 className="w-4 h-4 stroke-[2.5]" />
                           </button>
-                          <button 
+                          <button
                             onClick={() => {
                               if (window.confirm(`Are you sure you want to delete "${lec.title}" completely?`)) {
                                 onDeleteLecture(lec.id);
                               }
-                            }} 
+                            }}
                             className="p-1 text-black/70 dark:text-white/70 hover:text-[#EF4444] hover:bg-red-500/10 rounded transition-colors"
                             title="Delete Lecture"
                           >
@@ -1211,9 +1201,8 @@ export default function LibraryView({
                           if (setActiveLectureId) setActiveLectureId(lec.id);
                           setActivePage('lecture-capture');
                         }}
-                        className={`text-xs font-black uppercase hover:text-[#FFC107] flex items-center gap-1 ${
-                          lec.isShared ? 'text-black' : 'text-black dark:text-white'
-                        }`}
+                        className={`text-xs font-black uppercase hover:text-[#FFC107] flex items-center gap-1 ${lec.isShared ? 'text-black' : 'text-black dark:text-white'
+                          }`}
                       >
                         {lec.status === 'failed' ? '📄 VIEW TRANSCRIPT / RETRY' : 'OPEN LECTURE NOTES'} <ArrowRight className="w-3.5 h-3.5 stroke-[3]" />
                       </button>
@@ -1373,7 +1362,7 @@ export default function LibraryView({
                 <Share2 className="w-5 h-5 text-[#2563EB]" />
                 <span>SHARE LECTURE NOTES</span>
               </h3>
-              <button 
+              <button
                 onClick={() => {
                   setShareModalLecture(null);
                   setShareSuccessMsg(null);
@@ -1518,10 +1507,10 @@ export default function LibraryView({
 
       {/* FLOATING CONTEXT MENU POPUP (Right-Click Menu on Subject or Lecture) */}
       {contextMenu && (
-        <div 
-          style={{ 
-            top: `${Math.min(contextMenu.y, window.innerHeight - 180)}px`, 
-            left: `${Math.min(contextMenu.x, window.innerWidth - 240)}px` 
+        <div
+          style={{
+            top: `${Math.min(contextMenu.y, window.innerHeight - 180)}px`,
+            left: `${Math.min(contextMenu.x, window.innerWidth - 240)}px`
           }}
           className="fixed z-[9999] w-60 bg-white dark:bg-[#161B22] border-4 border-black shadow-[8px_8px_0px_#000] p-1.5 flex flex-col gap-1 font-mono text-xs animate-in fade-in zoom-in-95 duration-100 select-none"
           onClick={(e) => e.stopPropagation()}

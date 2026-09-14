@@ -184,7 +184,7 @@ export function SetupModal() {
               <input
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                placeholder="Kishan"
+                placeholder="Alex"
                 className={cn(inputCls, 'pl-10')}
                 autoFocus
               />
@@ -193,7 +193,7 @@ export function SetupModal() {
               <input
                 value={surname}
                 onChange={(e) => setSurname(e.target.value)}
-                placeholder="Verma"
+                placeholder="Morgan"
                 className={cn(inputCls, 'pl-10')}
               />
             </Field>

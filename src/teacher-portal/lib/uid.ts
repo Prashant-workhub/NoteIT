@@ -1,9 +1,9 @@
 /**
- * Teacher UID Code system — the "KISHVERM" scheme.
+ * Teacher UID Code system.
  *
  * 8-character uppercase code = first 4 letters of the first name
  * + first 4 letters of the surname.
- *   "Kishan Verma"  ->  "KISH" + "VERM"  ->  "KISHVERM"
+ *   "Alex Morgan"   ->  "ALEX" + "MORG"  ->  "ALEXMORG"
  *
  * Short names are padded with X so the code is always exactly 8 chars.
  */

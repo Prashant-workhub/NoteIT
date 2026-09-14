@@ -254,7 +254,7 @@ export default function FacultyOnboardingView({
                     required
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
-                    placeholder="Kishan"
+                    placeholder="Alex"
                     className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-alt)] text-[var(--app-text)] font-sans text-sm focus:outline-none focus:border-[#22C55E]"
                   />
                 </div>
@@ -271,7 +271,7 @@ export default function FacultyOnboardingView({
                     required
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
-                    placeholder="Verma"
+                    placeholder="Morgan"
                     className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-alt)] text-[var(--app-text)] font-sans text-sm focus:outline-none focus:border-[#22C55E]"
                   />
                 </div>

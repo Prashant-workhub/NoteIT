@@ -347,7 +347,7 @@ export default function FacultyProfileSettings({ user }: FacultyProfileSettingsP
                 required
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                placeholder="Kishan"
+                placeholder="Alex"
                 className="w-full p-3 rounded-xl bg-[var(--app-surface-alt)] border border-[var(--app-border)] text-[var(--app-text)] font-sans text-sm focus:outline-none focus:border-[var(--app-brand)]"
               />
             </div>
@@ -359,7 +359,7 @@ export default function FacultyProfileSettings({ user }: FacultyProfileSettingsP
                 required
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                placeholder="Verma"
+                placeholder="Morgan"
                 className="w-full p-3 rounded-xl bg-[var(--app-surface-alt)] border border-[var(--app-border)] text-[var(--app-text)] font-sans text-sm focus:outline-none focus:border-[var(--app-brand)]"
               />
             </div>

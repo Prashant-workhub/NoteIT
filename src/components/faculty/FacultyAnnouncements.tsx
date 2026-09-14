@@ -14,7 +14,7 @@ export default function FacultyAnnouncements() {
       subject: 'Operating Systems',
       content: 'Mid-term exams commence next Monday. Chapters 1 to 4 (Processes, Threads, CPU Scheduling, Virtual Memory) are included.',
       date: 'Today, 09:00 AM',
-      author: 'Dr. Kishan Verma'
+      author: 'Dr. Alex Morgan'
     },
     {
       id: 'ann-2',
@@ -22,7 +22,7 @@ export default function FacultyAnnouncements() {
       subject: 'Data Structures',
       content: 'Due to ongoing campus hackathon activities, the deadline for B-Tree implementation lab has been extended by 48 hours.',
       date: 'Yesterday',
-      author: 'Dr. Kishan Verma'
+      author: 'Dr. Alex Morgan'
     }
   ]);
 

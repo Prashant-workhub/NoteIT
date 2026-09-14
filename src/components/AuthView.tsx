@@ -4,27 +4,27 @@
  */
 
 import React, { useState } from 'react';
-import { 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
-  signInWithPopup, 
-  GoogleAuthProvider, 
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
   GithubAuthProvider,
   sendPasswordResetEmail,
   sendEmailVerification,
-  updateProfile 
+  updateProfile
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, getDocs, collection, query, where, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
-import { 
-  GraduationCap, 
-  ArrowRight, 
-  Mail, 
-  Lock, 
-  User, 
-  Sparkles, 
-  Eye, 
-  EyeOff, 
+import {
+  GraduationCap,
+  ArrowRight,
+  Mail,
+  Lock,
+  User,
+  Sparkles,
+  Eye,
+  EyeOff,
   CheckCircle,
   AlertCircle,
   Github,
@@ -54,13 +54,13 @@ export default function AuthView({
     initialMode === 'faculty' ? 'login' : initialMode
   );
   const [isFacultyMode, setIsFacultyMode] = useState(initialMode === 'faculty');
-  
+
   // Student & Common Field values
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  
+
   // Faculty-specific fields
   const [university, setUniversity] = useState('Chandigarh University');
   const [department, setDepartment] = useState('Computer Science & Engineering');
@@ -150,7 +150,7 @@ export default function AuthView({
       const usersRef = collection(db, 'users');
       const q = query(usersRef, where('email', '==', cleanEmail));
       const snap = await getDocs(q);
-      
+
       return snap.docs.some(docSnap => {
         const data = docSnap.data();
         const docRole = (data.role === 'faculty' || data.role === 'teacher') ? 'faculty' : 'student';
@@ -187,10 +187,10 @@ export default function AuthView({
         }
 
         const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password);
-        
+
         const detectedRole: 'student' | 'faculty' = isFacultyMode ? 'faculty' : 'student';
         const userRef = doc(db, 'users', userCredential.user.uid);
-        await setDoc(userRef, { 
+        await setDoc(userRef, {
           role: detectedRole,
           email: cleanEmail,
           updatedAt: serverTimestamp()
@@ -238,7 +238,7 @@ export default function AuthView({
 
         const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
         await updateProfile(userCredential.user, { displayName: fullName.trim() });
-        
+
         // 3. Send email verification link
         try {
           await sendEmailVerification(userCredential.user);
@@ -296,7 +296,7 @@ export default function AuthView({
 
       const detectedRole: 'student' | 'faculty' = isFacultyMode ? 'faculty' : 'student';
       const userRef = doc(db, 'users', userCredential.user.uid);
-      await setDoc(userRef, { 
+      await setDoc(userRef, {
         role: detectedRole,
         fullName: userCredential.user.displayName || 'Google User',
         email: userCredential.user.email || '',
@@ -305,8 +305,8 @@ export default function AuthView({
 
       if (isFacultyMode) {
         await saveFacultyProfile(
-          userCredential.user.uid, 
-          userCredential.user.email || '', 
+          userCredential.user.uid,
+          userCredential.user.email || '',
           userCredential.user.displayName || 'Faculty Member'
         );
       }
@@ -333,7 +333,7 @@ export default function AuthView({
 
       const detectedRole: 'student' | 'faculty' = isFacultyMode ? 'faculty' : 'student';
       const userRef = doc(db, 'users', userCredential.user.uid);
-      await setDoc(userRef, { 
+      await setDoc(userRef, {
         role: detectedRole,
         fullName: userCredential.user.displayName || 'GitHub User',
         email: userCredential.user.email || '',
@@ -342,8 +342,8 @@ export default function AuthView({
 
       if (isFacultyMode) {
         await saveFacultyProfile(
-          userCredential.user.uid, 
-          userCredential.user.email || '', 
+          userCredential.user.uid,
+          userCredential.user.email || '',
           userCredential.user.displayName || 'Faculty Member'
         );
       }
@@ -363,12 +363,12 @@ export default function AuthView({
 
   return (
     <div className="min-h-screen w-screen flex flex-col md:flex-row overflow-hidden font-sans bg-grid-paper select-none text-[var(--text-primary)]">
-      
+
       {/* LEFT COLUMN: Product Branding & Showcase */}
       <div className="hidden md:flex md:w-1/2 flex-col justify-between p-12 relative border-r-2 border-[var(--border-main)] bg-[var(--sidebar-bg)]">
-        
+
         {/* Brand Header */}
-        <div 
+        <div
           className="flex items-center gap-3 cursor-pointer"
           onClick={onNavigateToLanding}
         >
@@ -421,7 +421,7 @@ export default function AuthView({
                 {isFacultyMode ? 'FACULTY' : 'COMPLETED'}
               </Badge>
             </div>
-            
+
             <p className="text-xs font-mono text-[var(--text-primary)] leading-relaxed italic">
               {isFacultyMode
                 ? '"Class Learning Alert: 14 students raised doubts on Deadlock Prevention. Quiz accuracy: 54%. Recommendation: Revise topic in next lecture."'
@@ -447,7 +447,7 @@ export default function AuthView({
 
       {/* RIGHT COLUMN: Auth Form Panel */}
       <div className="flex-1 flex items-center justify-center p-6 relative overflow-y-auto bg-[var(--bg-paper)]">
-        
+
         <div className="w-full max-w-md space-y-6">
           {/* Navigation trigger */}
           <div className="flex items-center justify-between">
@@ -484,7 +484,7 @@ export default function AuthView({
                 </h2>
               </div>
               <p className="text-xs font-mono text-[var(--text-secondary)]">
-                {isFacultyMode 
+                {isFacultyMode
                   ? 'Authenticate with your official university credentials to enter the Teacher Portal.'
                   : (mode === 'login' ? 'Authenticate to enter your research workspace.' : mode === 'signup' ? 'Register your scholar account to begin.' : 'Enter your email to receive a password reset link.')
                 }
@@ -513,7 +513,7 @@ export default function AuthView({
                   required
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  placeholder={isFacultyMode ? "Dr. Sharma" : "Kishan Verma"}
+                  placeholder={isFacultyMode ? "Dr. Sharma" : "Registered Name"}
                 />
               )}
 
@@ -569,13 +569,12 @@ export default function AuthView({
                 size="md"
                 type="submit"
                 disabled={loading}
-                className={`w-full justify-center text-[#111111] font-extrabold border-2 border-[var(--border-main)] shadow-paper-sm ${
-                  isFacultyMode ? 'bg-[#38BDF8] hover:bg-[#7dd3fc]' : 'bg-[#FFC400] hover:bg-[#ffe066]'
-                }`}
+                className={`w-full justify-center text-[#111111] font-extrabold border-2 border-[var(--border-main)] shadow-paper-sm ${isFacultyMode ? 'bg-[#38BDF8] hover:bg-[#7dd3fc]' : 'bg-[#FFC400] hover:bg-[#ffe066]'
+                  }`}
               >
-                {loading 
-                  ? 'AUTHENTICATING...' 
-                  : isFacultyMode 
+                {loading
+                  ? 'AUTHENTICATING...'
+                  : isFacultyMode
                     ? (mode === 'login' ? 'ENTER FACULTY PORTAL →' : 'REGISTER FACULTY IDENTITY →')
                     : (mode === 'login' ? 'AUTHENTICATE & ENTER →' : mode === 'signup' ? 'CREATE IDENTITY →' : 'SEND RESET LINK')
                 }
@@ -594,10 +593,10 @@ export default function AuthView({
                   className="social-auth-btn flex items-center justify-center gap-2 p-2.5 rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--card-bg)] font-mono text-xs font-bold uppercase shadow-paper-sm transition-colors cursor-pointer"
                 >
                   <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
-                    <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.2 9 5 12 5z"/>
-                    <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"/>
-                    <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 10.8 0 12s.7 2.3 1.9 4.7l3.7-2.9z"/>
-                    <path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.2-6.4-5.2L1.9 16C3.7 19.7 7.5 23 12 23z"/>
+                    <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.2 9 5 12 5z" />
+                    <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z" />
+                    <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 10.8 0 12s.7 2.3 1.9 4.7l3.7-2.9z" />
+                    <path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.2-6.4-5.2L1.9 16C3.7 19.7 7.5 23 12 23z" />
                   </svg>
                   <span style={{ color: 'var(--text-primary)' }} className="font-bold">Google</span>
                 </button>

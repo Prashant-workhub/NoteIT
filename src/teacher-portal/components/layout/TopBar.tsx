@@ -53,7 +53,7 @@ export function TopBar({
     )
   }
 
-  // Prevent duplicate title formatting (e.g. "Prof. Prof. Kishan Verma")
+  // Prevent duplicate title formatting (e.g. "Prof. Prof. Alex Morgan")
   const formattedName = profile
     ? profile.firstName.startsWith(profile.title)
       ? `${profile.firstName} ${profile.surname}`.trim()

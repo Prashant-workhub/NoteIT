@@ -31,7 +31,7 @@ export interface FileValidationResult {
 /**
  * Automatically generates an 8-character uppercase Teacher Code:
  * First 4 letters of First Name + First 4 letters of Surname
- * Example: Kishan Verma -> KISHVERM
+ * Example: Alex Morgan -> ALEXMORG
  */
 export function generateTeacherCode(fullName: string): string {
   if (!fullName || typeof fullName !== 'string') return 'TECH0000';
@@ -79,8 +79,8 @@ export async function isTeacherCodeTaken(
 
 /**
  * Generates a strictly unique 8-character Teacher UID Code across Firestore users.
- * Guarantees that only ONE teacher gets a given UID (e.g. Kishan Verma = KISHVERM).
- * If KISHVERM is already assigned to another teacher, produces a unique variant (e.g. KISHVER2).
+ * Guarantees that only ONE teacher gets a given UID (e.g. Alex Morgan = ALEXMORG).
+ * If ALEXMORG is already assigned to another teacher, produces a unique variant (e.g. ALEXMOR2).
  */
 export async function generateUniqueTeacherCode(
   fullName: string,
@@ -121,10 +121,10 @@ export interface FacultySearchResult {
 // Preset faculty directory for demo & fallback matches
 export const PRESET_FACULTY_LIST: FacultySearchResult[] = [
   {
-    teacherId: 'faculty_kishan_verma',
-    teacherName: 'Dr. Kishan Verma',
+    teacherId: 'faculty_alex_morgan',
+    teacherName: 'Dr. Alex Morgan',
     whatsappNumber: '919876543210',
-    teacherCode: 'KISHVERM',
+    teacherCode: 'ALEXMORG',
     department: 'Computer Science & Engineering',
     university: 'Chandigarh University'
   },

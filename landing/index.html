@@ -6,10 +6,13 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>NoteIT — AI That Thinks While You Learn</title>
     <!-- Google Fonts Outfit & Playfair Display (Serif) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@1,500&display=swap" rel="stylesheet">
-    
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@1,500&display=swap"
+      rel="stylesheet"
+    />
+
     <!-- ES Module Importmap for Three.js and Addons -->
     <script type="importmap">
       {
@@ -33,7 +36,7 @@
         --color-glass: rgba(13, 15, 23, 0.65);
         --color-glass-light: rgba(255, 255, 255, 0.03);
         --border-glass: 1px solid rgba(255, 255, 255, 0.08);
-        --font-sans: 'Outfit', sans-serif;
+        --font-sans: "Outfit", sans-serif;
       }
 
       * {
@@ -242,8 +245,13 @@
       }
 
       @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.4; }
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.4;
+        }
       }
 
       h1 {
@@ -254,15 +262,19 @@
       }
 
       @media (min-width: 640px) {
-        h1 { font-size: 56px; }
+        h1 {
+          font-size: 56px;
+        }
       }
 
       @media (min-width: 768px) {
-        h1 { font-size: 64px; }
+        h1 {
+          font-size: 64px;
+        }
       }
 
       .highlight-serif {
-        font-family: 'Playfair Display', serif;
+        font-family: "Playfair Display", serif;
         font-style: italic;
         font-weight: 500;
         background: linear-gradient(90deg, #818cf8, #3b82f6);
@@ -383,9 +395,15 @@
         border-radius: 50%;
       }
 
-      .dot-red { background: #ff5f56; }
-      .dot-yellow { background: #ffbd2e; }
-      .dot-green { background: #27c93f; }
+      .dot-red {
+        background: #ff5f56;
+      }
+      .dot-yellow {
+        background: #ffbd2e;
+      }
+      .dot-green {
+        background: #27c93f;
+      }
 
       .widget-tag {
         font-family: monospace;
@@ -448,13 +466,17 @@
 
       .wave-bar {
         flex: 1;
-        background: linear-gradient(0deg, var(--color-primary), var(--color-accent));
+        background: linear-gradient(
+          0deg,
+          var(--color-primary),
+          var(--color-accent)
+        );
         border-radius: 9999px;
         transition: height 0.3s;
       }
 
       .simulated-text {
-        font-family: 'Playfair Display', serif;
+        font-family: "Playfair Display", serif;
         font-style: italic;
         font-size: 11.5px;
         color: #8b9bb4;
@@ -523,7 +545,9 @@
       }
 
       @media (min-width: 768px) {
-        .section-header h2 { font-size: 38px; }
+        .section-header h2 {
+          font-size: 38px;
+        }
       }
 
       .section-header p {
@@ -542,11 +566,15 @@
       }
 
       @media (min-width: 640px) {
-        .features-grid { grid-template-cols: repeat(2, 1fr); }
+        .features-grid {
+          grid-template-cols: repeat(2, 1fr);
+        }
       }
 
       @media (min-width: 1024px) {
-        .features-grid { grid-template-cols: repeat(4, 1fr); }
+        .features-grid {
+          grid-template-cols: repeat(4, 1fr);
+        }
       }
 
       .feature-card {
@@ -587,8 +615,12 @@
         color: #ffffff;
       }
 
-      .card-icon-yellow { color: var(--color-warning); }
-      .card-icon-green { color: var(--color-success); }
+      .card-icon-yellow {
+        color: var(--color-warning);
+      }
+      .card-icon-green {
+        color: var(--color-success);
+      }
 
       .feature-card h4 {
         font-size: 14px;
@@ -612,7 +644,9 @@
       }
 
       @media (min-width: 1024px) {
-        .notebook { grid-template-cols: 5fr 7fr; }
+        .notebook {
+          grid-template-cols: 5fr 7fr;
+        }
       }
 
       .notebook-info {
@@ -685,7 +719,9 @@
       }
 
       @media (min-width: 768px) {
-        .macbook-screen { padding: 12px; }
+        .macbook-screen {
+          padding: 12px;
+        }
       }
 
       .macbook-camera {
@@ -811,7 +847,11 @@
       .concept-bar {
         height: 4px;
         width: 64px;
-        background: linear-gradient(90deg, var(--color-primary), var(--color-accent));
+        background: linear-gradient(
+          90deg,
+          var(--color-primary),
+          var(--color-accent)
+        );
         border-radius: 2px;
       }
 
@@ -877,7 +917,9 @@
       }
 
       @media (min-width: 768px) {
-        .steps-grid { grid-template-cols: repeat(3, 1fr); }
+        .steps-grid {
+          grid-template-cols: repeat(3, 1fr);
+        }
       }
 
       .step-item {
@@ -930,7 +972,9 @@
       }
 
       @media (min-width: 1024px) {
-        .memory-grid { grid-template-cols: 7fr 5fr; }
+        .memory-grid {
+          grid-template-cols: 7fr 5fr;
+        }
       }
 
       .memory-dashboard {
@@ -1115,9 +1159,18 @@
         flex-shrink: 0;
       }
 
-      .rec-green .rec-icon { background: rgba(16, 185, 129, 0.1); color: var(--color-success); }
-      .rec-orange .rec-icon { background: rgba(245, 158, 11, 0.1); color: var(--color-warning); }
-      .rec-blue .rec-icon { background: rgba(59, 130, 246, 0.1); color: var(--color-accent); }
+      .rec-green .rec-icon {
+        background: rgba(16, 185, 129, 0.1);
+        color: var(--color-success);
+      }
+      .rec-orange .rec-icon {
+        background: rgba(245, 158, 11, 0.1);
+        color: var(--color-warning);
+      }
+      .rec-blue .rec-icon {
+        background: rgba(59, 130, 246, 0.1);
+        color: var(--color-accent);
+      }
 
       .rec-details {
         display: flex;
@@ -1137,9 +1190,15 @@
         color: #ffffff;
       }
 
-      .rec-green .rec-title { color: #d1fae5; }
-      .rec-orange .rec-title { color: #ffedd5; }
-      .rec-blue .rec-title { color: #dbeafe; }
+      .rec-green .rec-title {
+        color: #d1fae5;
+      }
+      .rec-orange .rec-title {
+        color: #ffedd5;
+      }
+      .rec-blue .rec-title {
+        color: #dbeafe;
+      }
 
       .rec-badge {
         padding: 2px 6px;
@@ -1149,9 +1208,18 @@
         text-transform: uppercase;
       }
 
-      .rec-green .rec-badge { background: rgba(16, 185, 129, 0.2); color: #34d399; }
-      .rec-orange .rec-badge { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
-      .rec-blue .rec-badge { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+      .rec-green .rec-badge {
+        background: rgba(16, 185, 129, 0.2);
+        color: #34d399;
+      }
+      .rec-orange .rec-badge {
+        background: rgba(245, 158, 11, 0.2);
+        color: #fbbf24;
+      }
+      .rec-blue .rec-badge {
+        background: rgba(59, 130, 246, 0.2);
+        color: #60a5fa;
+      }
 
       .rec-desc {
         font-size: 10.5px;
@@ -1159,9 +1227,15 @@
         font-weight: 500;
       }
 
-      .rec-green .rec-desc { color: #a7f3d0; }
-      .rec-orange .rec-desc { color: #fed7aa; }
-      .rec-blue .rec-desc { color: #bfdbfe; }
+      .rec-green .rec-desc {
+        color: #a7f3d0;
+      }
+      .rec-orange .rec-desc {
+        color: #fed7aa;
+      }
+      .rec-blue .rec-desc {
+        color: #bfdbfe;
+      }
 
       /* Pricing Section */
       .pricing-grid {
@@ -1173,7 +1247,9 @@
       }
 
       @media (min-width: 768px) {
-        .pricing-grid { grid-template-cols: repeat(3, 1fr); }
+        .pricing-grid {
+          grid-template-cols: repeat(3, 1fr);
+        }
       }
 
       .pricing-card {
@@ -1336,7 +1412,9 @@
       }
 
       @media (min-width: 768px) {
-        .cta-box { padding: 56px; }
+        .cta-box {
+          padding: 56px;
+        }
       }
 
       .cta-glow {
@@ -1367,7 +1445,9 @@
       }
 
       @media (min-width: 768px) {
-        .cta-content h3 { font-size: 45px; }
+        .cta-content h3 {
+          font-size: 45px;
+        }
       }
 
       .cta-content p {
@@ -1388,7 +1468,9 @@
       }
 
       @media (min-width: 640px) {
-        .cta-buttons { flex-direction: row; }
+        .cta-buttons {
+          flex-direction: row;
+        }
       }
 
       .cta-buttons .btn-cta {
@@ -1396,7 +1478,9 @@
       }
 
       @media (min-width: 640px) {
-        .cta-buttons .btn-cta { width: auto; }
+        .cta-buttons .btn-cta {
+          width: auto;
+        }
       }
 
       /* Footer styling */
@@ -1419,7 +1503,9 @@
       }
 
       @media (min-width: 768px) {
-        .footer-container { grid-template-cols: repeat(12, 1fr); }
+        .footer-container {
+          grid-template-cols: repeat(12, 1fr);
+        }
       }
 
       .footer-brand {
@@ -1429,7 +1515,9 @@
       }
 
       @media (min-width: 768px) {
-        .footer-brand { grid-column: span 4; }
+        .footer-brand {
+          grid-column: span 4;
+        }
       }
 
       .footer-desc {
@@ -1476,11 +1564,15 @@
       }
 
       @media (min-width: 640px) {
-        .footer-links-grid { grid-template-cols: repeat(3, 1fr); }
+        .footer-links-grid {
+          grid-template-cols: repeat(3, 1fr);
+        }
       }
 
       @media (min-width: 768px) {
-        .footer-links-grid { grid-column: span 8; }
+        .footer-links-grid {
+          grid-column: span 8;
+        }
       }
 
       .footer-nav-group {
@@ -1571,18 +1663,50 @@
         <div class="header-container">
           <a href="#" class="logo">
             <!-- Brand SVG Logo -->
-            <svg width="32" height="32" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg
+              width="32"
+              height="32"
+              viewBox="0 0 100 100"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
               <rect width="100" height="100" rx="28" fill="#0c0e17" />
-              <rect x="38" y="32" width="31" height="35" rx="5" fill="#242834" />
+              <rect
+                x="38"
+                y="32"
+                width="31"
+                height="35"
+                rx="5"
+                fill="#242834"
+              />
               <path d="M30 29.5 L38 34 V 66 L30 70.5 Z" fill="#FFFFFF" />
               <path d="M38 34 L38 66" stroke="#2c303f" stroke-width="0.8" />
               <rect x="38" y="34" width="4" height="32" fill="#1d202b" />
-              <rect x="42" y="34" width="22" height="32" rx="3.5" fill="#FFFFFF" />
+              <rect
+                x="42"
+                y="34"
+                width="22"
+                height="32"
+                rx="3.5"
+                fill="#FFFFFF"
+              />
               <rect x="46" y="42" width="10" height="2" rx="1" fill="#a4abb6" />
               <rect x="46" y="48" width="12" height="2" rx="1" fill="#a4abb6" />
               <rect x="46" y="54" width="8" height="2" rx="1" fill="#a4abb6" />
-              <circle cx="71" cy="33.5" r="9.5" fill="#5F6DF8" stroke="#0c0e17" stroke-width="2" />
-              <path d="M71 29 V38 M66.5 33.5 H75.5" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" />
+              <circle
+                cx="71"
+                cy="33.5"
+                r="9.5"
+                fill="#5F6DF8"
+                stroke="#0c0e17"
+                stroke-width="2"
+              />
+              <path
+                d="M71 29 V38 M66.5 33.5 H75.5"
+                stroke="#FFFFFF"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
             </svg>
             <span>NoteIT</span>
           </a>
@@ -1616,19 +1740,43 @@
           </h1>
 
           <p class="hero-desc">
-            Capture lectures live. Generate intelligent notes instantly. Track weak topics automatically. Learn with a persistent AI memory system.
+            Capture lectures live. Generate intelligent notes instantly. Track
+            weak topics automatically. Learn with a persistent AI memory system.
           </p>
 
           <div class="hero-actions">
             <a href="#" class="btn-cta btn-cta-primary">
               <!-- Volume2 icon inline -->
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                <path
+                  d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"
+                />
+              </svg>
               <span>Start Recording</span>
             </a>
-            
+
             <a href="#" class="btn-cta btn-cta-secondary">
               <!-- Play icon inline -->
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polygon points="5 3 19 12 5 21 5 3" />
+              </svg>
               <span>Watch Demo</span>
             </a>
           </div>
@@ -1637,7 +1785,7 @@
         <!-- Right Side Brand Glass Tablet Visual -->
         <div class="hero-visual">
           <div class="glow-blur"></div>
-          
+
           <div class="glass-widget">
             <!-- Tablet Header Mock -->
             <div class="widget-header">
@@ -1653,33 +1801,37 @@
             <div class="widget-body">
               <div class="inner-card">
                 <div class="inner-card-header">
-                  <span class="inner-card-title">Speaker 1 • Active Transcription</span>
+                  <span class="inner-card-title"
+                    >Speaker 1 • Active Transcription</span
+                  >
                   <span class="badge-success">LIVE STAGING</span>
                 </div>
-                
+
                 <!-- Simulated Audio waves -->
                 <div class="wave-container">
-                  <div class="wave-bar" style="height: 30%;"></div>
-                  <div class="wave-bar" style="height: 60%;"></div>
-                  <div class="wave-bar" style="height: 45%;"></div>
-                  <div class="wave-bar" style="height: 90%;"></div>
-                  <div class="wave-bar" style="height: 40%;"></div>
-                  <div class="wave-bar" style="height: 20%;"></div>
-                  <div class="wave-bar" style="height: 65%;"></div>
-                  <div class="wave-bar" style="height: 80%;"></div>
-                  <div class="wave-bar" style="height: 50%;"></div>
-                  <div class="wave-bar" style="height: 75%;"></div>
-                  <div class="wave-bar" style="height: 95%;"></div>
-                  <div class="wave-bar" style="height: 30%;"></div>
-                  <div class="wave-bar" style="height: 45%;"></div>
-                  <div class="wave-bar" style="height: 60%;"></div>
-                  <div class="wave-bar" style="height: 55%;"></div>
-                  <div class="wave-bar" style="height: 70%;"></div>
-                  <div class="wave-bar" style="height: 40%;"></div>
+                  <div class="wave-bar" style="height: 30%"></div>
+                  <div class="wave-bar" style="height: 60%"></div>
+                  <div class="wave-bar" style="height: 45%"></div>
+                  <div class="wave-bar" style="height: 90%"></div>
+                  <div class="wave-bar" style="height: 40%"></div>
+                  <div class="wave-bar" style="height: 20%"></div>
+                  <div class="wave-bar" style="height: 65%"></div>
+                  <div class="wave-bar" style="height: 80%"></div>
+                  <div class="wave-bar" style="height: 50%"></div>
+                  <div class="wave-bar" style="height: 75%"></div>
+                  <div class="wave-bar" style="height: 95%"></div>
+                  <div class="wave-bar" style="height: 30%"></div>
+                  <div class="wave-bar" style="height: 45%"></div>
+                  <div class="wave-bar" style="height: 60%"></div>
+                  <div class="wave-bar" style="height: 55%"></div>
+                  <div class="wave-bar" style="height: 70%"></div>
+                  <div class="wave-bar" style="height: 40%"></div>
                 </div>
 
                 <p class="simulated-text">
-                  "Gradient optimization constraints decrease exponentially when the activation functions are correctly scaled using adaptive weights parameters..."
+                  "Gradient optimization constraints decrease exponentially when
+                  the activation functions are correctly scaled using adaptive
+                  weights parameters..."
                 </p>
               </div>
 
@@ -1700,8 +1852,11 @@
       <!-- 3. Section: "Engineered for Intellectual Rigor" -->
       <section id="features">
         <div class="section-header">
-          <h2 style="color: #ffffff;">Engineered for Intellectual Rigor</h2>
-          <p>Precision tools designed for researchers, students, and high-level knowledge workers.</p>
+          <h2 style="color: #ffffff">Engineered for Intellectual Rigor</h2>
+          <p>
+            Precision tools designed for researchers, students, and high-level
+            knowledge workers.
+          </p>
         </div>
 
         <div class="features-grid">
@@ -1709,40 +1864,102 @@
           <div class="feature-card">
             <div class="card-icon">
               <!-- Upload icon inline -->
-              <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+              <svg
+                class="icon"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"
+                />
+              </svg>
             </div>
             <h4>Live Lecture Capture</h4>
-            <p>High-fidelity transcription that understands academic context and complex jargon.</p>
+            <p>
+              High-fidelity transcription that understands academic context and
+              complex jargon.
+            </p>
           </div>
 
           <!-- Card 2 -->
           <div class="feature-card">
             <div class="card-icon card-icon-yellow">
               <!-- Sparkles icon inline -->
-              <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+              <svg
+                class="icon"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"
+                />
+              </svg>
             </div>
             <h4>Smart Notes</h4>
-            <p>AI-structured summaries that link disparate concepts into a cohesive knowledge map.</p>
+            <p>
+              AI-structured summaries that link disparate concepts into a
+              cohesive knowledge map.
+            </p>
           </div>
 
           <!-- Card 3 -->
           <div class="feature-card">
             <div class="card-icon card-icon-green">
               <!-- TrendingUp icon inline -->
-              <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+              <svg
+                class="icon"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+                <polyline points="17 6 23 6 23 12" />
+              </svg>
             </div>
             <h4>Adaptive Learning</h4>
-            <p>Real-time gap analysis identifies what you missed and adapts your study path.</p>
+            <p>
+              Real-time gap analysis identifies what you missed and adapts your
+              study path.
+            </p>
           </div>
 
           <!-- Card 4 -->
           <div class="feature-card">
             <div class="card-icon">
               <!-- Brain icon inline -->
-              <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.44 2.5 2.5 0 0 1 0-3.12 3 3 0 0 1 0-4.88 2.5 2.5 0 0 1 0-3.12A2.5 2.5 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.44 2.5 2.5 0 0 0 0-3.12 3 3 0 0 0 0-4.88 2.5 2.5 0 0 0 0-3.12A2.5 2.5 0 0 0 14.5 2Z"/></svg>
+              <svg
+                class="icon"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.44 2.5 2.5 0 0 1 0-3.12 3 3 0 0 1 0-4.88 2.5 2.5 0 0 1 0-3.12A2.5 2.5 0 0 1 9.5 2Z"
+                />
+                <path
+                  d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.44 2.5 2.5 0 0 0 0-3.12 3 3 0 0 0 0-4.88 2.5 2.5 0 0 0 0-3.12A2.5 2.5 0 0 0 14.5 2Z"
+                />
+              </svg>
             </div>
             <h4>Persistent AI Brain</h4>
-            <p>A long-term memory system that recalls previous sessions to build cross-topic insights.</p>
+            <p>
+              A long-term memory system that recalls previous sessions to build
+              cross-topic insights.
+            </p>
           </div>
         </div>
       </section>
@@ -1752,23 +1969,61 @@
         <!-- Left info column -->
         <div class="notebook-info">
           <span class="badge">PRODUCT INTERFACE</span>
-          <h2 style="color: #ffffff;">The Ultimate Digital Notebook</h2>
+          <h2 style="color: #ffffff">The Ultimate Digital Notebook</h2>
           <p>
-            Our split-screen interface allows you to view the original source material alongside AI-generated insights. Highlight any text to trigger the "Persistent Memory" check.
+            Our split-screen interface allows you to view the original source
+            material alongside AI-generated insights. Highlight any text to
+            trigger the "Persistent Memory" check.
           </p>
 
           <div class="bullets-list">
             <div class="bullet-item">
               <!-- CheckCircle icon inline -->
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 8 8 12 12 16"/><line x1="16" y1="12" x2="8" y2="12"/></svg>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 8 8 12 12 16" />
+                <line x1="16" y1="12" x2="8" y2="12" />
+              </svg>
               <span>Interactive Knowledge Graphs</span>
             </div>
             <div class="bullet-item">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 8 8 12 12 16"/><line x1="16" y1="12" x2="8" y2="12"/></svg>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 8 8 12 12 16" />
+                <line x1="16" y1="12" x2="8" y2="12" />
+              </svg>
               <span>Instant Semantic Search</span>
             </div>
             <div class="bullet-item">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 8 8 12 12 16"/><line x1="16" y1="12" x2="8" y2="12"/></svg>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 8 8 12 12 16" />
+                <line x1="16" y1="12" x2="8" y2="12" />
+              </svg>
               <span>Context-Aware Highlighting</span>
             </div>
           </div>
@@ -1779,7 +2034,7 @@
           <div class="macbook-chassis">
             <div class="macbook-screen">
               <div class="macbook-camera"></div>
-              
+
               <div class="macbook-screen-content">
                 <div class="app-header">
                   <span class="app-title">workspace / Calculus-Theory.pdf</span>
@@ -1790,17 +2045,24 @@
                   <!-- Transcript view left -->
                   <div class="pane-left">
                     <span class="pane-tag">TRANSCRIPT VIEW</span>
-                    <p>"Under non-trivial topologies, boundary states diverge from traditional manifolds. We represent this as limit coordinates."</p>
+                    <p>
+                      "Under non-trivial topologies, boundary states diverge
+                      from traditional manifolds. We represent this as limit
+                      coordinates."
+                    </p>
                     <div class="formula-box">
                       f(x) = lim (h -> 0) [f(x+h) - f(x)] / h
                     </div>
-                    <p>"This establishes the derivatives base rules. Repeating this allows gradient tracing..."</p>
+                    <p>
+                      "This establishes the derivatives base rules. Repeating
+                      this allows gradient tracing..."
+                    </p>
                   </div>
 
                   <!-- Summaries workspace right -->
                   <div class="pane-right">
                     <span class="pane-tag">KNOWLEDGE RECALL</span>
-                    
+
                     <div class="concept-title">
                       <span class="concept-heading">Calculus Foundations</span>
                       <div class="concept-bar"></div>
@@ -1808,7 +2070,9 @@
 
                     <ul class="bullets-summary">
                       <li>Derivatives represent local slope systems.</li>
-                      <li>Highly vital for gradient optimization structures.</li>
+                      <li>
+                        Highly vital for gradient optimization structures.
+                      </li>
                     </ul>
 
                     <div class="midterm-flag">
@@ -1818,7 +2082,7 @@
                 </div>
               </div>
             </div>
-            
+
             <div class="macbook-base">
               <div class="macbook-indent"></div>
             </div>
@@ -1827,9 +2091,9 @@
       </section>
 
       <!-- 5. Section: "Three Steps to Mastery" -->
-      <section style="text-align: center;">
+      <section style="text-align: center">
         <div class="section-header">
-          <h2 style="color: #ffffff;">Three Steps to Mastery</h2>
+          <h2 style="color: #ffffff">Three Steps to Mastery</h2>
         </div>
 
         <div class="steps-grid">
@@ -1837,21 +2101,28 @@
           <div class="step-item">
             <div class="step-number">1</div>
             <h4>Record</h4>
-            <p>Live stream your audio or upload transcripts to our secure cloud.</p>
+            <p>
+              Live stream your audio or upload transcripts to our secure cloud.
+            </p>
           </div>
 
           <!-- Step 2 -->
           <div class="step-item">
             <div class="step-number">2</div>
             <h4>Understand</h4>
-            <p>AI clusters themes and highlights the most critical data points.</p>
+            <p>
+              AI clusters themes and highlights the most critical data points.
+            </p>
           </div>
 
           <!-- Step 3 -->
           <div class="step-item">
             <div class="step-number">3</div>
             <h4>Get Notes</h4>
-            <p>Receive structured documents, quiz banks, and flashcards instantly.</p>
+            <p>
+              Receive structured documents, quiz banks, and flashcards
+              instantly.
+            </p>
           </div>
         </div>
       </section>
@@ -1859,8 +2130,12 @@
       <!-- 6. Section: "Your Personal Academic Memory" -->
       <section id="memory">
         <div class="section-header">
-          <h2 style="color: #ffffff;">Your Personal Academic Memory</h2>
-          <p>NoteIT doesn't just process files; it builds a mental model of your knowledge. Over time, it identifies your cognitive gaps and proactively suggests review material.</p>
+          <h2 style="color: #ffffff">Your Personal Academic Memory</h2>
+          <p>
+            NoteIT doesn't just process files; it builds a mental model of your
+            knowledge. Over time, it identifies your cognitive gaps and
+            proactively suggests review material.
+          </p>
         </div>
 
         <div class="memory-grid">
@@ -1875,11 +2150,17 @@
                 </div>
                 <div class="chart-legends">
                   <div class="legend-item">
-                    <span class="legend-dot" style="background: var(--color-primary);"></span>
+                    <span
+                      class="legend-dot"
+                      style="background: var(--color-primary)"
+                    ></span>
                     <span>Current Mastery</span>
                   </div>
                   <div class="legend-item">
-                    <span class="legend-dot" style="background: var(--color-success);"></span>
+                    <span
+                      class="legend-dot"
+                      style="background: var(--color-success)"
+                    ></span>
                     <span>Preserved Knowledge</span>
                   </div>
                 </div>
@@ -1887,23 +2168,61 @@
 
               <!-- Curve representation -->
               <div class="chart-container">
-                <svg class="chart-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+                <svg
+                  class="chart-svg"
+                  viewBox="0 0 100 100"
+                  preserveAspectRatio="none"
+                >
                   <defs>
                     <linearGradient id="blue-grad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stop-color="var(--color-primary)" stop-opacity="0.25"/>
-                      <stop offset="100%" stop-color="var(--color-bg-dark)" stop-opacity="0"/>
+                      <stop
+                        offset="0%"
+                        stop-color="var(--color-primary)"
+                        stop-opacity="0.25"
+                      />
+                      <stop
+                        offset="100%"
+                        stop-color="var(--color-bg-dark)"
+                        stop-opacity="0"
+                      />
                     </linearGradient>
                     <linearGradient id="green-grad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stop-color="var(--color-success)" stop-opacity="0.12"/>
-                      <stop offset="100%" stop-color="var(--color-bg-dark)" stop-opacity="0"/>
+                      <stop
+                        offset="0%"
+                        stop-color="var(--color-success)"
+                        stop-opacity="0.12"
+                      />
+                      <stop
+                        offset="100%"
+                        stop-color="var(--color-bg-dark)"
+                        stop-opacity="0"
+                      />
                     </linearGradient>
                   </defs>
                   <!-- Curves -->
-                  <path d="M0 80 Q 25 30, 50 45 T 100 20 L 100 100 L 0 100 Z" fill="url(#blue-grad)"/>
-                  <path d="M0 80 Q 25 30, 50 45 T 100 20" stroke="var(--color-primary)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-                  
-                  <path d="M0 90 Q 30 70, 60 55 T 100 40 L 100 100 L 0 100 Z" fill="url(#green-grad)"/>
-                  <path d="M0 90 Q 30 70, 60 55 T 100 40" stroke="var(--color-success)" stroke-width="2" stroke-dasharray="4,3" fill="none"/>
+                  <path
+                    d="M0 80 Q 25 30, 50 45 T 100 20 L 100 100 L 0 100 Z"
+                    fill="url(#blue-grad)"
+                  />
+                  <path
+                    d="M0 80 Q 25 30, 50 45 T 100 20"
+                    stroke="var(--color-primary)"
+                    stroke-width="2.5"
+                    fill="none"
+                    stroke-linecap="round"
+                  />
+
+                  <path
+                    d="M0 90 Q 30 70, 60 55 T 100 40 L 100 100 L 0 100 Z"
+                    fill="url(#green-grad)"
+                  />
+                  <path
+                    d="M0 90 Q 30 70, 60 55 T 100 40"
+                    stroke="var(--color-success)"
+                    stroke-width="2"
+                    stroke-dasharray="4,3"
+                    fill="none"
+                  />
                 </svg>
                 <div class="chart-labels">
                   <span>LEC 1</span>
@@ -1918,29 +2237,95 @@
             <!-- Radar tracker -->
             <div class="dashboard-card">
               <span class="card-tag">Telemetry analysis</span>
-              <h4 class="card-title" style="margin-top: 0;">Weak Topic Radar</h4>
+              <h4 class="card-title" style="margin-top: 0">Weak Topic Radar</h4>
 
               <div class="radar-wrapper">
                 <div class="radar-svg-box">
                   <svg class="chart-svg" viewBox="0 0 100 100">
-                    <circle cx="50" cy="50" r="45" stroke="rgba(255,255,255,0.06)" stroke-width="0.8" fill="none" />
-                    <circle cx="50" cy="50" r="30" stroke="rgba(255,255,255,0.06)" stroke-width="0.8" fill="none" />
-                    <circle cx="50" cy="50" r="15" stroke="rgba(255,255,255,0.06)" stroke-width="0.8" fill="none" />
-                    
-                    <line x1="50" y1="5" x2="50" y2="95" stroke="rgba(255,255,255,0.06)" stroke-width="0.8" />
-                    <line x1="5" y1="50" x2="95" y2="50" stroke="rgba(255,255,255,0.06)" stroke-width="0.8" />
-                    <line x1="18.2" y1="18.2" x2="81.8" y2="81.8" stroke="rgba(255,255,255,0.06)" stroke-width="0.8" />
-                    <line x1="18.2" y1="81.8" x2="81.8" y2="18.2" stroke="rgba(255,255,255,0.06)" stroke-width="0.8" />
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="45"
+                      stroke="rgba(255,255,255,0.06)"
+                      stroke-width="0.8"
+                      fill="none"
+                    />
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="30"
+                      stroke="rgba(255,255,255,0.06)"
+                      stroke-width="0.8"
+                      fill="none"
+                    />
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="15"
+                      stroke="rgba(255,255,255,0.06)"
+                      stroke-width="0.8"
+                      fill="none"
+                    />
 
-                    <polygon points="50,15 70,30 85,50 60,75 50,80 35,60 20,50 30,35" fill="rgba(239, 68, 68, 0.12)" stroke="var(--color-error)" stroke-width="1.8" />
+                    <line
+                      x1="50"
+                      y1="5"
+                      x2="50"
+                      y2="95"
+                      stroke="rgba(255,255,255,0.06)"
+                      stroke-width="0.8"
+                    />
+                    <line
+                      x1="5"
+                      y1="50"
+                      x2="95"
+                      y2="50"
+                      stroke="rgba(255,255,255,0.06)"
+                      stroke-width="0.8"
+                    />
+                    <line
+                      x1="18.2"
+                      y1="18.2"
+                      x2="81.8"
+                      y2="81.8"
+                      stroke="rgba(255,255,255,0.06)"
+                      stroke-width="0.8"
+                    />
+                    <line
+                      x1="18.2"
+                      y1="81.8"
+                      x2="81.8"
+                      y2="18.2"
+                      stroke="rgba(255,255,255,0.06)"
+                      stroke-width="0.8"
+                    />
+
+                    <polygon
+                      points="50,15 70,30 85,50 60,75 50,80 35,60 20,50 30,35"
+                      fill="rgba(239, 68, 68, 0.12)"
+                      stroke="var(--color-error)"
+                      stroke-width="1.8"
+                    />
                   </svg>
                 </div>
 
                 <div class="radar-legend-grid">
-                  <div class="radar-legend-item"><span class="radar-dot" style="background: #f87171;"></span> NLP: Critical</div>
-                  <div class="radar-legend-item"><span class="radar-dot" style="background: #34d399;"></span> Algorithms: Mastered</div>
-                  <div class="radar-legend-item"><span class="radar-dot" style="background: #fbbf24;"></span> Neural Networks: Review</div>
-                  <div class="radar-legend-item"><span class="radar-dot" style="background: #f87171;"></span> Python: Staging</div>
+                  <div class="radar-legend-item">
+                    <span class="radar-dot" style="background: #f87171"></span>
+                    NLP: Critical
+                  </div>
+                  <div class="radar-legend-item">
+                    <span class="radar-dot" style="background: #34d399"></span>
+                    Algorithms: Mastered
+                  </div>
+                  <div class="radar-legend-item">
+                    <span class="radar-dot" style="background: #fbbf24"></span>
+                    Neural Networks: Review
+                  </div>
+                  <div class="radar-legend-item">
+                    <span class="radar-dot" style="background: #f87171"></span>
+                    Python: Staging
+                  </div>
                 </div>
               </div>
             </div>
@@ -1954,14 +2339,30 @@
             <div class="rec-card rec-green">
               <div class="rec-icon">
                 <!-- Brain icon -->
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.44 2.5 2.5 0 0 1 0-3.12 3 3 0 0 1 0-4.88 2.5 2.5 0 0 1 0-3.12A2.5 2.5 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.44 2.5 2.5 0 0 0 0-3.12 3 3 0 0 0 0-4.88 2.5 2.5 0 0 0 0-3.12A2.5 2.5 0 0 0 14.5 2Z"/></svg>
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.44 2.5 2.5 0 0 1 0-3.12 3 3 0 0 1 0-4.88 2.5 2.5 0 0 1 0-3.12A2.5 2.5 0 0 1 9.5 2Z"
+                  />
+                  <path
+                    d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.44 2.5 2.5 0 0 0 0-3.12 3 3 0 0 0 0-4.88 2.5 2.5 0 0 0 0-3.12A2.5 2.5 0 0 0 14.5 2Z"
+                  />
+                </svg>
               </div>
               <div class="rec-details">
                 <div class="rec-heading-row">
                   <span class="rec-title">Review: Neural Networks</span>
                   <span class="rec-badge">45% Score</span>
                 </div>
-                <p class="rec-desc">Learn micro-connections to practice your deep neural networks.</p>
+                <p class="rec-desc">
+                  Learn micro-connections to practice your deep neural networks.
+                </p>
               </div>
             </div>
 
@@ -1969,14 +2370,29 @@
             <div class="rec-card rec-orange">
               <div class="rec-icon">
                 <!-- Cpu icon -->
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 15h3M1 9h3M1 15h3"/></svg>
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
+                  <rect x="9" y="9" width="6" height="6" />
+                  <path
+                    d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 15h3M1 9h3M1 15h3"
+                  />
+                </svg>
               </div>
               <div class="rec-details">
                 <div class="rec-heading-row">
                   <span class="rec-title">Practice: Algorithms</span>
                   <span class="rec-badge">Review Required</span>
                 </div>
-                <p class="rec-desc">Learn more algorithms from leveraging your data structures.</p>
+                <p class="rec-desc">
+                  Learn more algorithms from leveraging your data structures.
+                </p>
               </div>
             </div>
 
@@ -1984,14 +2400,27 @@
             <div class="rec-card rec-blue">
               <div class="rec-icon">
                 <!-- Layers icon -->
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <polygon points="12 2 2 7 12 12 22 7 12 2 12 2" />
+                  <polyline points="2 17 12 22 22 17" />
+                  <polyline points="2 12 12 17 22 12" />
+                </svg>
               </div>
               <div class="rec-details">
                 <div class="rec-heading-row">
                   <span class="rec-title">Explore: Reinforcement Learning</span>
                   <span class="rec-badge">Suggested Core</span>
                 </div>
-                <p class="rec-desc">Explore how neurons learn to explore reinforcement learning.</p>
+                <p class="rec-desc">
+                  Explore how neurons learn to explore reinforcement learning.
+                </p>
               </div>
             </div>
           </div>
@@ -1999,9 +2428,9 @@
       </section>
 
       <!-- 7. Section: "Simple, Scholar-Focused Pricing" -->
-      <section id="pricing" style="text-align: center;">
+      <section id="pricing" style="text-align: center">
         <div class="section-header">
-          <h2 style="color: #ffffff;">Simple, Scholar-Focused Pricing</h2>
+          <h2 style="color: #ffffff">Simple, Scholar-Focused Pricing</h2>
           <p>Choose the optimal scaling factor for your education demands.</p>
         </div>
 
@@ -2017,20 +2446,58 @@
               <div class="pricing-divider"></div>
               <ul class="pricing-features">
                 <li>
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 8 8 12 12 16"/><line x1="16" y1="12" x2="8" y2="12"/></svg>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="3"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 8 8 12 12 16" />
+                    <line x1="16" y1="12" x2="8" y2="12" />
+                  </svg>
                   <span>5 Recordings / Mo</span>
                 </li>
                 <li>
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 8 8 12 12 16"/><line x1="16" y1="12" x2="8" y2="12"/></svg>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="3"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 8 8 12 12 16" />
+                    <line x1="16" y1="12" x2="8" y2="12" />
+                  </svg>
                   <span>Standard Transcription</span>
                 </li>
                 <li>
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 8 8 12 12 16"/><line x1="16" y1="12" x2="8" y2="12"/></svg>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="3"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 8 8 12 12 16" />
+                    <line x1="16" y1="12" x2="8" y2="12" />
+                  </svg>
                   <span>Basic Summaries</span>
                 </li>
               </ul>
             </div>
-            <button class="btn-pricing btn-pricing-secondary">Get Started</button>
+            <button class="btn-pricing btn-pricing-secondary">
+              Get Started
+            </button>
           </div>
 
           <!-- Student Pro tier -->
@@ -2045,19 +2512,67 @@
               <div class="pricing-divider"></div>
               <ul class="pricing-features">
                 <li>
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 8 8 12 12 16"/><line x1="16" y1="12" x2="8" y2="12"/></svg>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="3"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 8 8 12 12 16" />
+                    <line x1="16" y1="12" x2="8" y2="12" />
+                  </svg>
                   <span>Unlimited Recordings</span>
                 </li>
                 <li>
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 8 8 12 12 16"/><line x1="16" y1="12" x2="8" y2="12"/></svg>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="3"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 8 8 12 12 16" />
+                    <line x1="16" y1="12" x2="8" y2="12" />
+                  </svg>
                   <span>High-Fidelity AI Processing</span>
                 </li>
                 <li>
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 8 8 12 12 16"/><line x1="16" y1="12" x2="8" y2="12"/></svg>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="3"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 8 8 12 12 16" />
+                    <line x1="16" y1="12" x2="8" y2="12" />
+                  </svg>
                   <span>Persistent AI Memory</span>
                 </li>
                 <li>
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 8 8 12 12 16"/><line x1="16" y1="12" x2="8" y2="12"/></svg>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="3"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 8 8 12 12 16" />
+                    <line x1="16" y1="12" x2="8" y2="12" />
+                  </svg>
                   <span>Weak Topic Radar</span>
                 </li>
               </ul>
@@ -2070,45 +2585,110 @@
             <div class="pricing-info">
               <h3>Institution</h3>
               <div class="price-row">
-                <span class="price" style="font-size: 28px;">Custom</span>
+                <span class="price" style="font-size: 28px">Custom</span>
                 <span class="price-period">/ customized plan</span>
               </div>
               <div class="pricing-divider"></div>
               <ul class="pricing-features">
                 <li>
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 8 8 12 12 16"/><line x1="16" y1="12" x2="8" y2="12"/></svg>
-                  <span>Scale academic intelligence across university/lab.</span>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="3"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 8 8 12 12 16" />
+                    <line x1="16" y1="12" x2="8" y2="12" />
+                  </svg>
+                  <span
+                    >Scale academic intelligence across university/lab.</span
+                  >
                 </li>
                 <li>
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 8 8 12 12 16"/><line x1="16" y1="12" x2="8" y2="12"/></svg>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="3"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 8 8 12 12 16" />
+                    <line x1="16" y1="12" x2="8" y2="12" />
+                  </svg>
                   <span>Admin Dashboard</span>
                 </li>
                 <li>
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 8 8 12 12 16"/><line x1="16" y1="12" x2="8" y2="12"/></svg>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="3"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 8 8 12 12 16" />
+                    <line x1="16" y1="12" x2="8" y2="12" />
+                  </svg>
                   <span>API Integration</span>
                 </li>
                 <li>
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 8 8 12 12 16"/><line x1="16" y1="12" x2="8" y2="12"/></svg>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="3"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 8 8 12 12 16" />
+                    <line x1="16" y1="12" x2="8" y2="12" />
+                  </svg>
                   <span>Priority Support</span>
                 </li>
               </ul>
             </div>
-            <button class="btn-pricing btn-pricing-secondary">Contact Sales</button>
+            <button class="btn-pricing btn-pricing-secondary">
+              Contact Sales
+            </button>
           </div>
         </div>
       </section>
 
       <!-- 8. Section: "Ready to upgrade your intellect?" -->
-      <section style="text-align: center;">
+      <section style="text-align: center">
         <div class="cta-box">
           <div class="cta-glow"></div>
           <div class="cta-content">
-            <h3 style="color: #ffffff;">Ready to upgrade your intellect?</h3>
-            <p>Join 50,000+ researchers and students using ScholarAI to redefine how they learn.</p>
-            
+            <h3 style="color: #ffffff">Ready to upgrade your intellect?</h3>
+            <p>
+              Join 50,000+ researchers and students using ScholarAI to redefine
+              how they learn.
+            </p>
+
             <div class="cta-buttons">
-              <a href="#" class="btn-cta btn-cta-primary" style="justify-content: center;">Start Free Trial</a>
-              <a href="#" class="btn-cta btn-cta-secondary" style="justify-content: center;">Schedule a Demo</a>
+              <a
+                href="#"
+                class="btn-cta btn-cta-primary"
+                style="justify-content: center"
+                >Start Free Trial</a
+              >
+              <a
+                href="#"
+                class="btn-cta btn-cta-secondary"
+                style="justify-content: center"
+                >Schedule a Demo</a
+              >
             </div>
           </div>
         </div>
@@ -2120,30 +2700,84 @@
           <!-- Footer Branding left -->
           <div class="footer-brand">
             <a href="#" class="logo">
-              <svg width="32" height="32" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <svg
+                width="32"
+                height="32"
+                viewBox="0 0 100 100"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
                 <rect width="100" height="100" rx="28" fill="#0c0e17" />
-                <rect x="38" y="32" width="31" height="35" rx="5" fill="#242834" />
+                <rect
+                  x="38"
+                  y="32"
+                  width="31"
+                  height="35"
+                  rx="5"
+                  fill="#242834"
+                />
                 <path d="M30 29.5 L38 34 V 66 L30 70.5 Z" fill="#FFFFFF" />
                 <path d="M38 34 L38 66" stroke="#2c303f" stroke-width="0.8" />
                 <rect x="38" y="34" width="4" height="32" fill="#1d202b" />
-                <rect x="42" y="34" width="22" height="32" rx="3.5" fill="#FFFFFF" />
-                <rect x="46" y="42" width="10" height="2" rx="1" fill="#a4abb6" />
-                <rect x="46" y="48" width="12" height="2" rx="1" fill="#a4abb6" />
-                <rect x="46" y="54" width="8" height="2" rx="1" fill="#a4abb6" />
-                <circle cx="71" cy="33.5" r="9.5" fill="#5F6DF8" stroke="#0c0e17" stroke-width="2" />
-                <path d="M71 29 V38 M66.5 33.5 H75.5" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" />
+                <rect
+                  x="42"
+                  y="34"
+                  width="22"
+                  height="32"
+                  rx="3.5"
+                  fill="#FFFFFF"
+                />
+                <rect
+                  x="46"
+                  y="42"
+                  width="10"
+                  height="2"
+                  rx="1"
+                  fill="#a4abb6"
+                />
+                <rect
+                  x="46"
+                  y="48"
+                  width="12"
+                  height="2"
+                  rx="1"
+                  fill="#a4abb6"
+                />
+                <rect
+                  x="46"
+                  y="54"
+                  width="8"
+                  height="2"
+                  rx="1"
+                  fill="#a4abb6"
+                />
+                <circle
+                  cx="71"
+                  cy="33.5"
+                  r="9.5"
+                  fill="#5F6DF8"
+                  stroke="#0c0e17"
+                  stroke-width="2"
+                />
+                <path
+                  d="M71 29 V38 M66.5 33.5 H75.5"
+                  stroke="#FFFFFF"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
               </svg>
               <span>NoteIT</span>
             </a>
             <p class="footer-desc">
-              NoteIT. Precision in knowledge synthesis. Helping the world think deeper through technology.
+              NoteIT. Precision in knowledge synthesis. Helping the world think
+              deeper through technology.
             </p>
             <div class="footer-telemetry">
-              <div class="founder-info" style="font-weight: 800;">Built by BRUTE</div>
-              <div class="founder-info">Founder: <span>Kishan Verma</span></div>
               <div class="footer-contact-title">Contact Us</div>
-              <div class="footer-contact-item">Email: vermakishan478@gmail.com</div>
-              <div class="footer-contact-item">Phone: +91 7471111980</div>
+              <div class="footer-contact-item">
+                Email: support@noteit.ai
+              </div>
+              <div class="footer-contact-item">Phone: +1 (555) 019-2834</div>
             </div>
           </div>
 
@@ -2181,19 +2815,59 @@
         </div>
 
         <div class="footer-bottom">
-          <span>© 2026 ScholarAI. Precision in knowledge synthesis. All rights reserved.</span>
+          <span
+            >© 2026 ScholarAI. Precision in knowledge synthesis. All rights
+            reserved.</span
+          >
           <div class="footer-socials">
             <a href="#">
               <!-- Network icon inline -->
-              <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3M12 12V8"/></svg>
+              <svg
+                class="icon"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <rect x="16" y="16" width="6" height="6" rx="1" />
+                <rect x="2" y="16" width="6" height="6" rx="1" />
+                <rect x="9" y="2" width="6" height="6" rx="1" />
+                <path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3M12 12V8" />
+              </svg>
             </a>
             <a href="#">
               <!-- Users icon inline -->
-              <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              <svg
+                class="icon"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
             </a>
             <a href="#">
               <!-- Award icon inline -->
-              <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
+              <svg
+                class="icon"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle cx="12" cy="8" r="7" />
+                <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88" />
+              </svg>
             </a>
           </div>
         </div>
@@ -2202,21 +2876,26 @@
 
     <!-- Three.js Setup Script (ES Module) -->
     <script type="module">
-      import * as THREE from 'https://unpkg.com/three@0.143.0/build/three.module.js';
-      import { EffectComposer } from 'https://unpkg.com/three@0.143.0/examples/jsm/postprocessing/EffectComposer.js';
-      import { RenderPass } from 'https://unpkg.com/three@0.143.0/examples/jsm/postprocessing/RenderPass.js';
-      import { UnrealBloomPass } from 'https://unpkg.com/three@0.143.0/examples/jsm/postprocessing/UnrealBloomPass.js';
-      import { ShaderPass } from 'https://unpkg.com/three@0.143.0/examples/jsm/postprocessing/ShaderPass.js';
-      import { GammaCorrectionShader } from 'https://unpkg.com/three@0.143.0/examples/jsm/shaders/GammaCorrectionShader.js';
-      import { CopyShader } from 'https://unpkg.com/three@0.143.0/examples/jsm/shaders/CopyShader.js';
+      import * as THREE from "https://unpkg.com/three@0.143.0/build/three.module.js";
+      import { EffectComposer } from "https://unpkg.com/three@0.143.0/examples/jsm/postprocessing/EffectComposer.js";
+      import { RenderPass } from "https://unpkg.com/three@0.143.0/examples/jsm/postprocessing/RenderPass.js";
+      import { UnrealBloomPass } from "https://unpkg.com/three@0.143.0/examples/jsm/postprocessing/UnrealBloomPass.js";
+      import { ShaderPass } from "https://unpkg.com/three@0.143.0/examples/jsm/postprocessing/ShaderPass.js";
+      import { GammaCorrectionShader } from "https://unpkg.com/three@0.143.0/examples/jsm/shaders/GammaCorrectionShader.js";
+      import { CopyShader } from "https://unpkg.com/three@0.143.0/examples/jsm/shaders/CopyShader.js";
 
       // 1. Initialise Scene, Camera, Renderer
-      const canvas = document.getElementById('scene');
+      const canvas = document.getElementById("scene");
       const scene = new THREE.Scene();
       scene.background = new THREE.Color(0x000000);
       scene.fog = new THREE.Fog(0x000000, 0, 45);
 
-      const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 400);
+      const camera = new THREE.PerspectiveCamera(
+        45,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        400,
+      );
       camera.position.set(0, 7, 16);
       scene.add(camera);
 
@@ -2227,8 +2906,13 @@
       renderer.shadowMap.type = THREE.VSMShadowMap;
 
       // Layers definition
-      const LAYERS = { NONE: 0, TORUS_SCENE: 1, BLOOM_SCENE: 2, ENTIRE_SCENE: 3 };
-      
+      const LAYERS = {
+        NONE: 0,
+        TORUS_SCENE: 1,
+        BLOOM_SCENE: 2,
+        ENTIRE_SCENE: 3,
+      };
+
       // Enable camera layers
       camera.layers.enable(LAYERS.NONE);
       camera.layers.enable(LAYERS.TORUS_SCENE);
@@ -2243,7 +2927,12 @@
       torusComposer.renderToScreen = false;
       torusComposer.addPass(renderPass);
       torusComposer.addPass(new ShaderPass(GammaCorrectionShader));
-      const torusBloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.22, 0.2, 0);
+      const torusBloomPass = new UnrealBloomPass(
+        new THREE.Vector2(window.innerWidth, window.innerHeight),
+        0.22,
+        0.2,
+        0,
+      );
       torusComposer.addPass(torusBloomPass);
       torusComposer.addPass(new ShaderPass(CopyShader));
 
@@ -2251,7 +2940,12 @@
       const bloomComposer = new EffectComposer(renderer);
       bloomComposer.renderToScreen = false;
       bloomComposer.addPass(renderPass);
-      const gridBloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.4, 0.55, 0);
+      const gridBloomPass = new UnrealBloomPass(
+        new THREE.Vector2(window.innerWidth, window.innerHeight),
+        0.4,
+        0.55,
+        0,
+      );
       bloomComposer.addPass(gridBloomPass);
       bloomComposer.addPass(new ShaderPass(GammaCorrectionShader));
 
@@ -2264,7 +2958,7 @@
           uniforms: {
             baseTexture: { value: null },
             bloomTexture: { value: null },
-            torusTexture: { value: null }
+            torusTexture: { value: null },
           },
           vertexShader: `
             varying vec2 vUv;
@@ -2284,14 +2978,14 @@
               vec4 torus = texture2D(torusTexture, vUv);
               gl_FragColor = base + bloom * 1.6 + torus * 1.3;
             }
-          `
+          `,
         }),
-        'baseTexture'
+        "baseTexture",
       );
       finalComposer.addPass(finalPass);
 
       // 3. Create Objects & Assign Layers
-      
+
       // Floating ambient star particles (Base layer)
       const starGeo = new THREE.BufferGeometry();
       const starCount = 300;
@@ -2299,12 +2993,12 @@
       for (let i = 0; i < starCount * 3; i++) {
         starPos[i] = (Math.random() - 0.5) * 150;
       }
-      starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+      starGeo.setAttribute("position", new THREE.BufferAttribute(starPos, 3));
       const starMat = new THREE.PointsMaterial({
         color: 0xffffff,
         size: 0.35,
         transparent: true,
-        opacity: 0.45
+        opacity: 0.45,
       });
       const stars = new THREE.Points(starGeo, starMat);
       stars.layers.set(LAYERS.NONE);
@@ -2316,7 +3010,7 @@
         color: 0x5f6df8,
         wireframe: true,
         transparent: true,
-        opacity: 0.35
+        opacity: 0.35,
       });
       const torus1 = new THREE.Mesh(torusGeo1, torusMat1);
       torus1.position.set(7, 1, -12);
@@ -2328,7 +3022,7 @@
         color: 0x10b981,
         wireframe: true,
         transparent: true,
-        opacity: 0.3
+        opacity: 0.3,
       });
       const torus2 = new THREE.Mesh(torusGeo2, torusMat2);
       torus2.position.set(-8, -2, -26);
@@ -2337,28 +3031,34 @@
 
       // Dynamic canvas circular soft dot texture
       function createCircleTexture() {
-        const canvas = document.createElement('canvas');
+        const canvas = document.createElement("canvas");
         canvas.width = 16;
         canvas.height = 16;
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext("2d");
         const grad = ctx.createRadialGradient(8, 8, 0, 8, 8, 8);
-        grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
-        grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        grad.addColorStop(0, "rgba(255, 255, 255, 1)");
+        grad.addColorStop(1, "rgba(255, 255, 255, 0)");
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, 16, 16);
         return new THREE.CanvasTexture(canvas);
       }
-      
+
       // Winding stream paths helper for organic particle ribbons
       function getStreamPath3D(streamId, x, time) {
         if (streamId === 0) {
           // Upper winding ribbon
-          const y = Math.sin(x * 0.045 + time * 0.5) * 4.2 + Math.cos(x * 0.02) * 2.0 - 2.0;
+          const y =
+            Math.sin(x * 0.045 + time * 0.5) * 4.2 +
+            Math.cos(x * 0.02) * 2.0 -
+            2.0;
           const z = Math.cos(x * 0.02 + time * 0.2) * 8.0 - 10.0;
           return { y, z };
         } else if (streamId === 1) {
           // Lower winding ribbon
-          const y = Math.sin(x * 0.025 - time * 0.3) * 5.0 + Math.cos(x * 0.01 + time * 0.1) * 3.0 - 6.0;
+          const y =
+            Math.sin(x * 0.025 - time * 0.3) * 5.0 +
+            Math.cos(x * 0.01 + time * 0.1) * 3.0 -
+            6.0;
           const z = Math.sin(x * 0.015 - time * 0.15) * 10.0 - 18.0;
           return { y, z };
         } else if (streamId === 2) {
@@ -2368,12 +3068,15 @@
           return { y, z };
         } else {
           // Diffuse background stream
-          const y = Math.sin(x * 0.012 + time * 0.12) * 6.0 + Math.cos(x * 0.005) * 3.5 - 5.0;
+          const y =
+            Math.sin(x * 0.012 + time * 0.12) * 6.0 +
+            Math.cos(x * 0.005) * 3.5 -
+            5.0;
           const z = Math.cos(x * 0.01 - time * 0.1) * 13.0 - 22.0;
           return { y, z };
         }
       }
-      
+
       // Flow Stream Particle System (Organic data streams)
       const particleCount = 2000;
       const particleGeo = new THREE.BufferGeometry();
@@ -2385,13 +3088,13 @@
         new THREE.Color(0x5f6df8), // Indigo
         new THREE.Color(0x06b6d4), // Cyan/Teal
         new THREE.Color(0xa855f7), // Violet
-        new THREE.Color(0x2563eb)  // Deep Blue
+        new THREE.Color(0x2563eb), // Deep Blue
       ];
 
       for (let i = 0; i < particleCount; i++) {
         const streamId = i % 4;
         const x = (Math.random() - 0.5) * 120;
-        
+
         // Pre-calculate positions on the stream paths for cohesion
         const path = getStreamPath3D(streamId, x, 0);
 
@@ -2400,7 +3103,8 @@
         positions[i * 3 + 2] = path.z + (Math.random() - 0.5) * 4.0;
 
         // Choose a random color from our premium palette
-        const baseColor = colorPalette[Math.floor(Math.random() * colorPalette.length)];
+        const baseColor =
+          colorPalette[Math.floor(Math.random() * colorPalette.length)];
         colors[i * 3] = baseColor.r * 0.75;
         colors[i * 3 + 1] = baseColor.g * 0.75;
         colors[i * 3 + 2] = baseColor.b * 0.75;
@@ -2411,12 +3115,15 @@
           speed: (0.07 + Math.random() * 0.08) * (streamId === 2 ? 1.4 : 1.0), // Fast stream flows quicker
           noiseOffset: Math.random() * 100,
           offsetY: (Math.random() - 0.5) * 1.5,
-          offsetZ: (Math.random() - 0.5) * 2.5
+          offsetZ: (Math.random() - 0.5) * 2.5,
         });
       }
 
-      particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      particleGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      particleGeo.setAttribute(
+        "position",
+        new THREE.BufferAttribute(positions, 3),
+      );
+      particleGeo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 
       const particleMat = new THREE.PointsMaterial({
         size: 0.45,
@@ -2425,7 +3132,7 @@
         transparent: true,
         opacity: 0.75,
         blending: THREE.AdditiveBlending,
-        depthWrite: false
+        depthWrite: false,
       });
 
       const flowParticles = new THREE.Points(particleGeo, particleMat);
@@ -2438,19 +3145,19 @@
       let targetPoint = new THREE.Vector3(0, -5, 0);
       let isMouseActive = false;
 
-      window.addEventListener('mousemove', (event) => {
+      window.addEventListener("mousemove", (event) => {
         mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
         mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
         isMouseActive = true;
       });
 
-      window.addEventListener('mouseleave', () => {
+      window.addEventListener("mouseleave", () => {
         isMouseActive = false;
       });
 
       // 4. Scroll Tracking & Animation loop
       let scrollY = 0;
-      window.addEventListener('scroll', () => {
+      window.addEventListener("scroll", () => {
         scrollY = window.scrollY;
       });
 
@@ -2472,7 +3179,10 @@
               const intersectX = ray.origin.x + t * ray.direction.x;
               const intersectZ = ray.origin.z + t * ray.direction.z;
               // Smoothly lerp towards target to make mouse tracking fluid
-              targetPoint.lerp(new THREE.Vector3(intersectX, -5, intersectZ), 0.1);
+              targetPoint.lerp(
+                new THREE.Vector3(intersectX, -5, intersectZ),
+                0.1,
+              );
             }
           }
         } else {
@@ -2485,21 +3195,21 @@
         const posArray = posAttr.array;
         const colorAttr = flowParticles.geometry.attributes.color;
         const colorsArray = colorAttr.array;
-        
+
         for (let i = 0; i < particleCount; i++) {
           const data = particleData[i];
           // Particles flow from right to left (along negative X direction)
           posArray[i * 3] -= data.speed;
-          
+
           // Respawn at right edge if they pass the left boundary
           if (posArray[i * 3] < -60) {
             posArray[i * 3] = 60;
             data.offsetY = (Math.random() - 0.5) * 1.5;
             data.offsetZ = (Math.random() - 0.5) * 2.5;
           }
-          
+
           const px = posArray[i * 3];
-          
+
           // Compute paths using stream ribbons
           const path = getStreamPath3D(data.streamId, px, time);
 
@@ -2513,7 +3223,7 @@
             const dy = posArray[i * 3 + 1] - targetPoint.y; // targetPoint.y is -5
             const dz = posArray[i * 3 + 2] - targetPoint.z;
             const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-            
+
             if (dist < 18) {
               const force = (18 - dist) * 0.08;
               deflectionX = (dx / dist) * force;
@@ -2523,10 +3233,12 @@
           }
 
           // Flow field micro-fluctuation noise
-          const noiseForce = Math.sin(px * 0.12 + data.noiseOffset + time) * 0.45;
+          const noiseForce =
+            Math.sin(px * 0.12 + data.noiseOffset + time) * 0.45;
 
           // Set final coordinates
-          posArray[i * 3 + 1] = path.y + data.offsetY + noiseForce + deflectionY;
+          posArray[i * 3 + 1] =
+            path.y + data.offsetY + noiseForce + deflectionY;
           posArray[i * 3 + 2] = path.z + data.offsetZ + deflectionZ;
           posArray[i * 3] += deflectionX;
 
@@ -2553,7 +3265,8 @@
         torus2.rotation.z = time * 0.25;
 
         // Camera scroll reactive positioning
-        const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+        const maxScroll =
+          document.documentElement.scrollHeight - window.innerHeight;
         const scrollFrac = maxScroll > 0 ? scrollY / maxScroll : 0;
 
         const targetCamY = 7 - scrollFrac * 11;
@@ -2568,8 +3281,10 @@
         camera.lookAt(0, lookAtY, lookAtZ);
 
         // Composers texture binding
-        finalPass.uniforms.bloomTexture.value = bloomComposer.readBuffer.texture;
-        finalPass.uniforms.torusTexture.value = torusComposer.readBuffer.texture;
+        finalPass.uniforms.bloomTexture.value =
+          bloomComposer.readBuffer.texture;
+        finalPass.uniforms.torusTexture.value =
+          torusComposer.readBuffer.texture;
 
         // Multi-Composer Selective Render Passes
         // Pass 1: Torus scene only
@@ -2588,19 +3303,19 @@
       animate();
 
       // Handle window sizing
-      window.addEventListener('resize', () => {
+      window.addEventListener("resize", () => {
         const width = window.innerWidth;
         const height = window.innerHeight;
-        
+
         camera.aspect = width / height;
         camera.updateProjectionMatrix();
 
         renderer.setSize(width, height);
-        
+
         torusComposer.setSize(width, height);
         bloomComposer.setSize(width, height);
         finalComposer.setSize(width, height);
-        
+
         torusBloomPass.setSize(width, height);
         gridBloomPass.setSize(width, height);
       });

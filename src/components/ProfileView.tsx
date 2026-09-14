@@ -290,7 +290,7 @@ export default function ProfileView({
                   required
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
-                  placeholder="7471111980"
+                  placeholder="+1 (555) 019-2834"
                 />
               </div>
             </div>

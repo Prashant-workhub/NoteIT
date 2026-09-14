@@ -14,7 +14,7 @@ import { db } from '../firebaseConfig';
 import { Subject } from '../types';
 
 const DEFAULT_SUBJECTS: Subject[] = [
-  { id: 'sub-def-1', name: 'Data Structures', code: 'CS201', professor: 'Prof. Kishan Verma', teacherCode: 'CS201', color: '#3B82F6' },
+  { id: 'sub-def-1', name: 'Data Structures', code: 'CS201', professor: 'Prof. Alex Morgan', teacherCode: 'CS201', color: '#3B82F6' },
   { id: 'sub-def-2', name: 'Operating Systems', code: 'CS301', professor: 'Prof. Sharma', teacherCode: 'CS301', color: '#10B981' },
   { id: 'sub-def-3', name: 'Computer Networks', code: 'CS302', professor: 'Prof. Gupta', teacherCode: 'CS302', color: '#8B5CF6' },
   { id: 'sub-def-4', name: 'Database Management', code: 'CS303', professor: 'Prof. Roy', teacherCode: 'CS303', color: '#F59E0B' },
