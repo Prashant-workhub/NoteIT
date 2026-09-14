@@ -39,7 +39,7 @@ interface LectureProcessingViewProps {
 
 const COMPILATION_STEPS = [
   { label: "Uploading Audio", description: "Saving raw audio bytes to Local Storage." },
-  { label: "Deciphering Speech", description: "Trying Gemini transcription first, with automatic Speechmatics fallback." },
+  { label: "Deciphering Speech", description: "Transcribing audio using Gemini AI and processing speech text." },
   { label: "Cleaning Transcript", description: "Removing stutters, filler words, and converting to professional academic prose." },
   { label: "Generating Study Assets", description: "Segmenting chapters, writing study notes, flashcards, quizzes & mindmaps." },
   { label: "Saving Results", description: "Persisting the completed academic workspace directly to Firestore." }

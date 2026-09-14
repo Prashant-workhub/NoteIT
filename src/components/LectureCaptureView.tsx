@@ -57,7 +57,7 @@ interface LectureCaptureViewProps {
     duration: string,
     audioBlob: Blob,
     existingLectureId?: string,
-    transcriptionEngine?: 'gemini' | 'speechmatics' | 'browser',
+    transcriptionEngine?: 'gemini' | 'browser',
     browserLiveTranscript?: string
   ) => Promise<void>;
   onStartCapture?: (title: string, subject: string) => Promise<string>;
@@ -127,7 +127,7 @@ export default function LectureCaptureView({
   const [captureInputMode, setCaptureInputMode] = useState<'audio' | 'manual'>('audio');
   const [manualTranscriptInput, setManualTranscriptInput] = useState('');
   const [isSubmittingManual, setIsSubmittingManual] = useState(false);
-  const [transcriptionEngine, setTranscriptionEngine] = useState<'gemini' | 'speechmatics' | 'browser'>('gemini');
+  const [transcriptionEngine, setTranscriptionEngine] = useState<'gemini' | 'browser'>('gemini');
 
   const handleProcessManualTranscript = async () => {
     if (!manualTranscriptInput.trim()) {

@@ -130,7 +130,7 @@ export interface Lecture {
   storageProvider?: string;
   storageVersion?: number;
   geminiModel?: string;
-  transcriptionProvider?: 'gemini' | 'speechmatics';
+  transcriptionProvider?: 'gemini' | 'browser';
   transcriptionEngine?: string;
   browserLiveTranscript?: string;
   processingTimeMs?: number;

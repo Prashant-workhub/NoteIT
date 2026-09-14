@@ -595,7 +595,7 @@ export default function App() {
     duration: string, 
     audioBlob: Blob, 
     existingLectureId?: string,
-    transcriptionEngine?: 'gemini' | 'speechmatics' | 'browser',
+    transcriptionEngine?: 'gemini' | 'browser',
     browserLiveTranscript?: string
   ) => {
     if (!sessionUser) return;

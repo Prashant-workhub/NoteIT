@@ -405,24 +405,21 @@ Format the transcript text by preserving actual audio timestamps (e.g. [00:15], 
 };
 
 export type TranscriptionProgress = {
-  provider: 'gemini' | 'speechmatics';
+  provider: 'gemini' | 'browser';
   message: string;
   fallback?: boolean;
 };
 
 /**
- * Uses Gemini strictly for speech-to-text, then falls back to the server-owned
- * Speechmatics integration. This is intentionally separate from the user's
- * selected writing provider (for example, Notion), which only receives text in
- * the later analysis stages.
+ * Transcribes audio using Gemini AI, with browser live transcript fallback if selected.
  */
 export const transcribeAudioWithFallback = async (
   base64Audio: string,
   mimeType: string,
   onProgress?: (progress: TranscriptionProgress) => void,
   onBusy?: (isBusy: boolean) => void,
-  preferredProvider: 'gemini' | 'speechmatics' | 'auto' = 'auto'
-): Promise<{ transcript: string; provider: 'gemini' | 'speechmatics' | 'browser'; fallback: boolean }> => {
+  preferredProvider: 'gemini' | 'browser' | 'auto' = 'auto'
+): Promise<{ transcript: string; provider: 'gemini' | 'browser'; fallback: boolean }> => {
   const currentUser = auth.currentUser;
   if (!currentUser) throw new Error('User not authenticated with Firebase Auth.');
 
@@ -451,7 +448,7 @@ export const transcribeAudioWithFallback = async (
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
-    let result: { transcript: string; provider: 'gemini' | 'speechmatics'; fallback?: boolean } | null = null;
+    let result: { transcript: string; provider: 'gemini' | 'browser'; fallback?: boolean } | null = null;
 
     const consumeEvent = (rawEvent: string) => {
       const event = rawEvent.match(/^event:\s*(.+)$/m)?.[1]?.trim();
@@ -1014,7 +1011,7 @@ export const generateLectureContent = async (
   onBusy?: (isBusy: boolean) => void,
   mode: 'academic' | 'executive' | 'revision' = 'academic',
   onProgress?: (step: number, message: string) => void,
-  transcriptionEngine: 'gemini' | 'speechmatics' | 'browser' | 'auto' = 'auto',
+  transcriptionEngine: 'gemini' | 'browser' | 'auto' = 'auto',
   browserLiveTranscript?: string
 ): Promise<any> => {
   const apiKey = getAIConfig().geminiKey;
@@ -1023,7 +1020,7 @@ export const generateLectureContent = async (
   }
 
   let rawTranscript = '';
-  let providerName: 'gemini' | 'speechmatics' | 'browser' = 'gemini';
+  let providerName: 'gemini' | 'browser' = 'gemini';
 
   // Option 3: Browser Built-in Live STT (Zero Token Cost)
   if (transcriptionEngine === 'browser' && browserLiveTranscript && browserLiveTranscript.trim().length > 0) {
@@ -1036,8 +1033,8 @@ export const generateLectureContent = async (
     console.log(`- Transcribed Audio Content:\n${rawTranscript}`);
     console.log('==================================================');
   } else {
-    // Option 1 & Option 2: Server-side Gemini or Speechmatics
-    if (onProgress) onProgress(1, `Preparing audio transcription via ${transcriptionEngine === 'speechmatics' ? 'Speechmatics' : transcriptionEngine === 'gemini' ? 'Gemini AI' : 'transcription pipeline'}…`);
+    // Server-side Gemini AI Transcription
+    if (onProgress) onProgress(1, `Preparing audio transcription via ${transcriptionEngine === 'browser' ? 'Browser Transcript' : 'Gemini AI'}…`);
     const transcription = await transcribeAudioWithFallback(
       base64Audio,
       mimeType,
