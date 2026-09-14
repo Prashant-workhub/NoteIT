@@ -14,10 +14,10 @@ if (isProd && !apiEnvUrl) {
   console.warn("VITE_API_URL is not configured; API requests will use this deployment's /api routes.");
 }
 
-let defaultApiUrl = 'http://localhost:3002';
+let defaultApiUrl = 'http://localhost:3003';
 if (Capacitor.isNativePlatform()) {
-  // If running in Android emulator, use 10.0.2.2 to point to host machine's localhost
-  defaultApiUrl = Capacitor.getPlatform() === 'android' ? 'http://10.0.2.2:3002' : 'http://localhost:3002';
+  // If running in Android emulator, use 10.0.2.2 to point to host machine's localhost port 3003
+  defaultApiUrl = Capacitor.getPlatform() === 'android' ? 'http://10.0.2.2:3003' : 'http://localhost:3003';
 }
 
 export const API_BASE_URL = apiEnvUrl?.replace(/\/$/, '') ?? (Capacitor.isNativePlatform() ? defaultApiUrl : (isProd ? '' : defaultApiUrl));
