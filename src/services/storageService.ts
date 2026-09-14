@@ -122,10 +122,18 @@ export const uploadBlobStorage = async (
   }
 
   const sanitizedUrl = sanitizeStorageUrl(uploadUrl);
+  let idToken = '';
+  if (currentUser) {
+    idToken = await currentUser.getIdToken().catch(() => '');
+  }
+
   return new Promise((resolve) => {
     const xhr = new XMLHttpRequest();
     xhr.open('PUT', sanitizedUrl, true);
     xhr.setRequestHeader('Content-Type', blob.type || 'application/octet-stream');
+    if (idToken) {
+      xhr.setRequestHeader('Authorization', `Bearer ${idToken}`);
+    }
 
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable && event.total > 0) {

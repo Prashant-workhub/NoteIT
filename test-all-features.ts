@@ -67,6 +67,19 @@ const RUN_TYPECHECK = process.env.SKIP_TYPECHECK !== '1';
 const AUTH_HEADER = { Authorization: 'Bearer test-token' };
 const UPLOADS_DIR = path.resolve('uploads');
 
+// The server-side test-token bypass is strictly opt-in: it only works when
+// ALLOW_TEST_AUTH_BYPASS=true is set in the environment, so enable it here
+// before the server is spawned (this never affects a production deploy).
+process.env.ALLOW_TEST_AUTH_BYPASS = 'true';
+
+// The server under test must generate self-referential storage URLs pointing
+// back at itself. A developer's local .env (gitignored) frequently pins
+// APP_URL / PORT to a dev-only port (e.g. 3003), which would otherwise make
+// /api/storage/sas hand the pipeline an uploadUrl on a host that is not the
+// server we are actually testing. Pin APP_URL to BASE_URL so the storage
+// round-trip always targets the test server (dotenv will not override it).
+process.env.APP_URL = BASE_URL;
+
 // ----------------------------------------------------------------------------
 // Tiny console UI helpers (no external deps)
 // ----------------------------------------------------------------------------
@@ -313,9 +326,7 @@ async function ensureServerRunning() {
 
   console.log(paint('dim', `No server detected at ${BASE_URL}. Booting "tsx server.ts"...`));
   await runTest('Server Boot', 'Spawn server.ts and wait for /api/health', async () => {
-    // Use the Node entrypoint for tsx instead of invoking the .cmd shim directly.
-    // On Windows, spawning .cmd files without a shell can throw EINVAL, while
-    // `node node_modules/tsx/dist/cli.mjs server.ts` works consistently across OSes.
+
     const tsxCli = path.join(process.cwd(), 'node_modules', 'tsx', 'dist', 'cli.mjs');
     const nodeBin = process.execPath;
 
@@ -385,19 +396,42 @@ async function runHttpTests() {
     assert(json?.status === 'ok', `unexpected body: ${JSON.stringify(json)}`);
   });
 
-  await runTest('Debug', 'GET /api/debug/routes lists registered routes', async () => {
+  await runTest('Auth Guard', 'GET /api/debug/routes without a token is rejected (401)', async () => {
     const res = await fetchWithTimeout(`${BASE_URL}/api/debug/routes`);
-    const json = await readJsonSafely(res);
-    assert(res.status === 200, `expected 200, got ${res.status}`);
-    assert(Array.isArray(json?.routes) && json.routes.length > 10, 'expected a substantial route list');
-    return `${json.routes.length} routes registered`;
+    assert(res.status === 401, `expected 401, got ${res.status}`);
   });
 
-  await runTest('Debug', 'GET /api/debug/logs returns the in-memory log buffer', async () => {
+  await runTest('Debug', 'GET /api/debug/routes with admin credentials lists routes', async () => {
+    const adminSecret = process.env.ADMIN_API_SECRET || process.env.ENCRYPTION_SECRET || '';
+    const res = await fetchWithTimeout(`${BASE_URL}/api/debug/routes`, {
+      headers: { ...AUTH_HEADER, 'x-admin-secret': adminSecret },
+    });
+    if (res.status === 200) {
+      const json = await readJsonSafely(res);
+      assert(Array.isArray(json?.routes) && json.routes.length > 10, 'expected a substantial route list');
+      return `${json.routes.length} routes registered`;
+    }
+    if (res.status === 403) return warn('admin secret not configured in this environment; route listing correctly refused');
+    assert(false, `expected 200 or 403, got ${res.status}`);
+  });
+
+  await runTest('Auth Guard', 'GET /api/debug/logs without a token is rejected (401)', async () => {
     const res = await fetchWithTimeout(`${BASE_URL}/api/debug/logs`);
-    const json = await readJsonSafely(res);
-    assert(res.status === 200, `expected 200, got ${res.status}`);
-    assert(Array.isArray(json?.logs), 'expected a logs array');
+    assert(res.status === 401, `expected 401, got ${res.status}`);
+  });
+
+  await runTest('Debug', 'GET /api/debug/logs with admin credentials returns the in-memory log buffer', async () => {
+    const adminSecret = process.env.ADMIN_API_SECRET || process.env.ENCRYPTION_SECRET || '';
+    const res = await fetchWithTimeout(`${BASE_URL}/api/debug/logs`, {
+      headers: { ...AUTH_HEADER, 'x-admin-secret': adminSecret },
+    });
+    if (res.status === 200) {
+      const json = await readJsonSafely(res);
+      assert(Array.isArray(json?.logs), 'expected a logs array');
+      return `${json.logs.length} buffered log entries`;
+    }
+    if (res.status === 403) return warn('admin secret not configured in this environment; log buffer read correctly refused');
+    assert(false, `expected 200 or 403, got ${res.status}`);
   });
 
   await runTest('Auth Guard', 'GET /api/debug/auth without a token is rejected (401)', async () => {
@@ -487,7 +521,7 @@ async function runHttpTests() {
   await runTest('Bhai Lang', 'POST /api/ai/explain-bhailang rejects empty text', async () => {
     const res = await fetchWithTimeout(`${BASE_URL}/api/ai/explain-bhailang`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...AUTH_HEADER, 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: '   ' }),
     });
     assert(res.status === 400, `expected 400, got ${res.status}`);
@@ -498,7 +532,7 @@ async function runHttpTests() {
       `${BASE_URL}/api/ai/explain-bhailang`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...AUTH_HEADER, 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: 'A binary search tree keeps its left subtree smaller and right subtree larger.', subjectName: 'DSA' }),
       },
       REQUEST_TIMEOUT_MS
@@ -523,7 +557,7 @@ async function runHttpTests() {
     const uploadUrl = sasJson.uploadUrl.startsWith('http') ? sasJson.uploadUrl : `${BASE_URL}${sasJson.uploadUrl}`;
     const putRes = await fetchWithTimeout(uploadUrl, {
       method: 'PUT',
-      headers: { 'Content-Type': 'text/plain' },
+      headers: { ...AUTH_HEADER, 'Content-Type': 'text/plain' },
       body: fileContents,
     });
     assert(putRes.status === 201 || putRes.status === 200, `upload failed with status ${putRes.status}`);
@@ -684,15 +718,13 @@ async function runHttpTests() {
     warn(`requires a configured Firebase Admin/Firestore project in this environment (status ${res.status}): ${JSON.stringify(json).slice(0, 150)}`);
   });
 
-  await runTest('Notifications', 'POST /api/admin/broadcast-notification rejects a bad admin secret', async () => {
+  await runTest('Auth Guard', 'POST /api/admin/broadcast-notification without credentials is rejected (401/403)', async () => {
     const res = await fetchWithTimeout(`${BASE_URL}/api/admin/broadcast-notification`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: 'x', body: 'y', adminSecret: 'definitely-wrong' }),
+      body: JSON.stringify({ title: 'x', body: 'y' }),
     }, REQUEST_TIMEOUT_MS);
-    if (res.status === 401 || res.status === 403) return 'correctly rejected a bad admin secret';
-    const json = await readJsonSafely(res);
-    warn(`expected 401/403 for a bad admin secret but got ${res.status}: ${JSON.stringify(json).slice(0, 150)}`);
+    assert(res.status === 401 || res.status === 403, `expected 401/403 at minimum, got ${res.status}`);
   });
 }
 

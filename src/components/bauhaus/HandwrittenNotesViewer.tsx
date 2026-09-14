@@ -358,10 +358,10 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
             <span className="text-2xl">📝</span>
           </div>
           <div className="space-y-2">
-            <span className="px-3 py-1 rounded-[4px] bg-[#1E3A8A] text-white text-[10px] font-mono font-extrabold uppercase tracking-wider border border-[#111111] shadow-paper-sm">
+            <span className="px-3 py-1 rounded-[4px] bg-[#1E3A8A] text-white text-[10px] font-mono font-bold uppercase tracking-wider border border-[#111111] shadow-paper-sm">
               COMPILING REVISION SHEET
             </span>
-            <h3 className="text-lg font-heading font-extrabold text-[#111111] uppercase tracking-tight">
+            <h3 className="text-lg font-heading font-bold text-[#111111] uppercase tracking-tight">
               AI IS COMPILING HANDWRITTEN REVISION NOTES...
             </h3>
             <p className="text-xs font-mono font-bold text-[#475569] max-w-md mx-auto leading-relaxed">
@@ -385,7 +385,7 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
             📝
           </div>
           <div className="space-y-1">
-            <h3 className="text-sm font-mono font-extrabold text-[#334155] uppercase">
+            <h3 className="text-sm font-mono font-bold text-[#334155] uppercase">
               No Handwritten Notes Available Yet
             </h3>
             <p className="text-xs font-mono font-medium text-[#64748B]">
@@ -410,7 +410,7 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
       {/* TOOLBAR CONTROLS */}
       <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-[6px] border-2 border-[#111111] bg-[#F6F2EA] shadow-paper-sm print:hidden">
         <div className="flex items-center gap-2">
-          <span className="px-2.5 py-1 rounded-[4px] bg-[#1E3A8A] text-white text-[10px] font-mono font-extrabold uppercase tracking-wider border border-[#111111] shadow-paper-sm">
+          <span className="px-2.5 py-1 rounded-[4px] bg-[#1E3A8A] text-white text-[10px] font-mono font-bold uppercase tracking-wider border border-[#111111] shadow-paper-sm">
             📝 A4 HANDWRITTEN REVISION SHEET
           </span>
           <span className="text-xs font-mono font-bold text-[#666666]">
@@ -421,14 +421,14 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={handleDownloadPdf}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#FFC400] text-[#111111] text-xs font-mono font-extrabold uppercase rounded-[4px] border border-[#111111] shadow-paper-sm hover:bg-[#ffe066] cursor-pointer transition-all"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#FFC400] text-[#111111] text-xs font-mono font-bold uppercase rounded-[4px] border border-[#111111] shadow-paper-sm hover:bg-[#ffe066] cursor-pointer transition-all"
           >
             <Download className="h-3.5 w-3.5" />
             <span>Download PDF</span>
           </button>
           <button
             onClick={handlePrint}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white text-[#111111] text-xs font-mono font-extrabold uppercase rounded-[4px] border border-[#111111] shadow-paper-sm hover:bg-gray-100 cursor-pointer transition-all"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white text-[#111111] text-xs font-mono font-bold uppercase rounded-[4px] border border-[#111111] shadow-paper-sm hover:bg-gray-100 cursor-pointer transition-all"
           >
             <Printer className="h-3.5 w-3.5" />
             <span>Print</span>
@@ -559,7 +559,7 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
                           <p key={pIdx} className="leading-[28px]">
                             {pLine.startsWith('- ') || pLine.startsWith('* ') ? (
                               <span className="flex items-start gap-2">
-                                <span className="text-amber-500 font-extrabold">•</span>
+                                <span className="text-amber-500 font-bold">•</span>
                                 <span>{pLine.replace(/^[-*]\s+/, '')}</span>
                               </span>
                             ) : (
@@ -658,7 +658,7 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
                     <ul className="space-y-1.5 pl-2 text-lg">
                       {Array.isArray(item.content) && item.content.map((bullet: string, bIdx: number) => (
                         <li key={bIdx} className="flex items-start gap-2">
-                          <span className="text-amber-500 font-extrabold">•</span>
+                          <span className="text-amber-500 font-bold">•</span>
                           <span className="font-bold text-[#0F294A] leading-[28px]">{bullet}</span>
                         </li>
                       ))}

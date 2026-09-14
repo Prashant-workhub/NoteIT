@@ -12,4 +12,4 @@ if (isProd && !apiEnvUrl) {
   console.warn('VITE_API_URL is not configured; API requests will use this deployment\'s /api routes.');
 }
 
-export const API_BASE_URL = apiEnvUrl?.replace(/\/$/, '') ?? (isProd ? '' : 'http://localhost:3003');
+export const API_BASE_URL = apiEnvUrl?.replace(/\/$/, '') ?? (isProd ? '' : 'http://localhost:3002');

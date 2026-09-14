@@ -35,6 +35,10 @@ dotenv.config();
 
 process.on('uncaughtException', (err) => {
   console.error('[SERVER UNCAUGHT EXCEPTION]', err);
+  // Node's state is undefined after an uncaught exception; exit so the
+  // process manager restarts the server in a clean state instead of
+  // continuing to serve requests from a corrupted process.
+  process.exit(1);
 });
 
 process.on('unhandledRejection', (reason) => {
@@ -63,27 +67,50 @@ console.error = (...args: any[]) => {
 const app = express();
 const PORT = process.env.PORT || 3002;
 
-// Enable CORS and JSON parsing
-app.use(cors());
+// Restrict CORS to same-origin requests, explicitly configured origins
+// (CORS_ORIGINS, comma-separated), and local dev hosts. Requests without an
+// Origin header (curl, mobile apps, server-to-server) are always allowed.
+const corsOrigins = (process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (corsOrigins.includes('*')) return callback(null, true);
+    if (corsOrigins.includes(origin)) return callback(null, true);
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return callback(null, true);
+    return callback(new Error(`Origin ${origin} not allowed by CORS`));
+  },
+}));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Helper to determine base backend URL dynamically from request when process.env.APP_URL is not set
 const getBackendUrl = (req: express.Request) => {
   if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, '');
-  const protoHeader = req.headers['x-forwarded-proto'];
-  const protocol = (Array.isArray(protoHeader) ? protoHeader[0] : protoHeader) || req.protocol || 'http';
-  const hostHeader = req.headers['x-forwarded-host'];
-  const host = (Array.isArray(hostHeader) ? hostHeader[0] : hostHeader) || req.get('host') || `localhost:${PORT}`;
-  return `${protocol}://${host}`;
+  const protocol = req.protocol || 'http';
+  const hostHeader =
+    (Array.isArray(req.headers['x-forwarded-host']) ? req.headers['x-forwarded-host'][0] : req.headers['x-forwarded-host']) ||
+    req.get('host') ||
+    '';
+  // Only trust hosts that look like a real hostname[:port]. This blocks
+  // header-injection / host-poisoning via crafted Host or x-forwarded-host
+  // values in the dynamically generated self URLs.
+  const safeHost = hostHeader.trim();
+  if (/^[a-zA-Z0-9.-]+(:\d+)?$/.test(safeHost)) {
+    return `${protocol}://${safeHost}`;
+  }
+  return `${protocol}://localhost:${PORT}`;
 };
 
 
-// Temporary request logging middleware for debugging audit
+// Request logging middleware. Entries are buffered for the admin-gated
+// /api/debug/logs endpoint; per-request origin/authorization echoes were
+// removed to reduce log noise and avoid buffering user metadata.
 app.use((req, res, next) => {
   console.log(`[REQUEST LOG] ${req.method} ${req.path}`);
-  console.log(`- Origin: ${req.headers.origin || 'N/A'}`);
-  console.log(`- Authorization Header Present: ${!!req.headers.authorization}`);
   next();
 });
 
@@ -130,11 +157,10 @@ function decryptKey(encryptedText: string): string {
     decrypted += decipher.final('utf8');
     return decrypted;
   } catch (err) {
-    console.warn('[DECRYPT] Decryption failed, using raw string fallback:', err);
-    // If decryption fails, check if input string looks like a valid unencrypted key
-    if (encryptedText.length > 10) {
-      return encryptedText;
-    }
+    console.error('[DECRYPT] Decryption of AI API key failed:', err);
+    // Do NOT return the raw ciphertext as if it were a real key — silently
+    // passing the encrypted blob upstream corrupts provider calls and hides
+    // the real problem. Surface the failure instead.
     throw new Error('Decryption of AI API key failed');
   }
 }
@@ -1168,7 +1194,7 @@ app.post(['/api/lectures/:lectureId/generate-resources', '/api/lectures/generate
 });
 
 // Dedicated endpoint for Bhai Lang contextual text explanations
-app.post('/api/ai/explain-bhailang', async (req, res) => {
+app.post('/api/ai/explain-bhailang', authenticateFirebaseUser, async (req, res) => {
   try {
     const { text, subjectName } = req.body;
     if (!text || !text.trim()) {
@@ -1829,8 +1855,23 @@ app.post('/api/storage/extract-url', authenticateFirebaseUser, async (req, res) 
   }
 });
 
-// Temporary debug endpoints
-app.get('/api/debug/routes', (req, res) => {
+// Admin guard: requires a valid Firebase token AND the configured admin secret
+// (passed via the x-admin-secret header and matched against ADMIN_API_SECRET,
+// falling back to ENCRYPTION_SECRET). If no secret is configured the request
+// is refused, so a misconfiguration cannot open the door.
+const requireAdminSecret = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const secretKey = req.headers['x-admin-secret'];
+  const expectedSecret = process.env.ADMIN_API_SECRET || process.env.ENCRYPTION_SECRET;
+  if (!expectedSecret || !secretKey || secretKey !== expectedSecret) {
+    res.status(403).json({ error: 'Unauthorized: valid admin secret required.' });
+    return;
+  }
+  next();
+};
+
+// Debug endpoints are admin-only: unauthenticated access would let anonymous
+// clients enumerate every registered route and read cross-user request logs.
+app.get('/api/debug/routes', authenticateFirebaseUser, requireAdminSecret, (req, res) => {
   const routes: string[] = [];
   app._router.stack.forEach((middleware: any) => {
     if (middleware.route) {
@@ -1856,29 +1897,37 @@ app.get('/api/debug/auth', authenticateFirebaseUser, (req, res) => {
   });
 });
 
-app.get('/api/debug/logs', (req, res) => {
+app.get('/api/debug/logs', authenticateFirebaseUser, requireAdminSecret, (req, res) => {
   res.json({ logs: logBuffer });
 });
 
-// Endpoint to save upload locally (mimics Azure Storage PUT block blob)
-app.put('/api/storage/local-upload', express.raw({ type: '*/*', limit: '150mb' }), async (req, res) => {
-  const fileName = req.query.fileName as string;
-  if (!fileName) {
+// Endpoint to save upload locally (mimics Azure Storage PUT block blob).
+// Requires a valid Firebase ID token and sanitizes the file name so uploads
+// can never escape the uploads directory (arbitrary-file-write protection).
+app.put('/api/storage/local-upload', authenticateFirebaseUser, express.raw({ type: '*/*', limit: '150mb' }), async (req, res) => {
+  const rawFileName = req.query.fileName as string;
+  if (!rawFileName) {
     res.status(400).json({ error: 'Missing required query parameter: fileName' });
     return;
   }
 
   try {
-    const filePath = path.join(uploadsDir, fileName);
-    
+    // Strip any directory components and unsafe characters from the name.
+    const fileName = path.basename(rawFileName).replace(/[^\w.\-()+\s]/g, '_');
+    const resolvedFilePath = path.resolve(uploadsDir, fileName);
+    if (path.resolve(uploadsDir) !== path.dirname(resolvedFilePath)) {
+      res.status(400).json({ error: 'Invalid file name.' });
+      return;
+    }
+
     if (!req.body || !Buffer.isBuffer(req.body)) {
       res.status(400).json({ error: 'Invalid or missing file binary payload.' });
       return;
     }
 
-    await fs.promises.writeFile(filePath, req.body);
-    console.log(`Local file saved successfully at: ${filePath}`);
-    
+    await fs.promises.writeFile(resolvedFilePath, req.body);
+    console.log(`Local file saved successfully at: ${resolvedFilePath}`);
+
     // Azure Block Blob upload returns 201 Created on success
     res.status(201).send();
   } catch (error: any) {
@@ -1972,17 +2021,10 @@ app.post('/api/notifications/send-test', authenticateFirebaseUser, async (req, r
   }
 });
 
-// Endpoint for Admin to broadcast push notifications to ALL registered devices across NoteIT automatically
-app.post('/api/admin/broadcast-notification', async (req, res) => {
-  const { title, body, route, adminSecret } = req.body;
-
-  const secretKey = adminSecret || req.headers['x-admin-secret'];
-  const expectedSecret = process.env.ENCRYPTION_SECRET || 'noteit-admin-secret-2026';
-
-  if (secretKey && secretKey !== expectedSecret) {
-    res.status(403).json({ error: 'Unauthorized admin broadcast request.' });
-    return;
-  }
+// Endpoint for Admin to broadcast push notifications to ALL registered devices across NoteIT automatically.
+// Requires a valid Firebase token AND the configured admin secret (x-admin-secret header).
+app.post('/api/admin/broadcast-notification', authenticateFirebaseUser, requireAdminSecret, async (req, res) => {
+  const { title, body, route } = req.body;
 
   const broadcastTitle = title || 'NoteIT AI Broadcast 🚀';
   const broadcastBody = body || 'yourr noteit is readyyy';
