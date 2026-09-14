@@ -186,9 +186,16 @@ function decryptKey(encryptedText: string): string {
   }
 }
 
+function maskApiKey(key: string): string {
+  if (!key || key.length < 8) return '••••••••';
+  const start = key.slice(0, 6);
+  const end = key.slice(-4);
+  return `${start}...${end}`;
+}
+
 // AI Provider Abstraction endpoints
 app.post('/api/ai/validate-key', authenticateFirebaseUser, async (req, res) => {
-  const { key, apiKey, provider, model } = req.body;
+  const { key, apiKey, provider, model, label, isBackupOnly } = req.body;
   const inputKey = key || apiKey;
   const inputProvider = provider || 'gemini';
 
@@ -217,28 +224,51 @@ app.post('/api/ai/validate-key', authenticateFirebaseUser, async (req, res) => {
     const uid = user.uid;
     const encrypted = encryptKey(inputKey);
 
-    const providerInstance = ProviderFactory.getProvider(inputProvider, inputKey);
     const defaultModel = sanitizeModelName(model, activeProvider);
+    const masked = maskApiKey(inputKey);
+    const presetId = `key_${activeProvider}_${masked.replace(/[^a-zA-Z0-9]/g, '')}`;
+
+    const newPreset = {
+      id: presetId,
+      provider: activeProvider,
+      model: defaultModel,
+      encryptedKey: encrypted,
+      maskedKey: masked,
+      label: label || `${activeProvider.toUpperCase()} (${defaultModel})`,
+      savedAt: new Date().toISOString(),
+      lastUsedAt: new Date().toISOString()
+    };
 
     try {
       const adminDb = getFirestore();
       const userDocRef = adminDb.collection('users').doc(uid);
+      const userSnap = await userDocRef.get().catch(() => null);
+      const userData = userSnap && userSnap.exists ? userSnap.data() : {};
+
+      const existingSavedKeys: any[] = Array.isArray(userData?.savedKeys) ? userData.savedKeys : [];
+      const updatedSavedKeys = existingSavedKeys.filter(
+        (k: any) => k.id !== presetId && !(k.provider === activeProvider && k.maskedKey === masked)
+      );
+      updatedSavedKeys.unshift(newPreset);
 
       const updateFields: any = {
-        aiProvider: activeProvider,
-        providerConfigured: true,
-        providerLastValidated: new Date(),
-        encryptedApiKey: encrypted,
-        selectedModel: defaultModel,
-        usageStats: { todayRequests: 0, estimatedTokens: 0, avgResponseTime: 0, failedRequests: 0, errors429: 0, errors503: 0 },
-        estimatedMonthlyTokens: 0,
-        lastHealthCheck: { status: 'Healthy', latency: 0, checkedAt: new Date() }
+        savedKeys: updatedSavedKeys
       };
 
-      // Preserve a user-validated Gemini key for live audio transcription even
-      // after the user changes their downstream writing provider to Notion.
-      if (activeProvider === 'gemini') {
-        updateFields.encryptedGeminiTranscriptionKey = encrypted;
+      // Update active provider & key unless specifically adding as a non-active backup key
+      if (!isBackupOnly) {
+        updateFields.aiProvider = activeProvider;
+        updateFields.providerConfigured = true;
+        updateFields.providerLastValidated = new Date();
+        updateFields.encryptedApiKey = encrypted;
+        updateFields.selectedModel = defaultModel;
+        updateFields.usageStats = { todayRequests: 0, estimatedTokens: 0, avgResponseTime: 0, failedRequests: 0, errors429: 0, errors503: 0 };
+        updateFields.estimatedMonthlyTokens = 0;
+        updateFields.lastHealthCheck = { status: 'Healthy', latency: 0, checkedAt: new Date() };
+
+        if (activeProvider === 'gemini') {
+          updateFields.encryptedGeminiTranscriptionKey = encrypted;
+        }
       }
 
       await userDocRef.set(updateFields, { merge: true });
@@ -246,7 +276,7 @@ app.post('/api/ai/validate-key', authenticateFirebaseUser, async (req, res) => {
       console.warn('[validate-key] Local Firestore save skipped (no GCP ADC credentials):', fsErr);
     }
 
-    res.json({ success: true, message: `${activeProvider} API connected successfully` });
+    res.json({ success: true, message: `${activeProvider} API key validated and saved to encrypted vault`, preset: newPreset });
   } catch (error: any) {
     console.error(`API key validation error for provider ${inputProvider}:`, error);
     if (error.name === 'ProviderValidationError') {
@@ -254,6 +284,125 @@ app.post('/api/ai/validate-key', authenticateFirebaseUser, async (req, res) => {
     } else {
       res.status(500).json({ error: error.message || 'Internal server error validating key' });
     }
+  }
+});
+
+// Endpoint to list saved API key presets (masked keys only)
+app.get('/api/ai/saved-keys', authenticateFirebaseUser, async (req, res) => {
+  try {
+    const uid = req.body.user.uid;
+    const adminDb = getFirestore();
+    const userDoc = await adminDb.collection('users').doc(uid).get();
+    const data = userDoc.exists ? userDoc.data() : {};
+    const savedKeys: any[] = Array.isArray(data?.savedKeys) ? data.savedKeys : [];
+    const activeProvider = data?.aiProvider || 'gemini';
+    const activeModel = data?.selectedModel || 'gemini-3.6-flash';
+
+    const formatted = savedKeys.map((k: any) => ({
+      id: k.id,
+      provider: k.provider,
+      model: k.model,
+      maskedKey: k.maskedKey,
+      label: k.label || `${k.provider.toUpperCase()} (${k.model})`,
+      savedAt: k.savedAt,
+      lastUsedAt: k.lastUsedAt,
+      isActive: k.provider === activeProvider && k.model === activeModel
+    }));
+
+    res.json({ success: true, savedKeys: formatted, activeProvider, activeModel });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to fetch saved API keys' });
+  }
+});
+
+// Endpoint to 1-click switch active API key & model from saved presets
+app.post('/api/ai/switch-saved-key', authenticateFirebaseUser, async (req, res) => {
+  const { keyId } = req.body;
+  if (!keyId) {
+    res.status(400).json({ error: 'Missing required parameter: keyId' });
+    return;
+  }
+
+  try {
+    const uid = req.body.user.uid;
+    const adminDb = getFirestore();
+    const userDocRef = adminDb.collection('users').doc(uid);
+    const userDoc = await userDocRef.get();
+    if (!userDoc.exists) {
+      res.status(404).json({ error: 'User configuration not found' });
+      return;
+    }
+
+    const data = userDoc.data() || {};
+    const savedKeys: any[] = Array.isArray(data.savedKeys) ? data.savedKeys : [];
+    const targetKey = savedKeys.find((k: any) => k.id === keyId);
+
+    if (!targetKey) {
+      res.status(404).json({ error: 'Saved API key preset not found in vault' });
+      return;
+    }
+
+    // Verify key decryption works
+    let decrypted = '';
+    try {
+      decrypted = decryptKey(targetKey.encryptedKey);
+    } catch (e) {
+      res.status(400).json({ error: 'Failed to decrypt saved API key' });
+      return;
+    }
+
+    const updateFields: any = {
+      aiProvider: targetKey.provider,
+      selectedModel: targetKey.model,
+      encryptedApiKey: targetKey.encryptedKey,
+      providerConfigured: true,
+      providerLastValidated: new Date()
+    };
+
+    if (targetKey.provider === 'gemini') {
+      updateFields.encryptedGeminiTranscriptionKey = targetKey.encryptedKey;
+    }
+
+    const updatedSavedKeys = savedKeys.map((k: any) =>
+      k.id === keyId ? { ...k, lastUsedAt: new Date().toISOString() } : k
+    );
+    updateFields.savedKeys = updatedSavedKeys;
+
+    await userDocRef.set(updateFields, { merge: true });
+
+    res.json({
+      success: true,
+      message: `Active AI provider switched to ${targetKey.provider.toUpperCase()} (${targetKey.model})`,
+      provider: targetKey.provider,
+      model: targetKey.model
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to switch API key' });
+  }
+});
+
+// Endpoint to delete a saved API key preset
+app.delete('/api/ai/saved-keys/:keyId', authenticateFirebaseUser, async (req, res) => {
+  const { keyId } = req.params;
+  try {
+    const uid = req.body.user.uid;
+    const adminDb = getFirestore();
+    const userDocRef = adminDb.collection('users').doc(uid);
+    const userDoc = await userDocRef.get();
+    if (!userDoc.exists) {
+      res.status(404).json({ error: 'User configuration not found' });
+      return;
+    }
+
+    const data = userDoc.data() || {};
+    const savedKeys: any[] = Array.isArray(data.savedKeys) ? data.savedKeys : [];
+    const updatedSavedKeys = savedKeys.filter((k: any) => k.id !== keyId);
+
+    await userDocRef.set({ savedKeys: updatedSavedKeys }, { merge: true });
+
+    res.json({ success: true, message: 'API key preset removed from vault' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to delete saved API key' });
   }
 });
 
@@ -451,12 +600,41 @@ app.post('/api/ai/provider-proxy', authenticateFirebaseUser, async (req, res) =>
       const isRateLimitOrQuota = primaryErr?.status === 429 || primaryErr?.status === 402 || primaryErr?.status === 503 ||
         /429|quota|rate limit|resource_exhausted|too many requests|credit limit/i.test(primaryErr?.message || '');
 
-      const fallbackKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
-      if (isRateLimitOrQuota && fallbackKey && decryptedKey !== fallbackKey) {
-        console.warn(`[provider-proxy] Primary provider (${providerName}) rate limited/quota error. Executing automatic server platform key fallback...`);
-        const fallbackProvider = ProviderFactory.getProvider('gemini', fallbackKey);
-        result = await executeProxyCall(fallbackProvider, 'gemini-3.6-flash');
-      } else {
+      let retrySuccess = false;
+
+      // Tier 1: Check user's encrypted saved backup keys first
+      if (isRateLimitOrQuota && data?.savedKeys && Array.isArray(data.savedKeys)) {
+        const backupPresets = data.savedKeys.filter((k: any) => k.encryptedKey !== rawKey && k.encryptedKey !== data?.encryptedApiKey);
+        for (const backupKeyPreset of backupPresets) {
+          try {
+            const backupDecrypted = decryptKey(backupKeyPreset.encryptedKey);
+            console.warn(`[provider-proxy] Active key rate limited (${primaryErr?.status || 'quota'}). Retrying with user saved backup key (${backupKeyPreset.provider.toUpperCase()} - ${backupKeyPreset.model})...`);
+            const backupProviderInstance = ProviderFactory.getProvider(backupKeyPreset.provider, backupDecrypted);
+            result = await executeProxyCall(backupProviderInstance, backupKeyPreset.model);
+            retrySuccess = true;
+            break;
+          } catch (backupErr: any) {
+            console.warn(`[provider-proxy] Saved backup key (${backupKeyPreset.provider}) also failed:`, backupErr?.message || backupErr);
+          }
+        }
+      }
+
+      // Tier 2: Server platform key fallback
+      if (!retrySuccess && isRateLimitOrQuota) {
+        const fallbackKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+        if (fallbackKey && decryptedKey !== fallbackKey) {
+          try {
+            console.warn(`[provider-proxy] Primary provider (${providerName}) rate limited. Executing automatic server platform key fallback...`);
+            const fallbackProvider = ProviderFactory.getProvider('gemini', fallbackKey);
+            result = await executeProxyCall(fallbackProvider, 'gemini-3.6-flash');
+            retrySuccess = true;
+          } catch (fbErr) {
+            throw primaryErr;
+          }
+        } else {
+          throw primaryErr;
+        }
+      } else if (!retrySuccess) {
         throw primaryErr;
       }
     }

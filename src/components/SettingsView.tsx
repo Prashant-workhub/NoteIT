@@ -252,6 +252,21 @@ export default function SettingsView({
   const [newKey, setNewKey] = useState('');
   const [showReplaceForm, setShowReplaceForm] = useState(false);
 
+  // Saved Keys Vault state
+  const [savedKeys, setSavedKeys] = useState<Array<{
+    id: string;
+    provider: string;
+    model: string;
+    maskedKey: string;
+    label: string;
+    savedAt: string;
+    lastUsedAt?: string;
+    isActive: boolean;
+  }>>([]);
+  const [loadingSavedKeys, setLoadingSavedKeys] = useState(false);
+  const [switchingKeyId, setSwitchingKeyId] = useState<string | null>(null);
+  const [deletingPresetId, setDeletingPresetId] = useState<string | null>(null);
+
   const [saveSuccess, setSaveSuccess] = useState(false);
   
   // Migration State
@@ -439,9 +454,88 @@ export default function SettingsView({
     }
   };
 
+  const fetchSavedKeys = async () => {
+    setLoadingSavedKeys(true);
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) return;
+      const idToken = await currentUser.getIdToken();
+      const res = await fetch(`${API_BASE_URL}/api/ai/saved-keys`, {
+        headers: { 'Authorization': `Bearer ${idToken}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.savedKeys)) {
+          setSavedKeys(data.savedKeys);
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to fetch saved API keys:', err);
+    } finally {
+      setLoadingSavedKeys(false);
+    }
+  };
+
+  const handleSwitchSavedKey = async (keyId: string) => {
+    setSwitchingKeyId(keyId);
+    setValidationError(null);
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) return;
+      const idToken = await currentUser.getIdToken();
+      const res = await fetch(`${API_BASE_URL}/api/ai/switch-saved-key`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`
+        },
+        body: JSON.stringify({ keyId })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        localStorage.setItem('noteit_active_ai_provider', data.provider);
+        localStorage.setItem('noteit_active_ai_model', data.model);
+        localStorage.setItem('noteit_selected_model', data.model);
+        triggerSaveNotification();
+        await fetchConfigStatus();
+        await fetchSavedKeys();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setValidationError(errData.error || 'Failed to switch API key');
+      }
+    } catch (err: any) {
+      setValidationError(err.message || 'Failed to switch API key');
+    } finally {
+      setSwitchingKeyId(null);
+    }
+  };
+
+  const handleDeleteSavedKey = async (keyId: string) => {
+    if (!window.confirm('Are you sure you want to remove this API key preset from your encrypted vault?')) return;
+    setDeletingPresetId(keyId);
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) return;
+      const idToken = await currentUser.getIdToken();
+      const res = await fetch(`${API_BASE_URL}/api/ai/saved-keys/${keyId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${idToken}` }
+      });
+      if (res.ok) {
+        triggerSaveNotification();
+        await fetchSavedKeys();
+      }
+    } catch (err) {
+      console.error('Failed to delete saved key:', err);
+    } finally {
+      setDeletingPresetId(null);
+    }
+  };
+
   useEffect(() => {
     if (activeTab === 'ai' || activeTab === 'usage' || activeTab === 'security') {
       fetchConfigStatus();
+      fetchSavedKeys();
     }
   }, [activeTab]);
 
@@ -1084,9 +1178,99 @@ export default function SettingsView({
                       className="flex items-center gap-1.5 px-3.5 py-2 rounded-[6px] border-2 border-[#111111] bg-[#FF4D4D] text-white text-xs font-mono font-extrabold uppercase hover:bg-red-700 transition-all shadow-paper-sm cursor-pointer ml-auto disabled:opacity-50"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
-                      <span>Delete Key</span>
+                      <span>Delete Active Key</span>
                     </button>
                   </div>
+                </div>
+
+                {/* SAVED KEYS & BACKUP PRESETS ENCRYPTED VAULT CARD */}
+                <div className="p-5 rounded-[6px] border-2 border-[#111111] bg-white space-y-4 shadow-paper-sm text-left">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b-2 border-[#111111]">
+                    <div>
+                      <span className="text-[10px] font-mono font-extrabold text-[#19B56B] uppercase tracking-[2px] block flex items-center gap-1">
+                        <Lock className="h-3 w-3 text-[#19B56B]" />
+                        AES-256 ENCRYPTED KEY VAULT
+                      </span>
+                      <h4 className="text-sm font-heading font-extrabold uppercase text-[#111111] mt-0.5">
+                        Saved API Key Presets & Backup Keys
+                      </h4>
+                      <p className="text-[10px] font-mono font-bold text-[#666666] mt-0.5">
+                        Store multiple API keys & models for 1-click switching and automatic failover if rate limits (429/quota) occur.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowReplaceForm(true)}
+                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-[6px] border-2 border-[#111111] bg-[#FFC400] text-[#111111] text-xs font-mono font-extrabold uppercase hover:bg-[#ffe066] transition-all shadow-paper-sm shrink-0 cursor-pointer"
+                    >
+                      <Key className="h-3.5 w-3.5" />
+                      <span>+ Add Key Preset</span>
+                    </button>
+                  </div>
+
+                  {loadingSavedKeys ? (
+                    <div className="py-4 text-center text-xs font-mono text-[#666666] animate-pulse">Loading saved key vault...</div>
+                  ) : savedKeys.length === 0 ? (
+                    <div className="p-4 rounded-[6px] border-2 border-dashed border-[#111111] bg-[#F6F2EA] text-center space-y-1">
+                      <p className="text-xs font-mono font-bold text-[#111111]">No saved backup API key presets in vault yet.</p>
+                      <p className="text-[10px] font-mono text-[#666666]">Add backup keys from OpenAI, Gemini, Groq, or OpenRouter so your workspace automatically switches if quota limits are reached.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {savedKeys.map((preset) => (
+                        <div
+                          key={preset.id}
+                          className={`p-3.5 rounded-[6px] border-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all ${
+                            preset.isActive
+                              ? 'border-[#10B981] bg-[#F0FDF4] shadow-paper-xs'
+                              : 'border-[#111111] bg-[#F6F2EA]'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`p-2 rounded border-2 ${preset.isActive ? 'bg-[#10B981] text-white border-[#065F46]' : 'bg-white text-[#111111] border-[#111111]'}`}>
+                              <Key className="h-4 w-4" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-mono font-extrabold uppercase text-[#111111]">{preset.label}</span>
+                                {preset.isActive && (
+                                  <span className="px-2 py-0.5 rounded-[4px] bg-[#10B981] text-white text-[9px] font-mono font-extrabold border border-[#065F46] uppercase">
+                                    ACTIVE KEY
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[10px] font-mono font-bold text-[#666666] flex items-center gap-2 mt-0.5">
+                                <span>Key: <code className="bg-white px-1.5 py-0.5 rounded border border-[#111111] text-[#111111]">{preset.maskedKey}</code></span>
+                                <span>Model: <span className="text-[#2F6BFF] font-extrabold">{preset.model}</span></span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            {!preset.isActive && (
+                              <button
+                                type="button"
+                                disabled={switchingKeyId === preset.id}
+                                onClick={() => handleSwitchSavedKey(preset.id)}
+                                className="px-3 py-1.5 rounded-[4px] border-2 border-[#111111] bg-[#2F6BFF] text-white text-[11px] font-mono font-extrabold uppercase hover:bg-[#255cd9] transition-all cursor-pointer shadow-paper-xs disabled:opacity-50"
+                              >
+                                {switchingKeyId === preset.id ? 'Switching...' : 'Use as Active Key'}
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              disabled={deletingPresetId === preset.id}
+                              onClick={() => handleDeleteSavedKey(preset.id)}
+                              className="p-1.5 rounded-[4px] border-2 border-[#111111] bg-white text-[#FF4D4D] hover:bg-red-50 transition-all cursor-pointer"
+                              title="Remove preset"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Replace Key Form */}
