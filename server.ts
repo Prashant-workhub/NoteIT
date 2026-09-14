@@ -8,7 +8,6 @@ import { formatUserFriendlyErrorMessage } from './src/utils/errorSanitizer';
 import { authenticateFirebaseUser } from './src/middleware/authFirebase';
 import { 
   isAzureBlobConfigured, 
-  generateAzureUploadSasUrl, 
   uploadTranscriptToAzure, 
   downloadTranscriptFromAzure,
   uploadBinaryBlobToAzure 
@@ -1437,7 +1436,9 @@ function sanitizeUploadFileName(fileName: string): string {
   return base.replace(/[^\w.\-()+\s]/g, '_');
 }
 
-// Endpoint to generate Upload Target URL with Azure Blob Storage priority and Local fallback
+// Browser uploads always use this backend instead of Azure SAS URLs. This avoids
+// browser-to-Azure CORS failures and keeps a local copy available for immediate
+// document extraction. The upload endpoint mirrors the file to Azure afterwards.
 app.get('/api/storage/sas', authenticateFirebaseUser, async (req, res) => {
   const fileName = req.query.fileName as string;
   if (!fileName) {
@@ -1451,35 +1452,22 @@ app.get('/api/storage/sas', authenticateFirebaseUser, async (req, res) => {
     const safeName = sanitizeUploadFileName(fileName);
     const backendUrl = getBackendUrl(req);
 
-    // Primary: Attempt Azure Blob SAS URL generation if Azure is configured
-    if (isAzureBlobConfigured()) {
-      try {
-        const azureResult = await generateAzureUploadSasUrl(uid, safeName);
-        if (azureResult) {
-          return res.json({
-            ...azureResult,
-            isAzure: true
-          });
-        }
-      } catch (azureErr) {
-        console.warn('[Storage Endpoint] Azure SAS URL generation failed; falling back to local disk:', azureErr);
-      }
-    }
-
-    // Fallback: Local Backend Disk Storage Target
+    // Authenticated backend upload target. Do not return a direct Azure URL:
+    // Azure CORS configuration must never prevent a user from uploading a file.
     const localFileName = `${uid}-${safeName}`;
     res.json({
       uploadUrl: `${backendUrl}/api/storage/local-upload?fileName=${encodeURIComponent(localFileName)}`,
       audioUrl: `${backendUrl}/uploads/${localFileName}`,
-      blobPath: `users/${uid}/recordings/${safeName}`,
-      isLocal: true
+      blobPath: `users/${uid}/blobs/${safeName}`,
+      isBackend: true
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Upload setup failed.' });
   }
 });
 
-// Endpoint to receive binary uploads for local disk fallback (protected, 150MB limit)
+// Endpoint to receive browser uploads (protected, 150MB limit). Files are saved
+// locally for processing, then mirrored to Azure when its server credentials work.
 app.put('/api/storage/local-upload', authenticateFirebaseUser, express.raw({ type: '*/*', limit: '150mb' }), async (req, res) => {
   const rawFileName = req.query.fileName as string;
   if (!rawFileName) {
@@ -1488,6 +1476,13 @@ app.put('/api/storage/local-upload', authenticateFirebaseUser, express.raw({ typ
   }
 
   try {
+    // express.raw replaces req.body with the binary upload payload, so use the
+    // identity that the auth middleware attaches directly to the request.
+    const user = (req as any).user;
+    if (!user?.uid) {
+      res.status(401).json({ error: 'Authenticated user identity is missing.' });
+      return;
+    }
     const fileName = sanitizeUploadFileName(rawFileName);
     const resolvedFilePath = path.resolve(uploadsDir, fileName);
     if (path.resolve(uploadsDir) !== path.dirname(resolvedFilePath)) {
@@ -1502,7 +1497,25 @@ app.put('/api/storage/local-upload', authenticateFirebaseUser, express.raw({ typ
 
     await fs.promises.writeFile(resolvedFilePath, req.body);
     console.log(`[Local Upload] Saved upload payload to: ${resolvedFilePath} (${req.body.length} bytes)`);
-    res.json({ success: true, path: resolvedFilePath });
+
+    let storageProvider: 'azure' | 'local' = 'local';
+    if (isAzureBlobConfigured()) {
+      try {
+        await uploadBinaryBlobToAzure(
+          user.uid,
+          fileName.replace(`${user.uid}-`, ''),
+          req.body,
+          req.get('content-type') || 'application/octet-stream'
+        );
+        storageProvider = 'azure';
+      } catch (azureErr: any) {
+        // The upload itself has already succeeded locally. Azure is an optional
+        // durable mirror, so its failure must not fail the user's upload.
+        console.warn('[Local Upload] Azure mirror failed; retaining local file:', azureErr?.message || azureErr);
+      }
+    }
+
+    res.json({ success: true, storageProvider, path: resolvedFilePath });
   } catch (err: any) {
     console.error('[Local Upload] Failed to write file to disk:', err);
     res.status(500).json({ error: 'Failed to write upload payload to disk.' });
