@@ -6,8 +6,11 @@ import { GeminiAdapter } from './ValidationAdapters';
 // longer academic resource generation when needed.
 const MAX_OUTPUT_TOKENS = Number(process.env.AI_MAX_OUTPUT_TOKENS || 8192);
 
-function sanitizeGeminiModel(_model?: string): string {
-  return 'gemini-3.6-flash';
+function sanitizeGeminiModel(model?: string): string {
+  if (!model || model.includes('2.5') || model.includes('3.6') || model.includes('3.0')) {
+    return 'gemini-2.0-flash';
+  }
+  return model;
 }
 
 export async function fetchGeminiApi(apiKey: string, requestedModel: string, bodyObj: any): Promise<Response> {
@@ -76,11 +79,11 @@ export async function fetchGeminiApi(apiKey: string, requestedModel: string, bod
 
 export class GeminiProvider extends BaseProvider {
   constructor(apiKey: string) {
-    super(apiKey, 'gemini-3.6-flash');
+    super(apiKey, 'gemini-2.0-flash');
   }
 
   getAvailableModels(): string[] {
-    return ['gemini-3.6-flash'];
+    return ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
   }
 
   async validateKey(): Promise<boolean> {

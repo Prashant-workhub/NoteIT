@@ -1192,7 +1192,7 @@ export default function SettingsView({
                     <div>
                       <div className="text-[9px] uppercase text-[#666666]">Active Model</div>
                       <div className="mt-1 font-extrabold text-[#2F6BFF]">
-                        {configStatus?.selectedModel || 'gemini-2.5-flash'}
+                        {configStatus?.selectedModel || 'gemini-2.0-flash'}
                       </div>
                     </div>
                     <div>

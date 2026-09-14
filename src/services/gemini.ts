@@ -178,7 +178,7 @@ export const executeGeminiCall = async (
   const geminiKey = apiKey || getAIConfig().geminiKey;
   if (geminiKey) {
     try {
-      const directModel = model || 'gemini-2.5-flash';
+      const directModel = (model && !model.includes('2.5') && !model.includes('3.6')) ? model : 'gemini-2.0-flash';
       const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/${directModel}:generateContent?key=${geminiKey}`;
       
       const contentsParts: any[] = [];
@@ -1339,7 +1339,7 @@ export const generateAdditionalQuizQuestions = async (
     throw new Error("Gemini API key is not configured. Please configure an API key in Settings or environment.");
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
   const prompt = `
     You are an expert academic tutor. Generate 12 unique additional quiz questions about the topic "${topic}" with difficulty level "${difficulty}" directly from the provided source context.
