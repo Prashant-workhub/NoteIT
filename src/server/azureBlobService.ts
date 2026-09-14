@@ -174,11 +174,13 @@ export async function uploadTranscriptToAzure(
   const blobPath = `users/${userId}/transcripts/${lectureId}.json`;
   const blockBlobClient = container.getBlockBlobClient(blobPath);
   
+  const { notes, notesMarkdown, academicNotes, ...cleanData } = transcriptData as any;
+
   const content = JSON.stringify({
     userId,
     lectureId,
     timestamp: new Date().toISOString(),
-    ...transcriptData
+    ...cleanData
   });
 
   const uploadOptions = {

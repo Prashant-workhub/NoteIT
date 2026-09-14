@@ -1545,9 +1545,12 @@ app.post('/api/storage/transcripts/upload', authenticateFirebaseUser, async (req
   const user = req.body.user;
   const uid = user.uid;
 
+  // Explicitly omit notes, notesMarkdown, and academicNotes so notes are never stored
+  const { notes, notesMarkdown, academicNotes, ...cleanTranscriptData } = transcriptData || {};
+
   if (isAzureBlobConfigured()) {
     try {
-      const azureRes = await uploadTranscriptToAzure(uid, lectureId, transcriptData);
+      const azureRes = await uploadTranscriptToAzure(uid, lectureId, cleanTranscriptData);
       console.log(`[Transcript Storage] Stored transcript to Azure Blob for user ${uid}, lecture ${lectureId}`);
       return res.json({
         success: true,
@@ -1569,7 +1572,7 @@ app.post('/api/storage/transcripts/upload', authenticateFirebaseUser, async (req
       userId: uid,
       lectureId,
       timestamp: new Date().toISOString(),
-      ...transcriptData
+      ...cleanTranscriptData
     });
 
     await fs.promises.writeFile(targetPath, content, 'utf8');
@@ -1652,7 +1655,6 @@ app.get('/api/storage/read-sas', authenticateFirebaseUser, async (req, res) => {
     res.status(500).json({ error: err.message || 'Read URL resolution failed.' });
   }
 });
-
 
 // Endpoint to clean up temporary upload files to optimize storage usage
 app.post('/api/storage/cleanup', authenticateFirebaseUser, async (req, res) => {

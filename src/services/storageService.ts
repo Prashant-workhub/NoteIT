@@ -420,11 +420,14 @@ export const saveTranscriptMultiTier = async (
     throw new Error('UserId and LectureId are required to save transcript.');
   }
 
+  // Explicitly omit notes, notesMarkdown, and academicNotes so notes are never stored
+  const { notes, notesMarkdown, academicNotes, ...cleanTranscriptData } = transcriptData || {};
+
   try {
     const localKey = `noteit_transcript_${userId}_${lectureId}`;
     localStorage.setItem(localKey, JSON.stringify({
       timestamp: Date.now(),
-      ...transcriptData
+      ...cleanTranscriptData
     }));
   } catch (localStorageErr) {
     console.warn('[Storage] Client LocalStorage quota reached or unavailable:', localStorageErr);
@@ -443,7 +446,7 @@ export const saveTranscriptMultiTier = async (
           },
           body: JSON.stringify({
             lectureId,
-            transcriptData
+            transcriptData: cleanTranscriptData
           })
         });
 
