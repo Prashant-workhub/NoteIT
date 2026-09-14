@@ -8,7 +8,8 @@ import {
   Brain,
   Settings,
   RotateCcw,
-  FileText
+  FileText,
+  CloudUpload
 } from 'lucide-react';
 import { PageId } from '../types';
 import { blobToBase64, generateLectureContent, generateResourcesFromTranscript, getAIConfig } from '../services/gemini';
@@ -131,21 +132,60 @@ export default function LectureProcessingView({
         const existingData = lectureSnap.exists() ? lectureSnap.data() : null;
 
         let existingTranscript = existingData?.cleanTranscript || existingData?.transcript || '';
-        if (!existingTranscript && userId && lectureId) {
-          const remoteRes = await getTranscriptMultiTier(userId, lectureId).catch(() => null);
-          if (remoteRes?.cleanTranscript) {
+        let remoteRes: any = null;
+        if (userId && lectureId) {
+          remoteRes = await getTranscriptMultiTier(userId, lectureId).catch(() => null);
+          if (!existingTranscript && remoteRes?.cleanTranscript) {
             existingTranscript = remoteRes.cleanTranscript;
           }
         }
+
         if (existingTranscript) {
           setSavedTranscript(existingTranscript);
         }
 
+        if (remoteRes?.transcriptData) {
+          const tData = remoteRes.transcriptData;
+          const hasBlobGeneratedContent = tData.summary || 
+            (Array.isArray(tData.notes) && tData.notes.length > 0) ||
+            (Array.isArray(tData.quizzes) && tData.quizzes.length > 0) ||
+            (Array.isArray(tData.sections) && tData.sections.length > 0) ||
+            tData.storedInBlob;
+
+          if (hasBlobGeneratedContent) {
+            console.log('[LectureProcessingView] Found saved generated content in Azure Blob storage. Loading content directly from Blob Storage without regenerating...');
+            await updateLecture(lectureId, {
+              summary: tData.summary || existingData?.summary || '',
+              summaries: tData.summaries || existingData?.summaries || {},
+              notes: tData.notes || existingData?.notes || [],
+              quizzes: tData.quizzes || existingData?.quizzes || [],
+              flashcards: tData.flashcards || existingData?.flashcards || [],
+              mindMap: tData.mindMap || existingData?.mindMap || null,
+              timeline: tData.timeline || existingData?.timeline || [],
+              sections: tData.sections || existingData?.sections || [],
+              resourceGenerationStatus: 'completed',
+              status: 'generated',
+              storedInBlob: true
+            });
+
+            if (!isSubscribed) return;
+            setUploadStatus('completed');
+            setCurrentStepIndex(steps.length);
+            if (setActiveLectureId && lectureId) {
+              setActiveLectureId(lectureId);
+            }
+            setTimeout(() => {
+              if (isSubscribed) {
+                setActivePage('lecture-capture');
+              }
+            }, 1000);
+            return;
+          }
+        }
 
         let audioUrl = existingData?.audioUrl || '';
         let blobPath = existingData?.blobPath || '';
 
-        // RECOVERY ROUTE: If transcript & resources ALREADY exist in Firestore, skip regeneration!
         if (existingTranscript && existingTranscript.trim().length > 20) {
           const hasExistingResources = existingData?.status === 'generated' || 
             existingData?.resourceGenerationStatus === 'completed' ||
@@ -315,7 +355,16 @@ export default function LectureProcessingView({
           const storageRes = await saveTranscriptMultiTier(userId, lectureId, {
             cleanTranscript: aiData.cleanTranscript || '',
             transcript: aiData.transcript || '',
-            sections: aiData.sections || []
+            sections: aiData.sections || [],
+            summary: aiData.summary || '',
+            summaries: aiData.summaries || {},
+            notes: aiData.notes || [],
+            quizzes: aiData.quizzes || [],
+            flashcards: aiData.flashcards || [],
+            mindMap: aiData.mindMap || null,
+            timeline: aiData.timeline || [],
+            title: resolvedDocTitle,
+            storedInBlob: true
           }).catch(err => {
             console.warn('[LectureProcessingView] Multi-tier transcript save warning:', err);
             return { success: false, storageProvider: 'client' as const, blobPath: undefined, blobUrl: undefined };
@@ -337,7 +386,8 @@ export default function LectureProcessingView({
             keyConcepts: [],
             geminiModel: getAIConfig().model || 'gemini-3.6-flash',
             processingTimeMs,
-            transcriptionFinishedAt: serverTimestamp()
+            transcriptionFinishedAt: serverTimestamp(),
+            storedInBlob: true
           });
 
 
@@ -517,7 +567,16 @@ export default function LectureProcessingView({
           const audioStorageRes = await saveTranscriptMultiTier(userId, lectureId, {
             cleanTranscript: aiData.cleanTranscript || '',
             transcript: aiData.transcript || '',
-            sections: aiData.sections || []
+            sections: aiData.sections || [],
+            summary: aiData.summary || '',
+            summaries: aiData.summaries || {},
+            notes: aiData.notes || [],
+            quizzes: aiData.quizzes || [],
+            flashcards: aiData.flashcards || [],
+            mindMap: aiData.mindMap || null,
+            timeline: aiData.timeline || [],
+            title: resolvedTitle,
+            storedInBlob: true
           }).catch(err => {
             console.warn('[LectureProcessingView] Multi-tier audio transcript save warning:', err);
             return { success: false, storageProvider: 'client' as const, blobPath: undefined, blobUrl: undefined };
@@ -540,7 +599,8 @@ export default function LectureProcessingView({
             geminiModel: getAIConfig().model || 'gemini-3.6-flash',
             transcriptionProvider: aiData.transcriptionProvider || 'gemini',
             processingTimeMs,
-            transcriptionFinishedAt: serverTimestamp()
+            transcriptionFinishedAt: serverTimestamp(),
+            storedInBlob: true
           });
 
 
@@ -905,20 +965,55 @@ export default function LectureProcessingView({
           <div className="pt-4 border-t-2 border-[#111111] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <span className="text-xs font-mono font-extrabold text-[#111111] uppercase flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-[#2F6BFF]" />
-              WORKSPACE GENERATED SUCCESSFULLY! REDIRECTING NOW...
+              WORKSPACE GENERATED SUCCESSFULLY!
             </span>
-            <button
-              onClick={() => {
-                if (setActiveLectureId && lectureId) {
-                  setActiveLectureId(lectureId);
-                }
-                setActivePage('lecture-capture');
-              }}
-              className="inline-flex items-center gap-2 rounded-[6px] border-2 border-[#111111] bg-[#2F6BFF] text-white px-5 py-3 text-xs font-mono font-extrabold uppercase hover:bg-[#255cd9] transition-all shadow-paper-md cursor-pointer"
-            >
-              <span>Go to Active Review Workspace</span>
-              <BookMarked className="h-4 w-4" />
-            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                onClick={async () => {
+                  if (!userId || !lectureId) return;
+                  try {
+                    const lectureRef = doc(db, 'users', userId, 'lectures', lectureId);
+                    const snap = await getDoc(lectureRef);
+                    const lecData = snap.exists() ? snap.data() : {};
+                    await saveTranscriptMultiTier(userId, lectureId, {
+                      cleanTranscript: lecData.cleanTranscript || savedTranscript || '',
+                      transcript: lecData.transcript || savedTranscript || '',
+                      summary: lecData.summary || '',
+                      summaries: lecData.summaries || {},
+                      notes: lecData.notes || [],
+                      quizzes: lecData.quizzes || [],
+                      flashcards: lecData.flashcards || [],
+                      mindMap: lecData.mindMap || null,
+                      sections: lecData.sections || [],
+                      timeline: lecData.timeline || [],
+                      title: lecData.title || '',
+                      storedInBlob: true
+                    });
+                    await updateLecture(lectureId, { storedInBlob: true });
+                    alert('✓ Generated lecture content & notes successfully stored in Azure Cloud Storage!');
+                  } catch (err: any) {
+                    alert(`Storage save warning: ${err.message || 'Failed to save to cloud storage'}`);
+                  }
+                }}
+                className="inline-flex items-center gap-2 rounded-[6px] border-2 border-[#111111] bg-[#10B981] text-white px-4 py-3 text-xs font-mono font-extrabold uppercase hover:bg-emerald-600 transition-all shadow-paper-sm cursor-pointer"
+              >
+                <CloudUpload className="h-4 w-4" />
+                <span>STORE NOTE TO AZURE STORAGE</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  if (setActiveLectureId && lectureId) {
+                    setActiveLectureId(lectureId);
+                  }
+                  setActivePage('lecture-capture');
+                }}
+                className="inline-flex items-center gap-2 rounded-[6px] border-2 border-[#111111] bg-[#2F6BFF] text-white px-5 py-3 text-xs font-mono font-extrabold uppercase hover:bg-[#255cd9] transition-all shadow-paper-md cursor-pointer"
+              >
+                <span>Go to Active Review Workspace</span>
+                <BookMarked className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         )}
       </div>

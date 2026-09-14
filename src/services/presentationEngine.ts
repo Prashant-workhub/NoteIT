@@ -126,7 +126,6 @@ const executeLlmCall = async (
   return executeGeminiCall(prompt, apiKey, undefined, responseSchema, undefined, model || getAIConfig().model || 'gemini-3.6-flash');
 };
 
-// Stage 1 & 2 & 11 presentation blueprint planner with AI Critic pass
 export const generatePresentationBlueprint = async (
   transcriptOrNotes: string,
   theme: string,
@@ -202,7 +201,6 @@ ${transcriptOrNotes.substring(0, 15000)}
   let result = await executeLlmCall(plannerPrompt, model, apiKey, schema);
   let slides: SlideBlueprint[] = result.slides || [];
 
-  // Pass 2: AI Presentation Critic (Mod 3)
   if (level !== 'quick' && slides.length > 0) {
     const criticPrompt = `You are a presentation design expert.
 Review this draft presentation blueprint and critique it.

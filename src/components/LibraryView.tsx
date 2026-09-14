@@ -50,10 +50,12 @@ import {
   Share2,
   Send,
   UserCheck,
-  GripVertical
+  GripVertical,
+  CloudUpload
 } from 'lucide-react';
 import { PageId, Lecture, Folder, Subject } from '../types';
 import { generateResourcesFromTranscript } from '../services/gemini';
+import { saveTranscriptMultiTier } from '../services/storageService';
 import { useFolders } from '../hooks/useFolders';
 import { useSubjects } from '../hooks/useSubjects';
 import { auth } from '../firebaseConfig';
@@ -169,6 +171,7 @@ export default function LibraryView({
 
   // Selected Node Detail Slide-Over Drawer
   const [selectedLectureDetail, setSelectedLectureDetail] = useState<Lecture | null>(null);
+  const [isStoringToAzure, setIsStoringToAzure] = useState(false);
 
   // Academic Saved Tab States
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -906,6 +909,47 @@ export default function LibraryView({
                       >
                         <BookOpen className="w-5 h-5 stroke-[3]" />
                         OPEN LECTURE NOTES
+                      </button>
+
+                      <button
+                        disabled={isStoringToAzure}
+                        onClick={async () => {
+                          const currentUid = auth.currentUser?.uid;
+                          if (!currentUid || !selectedLectureDetail) return;
+                          try {
+                            setIsStoringToAzure(true);
+                            await saveTranscriptMultiTier(currentUid, selectedLectureDetail.id, {
+                              cleanTranscript: selectedLectureDetail.cleanTranscript || selectedLectureDetail.transcript || '',
+                              transcript: selectedLectureDetail.transcript || '',
+                              summary: selectedLectureDetail.summary || '',
+                              summaries: selectedLectureDetail.summaries || {},
+                              notes: selectedLectureDetail.notes || [],
+                              quizzes: selectedLectureDetail.quizzes || [],
+                              flashcards: selectedLectureDetail.flashcards || [],
+                              mindMap: selectedLectureDetail.mindMap || null,
+                              sections: selectedLectureDetail.sections || [],
+                              timeline: selectedLectureDetail.timeline || [],
+                              title: selectedLectureDetail.title || '',
+                              storedInBlob: true
+                            });
+                            if (onUpdateLecture) {
+                              await onUpdateLecture(selectedLectureDetail.id, { storedInBlob: true });
+                            }
+                            alert('✓ Generated lecture content & notes successfully stored in Azure Cloud Storage!');
+                          } catch (err: any) {
+                            alert(`Storage save warning: ${err.message || 'Failed to save to cloud storage'}`);
+                          } finally {
+                            setIsStoringToAzure(false);
+                          }
+                        }}
+                        className="w-full bg-[#10B981] text-white font-black uppercase text-xs py-3 brutal-border flex items-center justify-center gap-2 hover:bg-emerald-600 transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        <CloudUpload className="w-4 h-4 stroke-[3]" />
+                        {isStoringToAzure
+                          ? 'STORING TO AZURE...'
+                          : selectedLectureDetail.storedInBlob
+                            ? 'UPDATE NOTE IN AZURE STORAGE'
+                            : 'STORE NOTE TO AZURE STORAGE'}
                       </button>
 
                       <button

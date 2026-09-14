@@ -255,7 +255,6 @@ export async function fetchTaskProgressStates(userId: string): Promise<Record<st
       states['task_06'].status = 'in_progress';
     }
 
-    // Populate Task 07 - Daily Goals (3 activities today)
     const todayActivities: string[] = localTasks[`today_activities_${todayStr}`] || [];
     const uniqueCount = todayActivities.length;
     states['task_07'].progressCurrent = uniqueCount;
@@ -275,7 +274,7 @@ export async function fetchTaskProgressStates(userId: string): Promise<Record<st
 }
 
 /**
- * Validates and processes a learning activity event (Requirements 8, 9, 10)
+ * Validates and processes a learning activity event
  */
 export async function processActivityEvent(event: ActivityEvent): Promise<TrackActivityResult> {
   const { type, userId, resourceId, metadata = {} } = event;
@@ -285,7 +284,6 @@ export async function processActivityEvent(event: ActivityEvent): Promise<TrackA
   const localTasksJson = localStorage.getItem(`noteit_tasks_${userId}`);
   let localTasks: Record<string, any> = localTasksJson ? JSON.parse(localTasksJson) : {};
 
-  // Track activity type performed today for Task 07 (Daily Goals)
   const todayActivitiesKey = `today_activities_${todayStr}`;
   const todayActivities: string[] = localTasks[todayActivitiesKey] || [];
   if (!todayActivities.includes(type)) {
@@ -436,7 +434,6 @@ export async function processActivityEvent(event: ActivityEvent): Promise<TrackA
     console.warn('Firestore activity sync warning (handled gracefully via local state):', err);
   }
 
-  // Check Task 07 (Daily Goals) progress
   if (todayActivities.length >= 3 && !localTasks['task_07']) {
     localTasks['task_07'] = { completedAt: new Date().toISOString() };
     localStorage.setItem(`noteit_tasks_${userId}`, JSON.stringify(localTasks));

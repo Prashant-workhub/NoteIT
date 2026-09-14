@@ -164,7 +164,7 @@ export async function runNotificationSchedulerCycle(): Promise<{
         if (
           prefs.streakAlerts !== false &&
           activeStreak > 0 &&
-          !todayClaimed && // CANCELLATION: If today claimed, CANCEL STREAK WARNING!
+          !todayClaimed &&
           !streakWarningSentToday &&
           currentHour >= SCHEDULER_CONFIG.STREAK_WARNING_HOUR
         ) {
@@ -189,27 +189,25 @@ export async function runNotificationSchedulerCycle(): Promise<{
             if (sent.successCount > 0) {
               notificationsSent += sent.successCount;
               tokensCleaned += sent.cleanedCount;
-              continue; // Streak warning sent, proceed to next user
+              continue;
             }
           }
         }
 
-        // 5. NORMAL RANDOM NOTIFICATION CHECK
         if (inQuietHours) {
-          continue; // Quiet hours active - skip normal notification
+          continue;
         }
 
         const maxDaily = prefs.dailyLimit || SCHEDULER_CONFIG.DEFAULT_MAX_NORMAL_NOTIFICATIONS_PER_DAY;
         if (todayCount >= maxDaily) {
-          continue; // Daily limit reached
+          continue;
         }
 
         const cooldownMs = (prefs.cooldownMinutes || SCHEDULER_CONFIG.DEFAULT_MIN_NOTIFICATION_COOLDOWN_MINUTES) * 60 * 1000;
         if (nowMs - lastSentMs < cooldownMs) {
-          continue; // Cooldown period active
+          continue;
         }
 
-        // Evaluate user activity conditions for Truth Validation (Requirement 15)
         const lecturesSnap = await adminDb.collection('users').doc(uid).collection('lectures').limit(5).get();
         const hasLecturesToRevise = !lecturesSnap.empty;
         const hasLearningKit = lecturesSnap.docs.some(d => d.data()?.resourceGenerationStatus === 'completed');
@@ -217,11 +215,9 @@ export async function runNotificationSchedulerCycle(): Promise<{
         const activeStreakUnclaimed = activeStreak > 0 && !todayClaimed;
         const untouchedChallenge = unclaimedDailyXp;
 
-        // Filter valid candidate templates
         const eligibleTemplates = NOTIFICATION_TEMPLATES.filter(template => {
           if (!template.enabled || template.category === 'STREAK_WARNING') return false;
 
-          // Check category preference toggles
           if (template.category === 'XP_CURRENCY' || template.category === 'PROGRESS_WAITING') {
             if (prefs.xpRewards === false) return false;
           }
@@ -232,7 +228,6 @@ export async function runNotificationSchedulerCycle(): Promise<{
             if (prefs.studyReminders === false) return false;
           }
 
-          // Privacy / Truth Rule (Requirement 15): Never claim a fake condition!
           if (template.requiresCondition) {
             if (template.requiresCondition === 'unclaimedDailyXp' && !unclaimedDailyXp) return false;
             if (template.requiresCondition === 'activeStreakUnclaimed' && !activeStreakUnclaimed) return false;

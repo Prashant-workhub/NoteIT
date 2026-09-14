@@ -20,7 +20,8 @@
     --sidebar-bg: #F6F2EA;
     --navbar-bg: #F6F2EA;
     --brand-header-bg: #FFFFFF;
-    --hero-banner-bg: #FFF8D6; /* Soft Light Yellow for Light Mode */
+    --hero-banner-bg: #FFF8D6;
+    /* Soft Light Yellow for Light Mode */
     --hero-banner-text: #111111;
     --hero-banner-subtext: #444444;
     --hero-banner-border: #111111;
@@ -47,19 +48,28 @@
 
   [data-theme="dark"],
   .dark {
-    --bg-paper: #050814;       /* Deep Dark Obsidian Navy Black */
+    --bg-paper: #050814;
+    /* Deep Dark Obsidian Navy Black */
     --bg-main: #050814;
-    --card-bg: #0C1220;        /* Dark Navy Surface */
-    --panel-bg: #10182A;       /* Dark Navy Panel */
-    --text-primary: #F8FAFC;   /* Crisp Silver-White Text */
-    --text-secondary: #94A3B8; /* Muted Slate Subtext */
-    --border-main: #1E293B;    /* Subtle Navy Border */
-    --border-subtle: #0F172A;  /* Dark Border */
+    --card-bg: #0C1220;
+    /* Dark Navy Surface */
+    --panel-bg: #10182A;
+    /* Dark Navy Panel */
+    --text-primary: #F8FAFC;
+    /* Crisp Silver-White Text */
+    --text-secondary: #94A3B8;
+    /* Muted Slate Subtext */
+    --border-main: #1E293B;
+    /* Subtle Navy Border */
+    --border-subtle: #0F172A;
+    /* Dark Border */
     --accent-yellow: #F59E0B;
     --accent-red: #F43F5E;
     --accent-blue: #38BDF8;
-    --accent-green: #22C55E;   /* Rich Green */
-    --hover-bg: #1E293B;       /* Deep Hover State */
+    --accent-green: #22C55E;
+    /* Rich Green */
+    --hover-bg: #1E293B;
+    /* Deep Hover State */
     --shadow-color: #02040A;
     --input-bg: #0C1220;
     --sidebar-bg: #050814;
@@ -103,13 +113,19 @@
   [data-theme="dark"] body,
   .dark body {
     background-color: #030610;
-    background-image: 
+    background-image:
       radial-gradient(circle at 50% -10%, rgba(30, 58, 138, 0.25) 0%, rgba(15, 23, 42, 0.5) 40%, rgba(3, 7, 18, 0.95) 80%, #02040A 100%),
       radial-gradient(circle at 80% 50%, rgba(29, 78, 216, 0.08) 0%, transparent 60%);
     background-attachment: fixed;
   }
 
-  h1, h2, h3, h4, h5, h6, .font-heading {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  .font-heading {
     font-family: 'Space Grotesk', system-ui, sans-serif;
     letter-spacing: -0.02em;
   }
@@ -119,7 +135,11 @@
     text-decoration: none;
   }
 
-  code, kbd, samp, pre, .font-mono {
+  code,
+  kbd,
+  samp,
+  pre,
+  .font-mono {
     font-family: 'IBM Plex Mono', monospace;
   }
 }
@@ -174,7 +194,7 @@
 /* Bauhaus Grid Paper Background Pattern */
 .bg-grid-paper {
   background-color: var(--bg-paper);
-  background-image: 
+  background-image:
     linear-gradient(to right, rgba(17, 17, 17, 0.05) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(17, 17, 17, 0.05) 1px, transparent 1px);
   background-size: 24px 24px;
@@ -183,14 +203,14 @@
 [data-theme="dark"] .bg-grid-paper,
 .dark .bg-grid-paper {
   background-color: var(--bg-paper);
-  background-image: 
+  background-image:
     radial-gradient(circle at 50% -10%, rgba(30, 58, 138, 0.2) 0%, rgba(15, 23, 42, 0.4) 40%, transparent 80%);
   background-attachment: fixed;
 }
 
 .bg-grid-paper-dense {
   background-color: var(--bg-paper);
-  background-image: 
+  background-image:
     linear-gradient(to right, rgba(17, 17, 17, 0.06) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(17, 17, 17, 0.06) 1px, transparent 1px);
   background-size: 16px 16px;
@@ -199,7 +219,7 @@
 [data-theme="dark"] .bg-grid-paper-dense,
 .dark .bg-grid-paper-dense {
   background-color: var(--bg-paper);
-  background-image: 
+  background-image:
     radial-gradient(circle at 50% -10%, rgba(30, 58, 138, 0.2) 0%, rgba(15, 23, 42, 0.4) 40%, transparent 80%);
   background-attachment: fixed;
 }
@@ -237,10 +257,12 @@
 .interactive-hover {
   transition: transform 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
 }
+
 .interactive-hover:hover {
   transform: translateY(-2px);
   box-shadow: 5px 5px 0px var(--shadow-color);
 }
+
 .interactive-hover:active {
   transform: translateY(0px);
   box-shadow: 2px 2px 0px var(--shadow-color);
@@ -250,6 +272,7 @@
 .focus-paper {
   outline: none;
 }
+
 .focus-paper:focus-visible {
   outline: 2px solid #FFC400;
   outline-offset: 2px;
@@ -261,14 +284,17 @@
   width: 8px;
   height: 8px;
 }
+
 ::-webkit-scrollbar-track {
   background: var(--bg-paper);
   border-left: 1px solid var(--border-main);
 }
+
 ::-webkit-scrollbar-thumb {
   background: var(--border-main);
   border-radius: 0px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: var(--accent-yellow);
 }
@@ -284,8 +310,15 @@
 
 /* Custom pulse animations for studio activity */
 @keyframes studio-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.4;
+  }
 }
 
 .animate-studio-pulse {
@@ -296,50 +329,122 @@
    Bauhaus Kinetic 7-Square Loader Animation (Uiverse.io by ZacharyCrespin)
    ========================================================================== */
 @keyframes square-animation {
- 0%, 10.5% { left: 0; top: 0; }
- 12.5%, 23% { left: 32px; top: 0; }
- 25%, 35.5% { left: 64px; top: 0; }
- 37.5%, 48% { left: 64px; top: 32px; }
- 50%, 60.5% { left: 32px; top: 32px; }
- 62.5%, 73% { left: 32px; top: 64px; }
- 75%, 85.5% { left: 0; top: 64px; }
- 87.5%, 98% { left: 0; top: 32px; }
- 100% { left: 0; top: 0; }
+
+  0%,
+  10.5% {
+    left: 0;
+    top: 0;
+  }
+
+  12.5%,
+  23% {
+    left: 32px;
+    top: 0;
+  }
+
+  25%,
+  35.5% {
+    left: 64px;
+    top: 0;
+  }
+
+  37.5%,
+  48% {
+    left: 64px;
+    top: 32px;
+  }
+
+  50%,
+  60.5% {
+    left: 32px;
+    top: 32px;
+  }
+
+  62.5%,
+  73% {
+    left: 32px;
+    top: 64px;
+  }
+
+  75%,
+  85.5% {
+    left: 0;
+    top: 64px;
+  }
+
+  87.5%,
+  98% {
+    left: 0;
+    top: 32px;
+  }
+
+  100% {
+    left: 0;
+    top: 0;
+  }
 }
 
 .bauhaus-loader {
- position: relative;
- width: 96px;
- height: 96px;
- transform: rotate(45deg);
+  position: relative;
+  width: 96px;
+  height: 96px;
+  transform: rotate(45deg);
 }
 
 .bauhaus-loader-square {
- position: absolute;
- top: 0;
- left: 0;
- width: 28px;
- height: 28px;
- margin: 2px;
- border-radius: 2px;
- border: 2px solid var(--border-main);
- box-shadow: 1.5px 1.5px 0px var(--shadow-color);
- animation: square-animation 10s ease-in-out infinite both;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 28px;
+  height: 28px;
+  margin: 2px;
+  border-radius: 2px;
+  border: 2px solid var(--border-main);
+  box-shadow: 1.5px 1.5px 0px var(--shadow-color);
+  animation: square-animation 10s ease-in-out infinite both;
 }
 
-.bauhaus-loader-square:nth-of-type(1) { animation-delay: 0s; background: #FFC400; }
-.bauhaus-loader-square:nth-of-type(2) { animation-delay: -1.4285714286s; background: #2F6BFF; }
-.bauhaus-loader-square:nth-of-type(3) { animation-delay: -2.8571428571s; background: #FF4D4D; }
-.bauhaus-loader-square:nth-of-type(4) { animation-delay: -4.2857142857s; background: #19B56B; }
-.bauhaus-loader-square:nth-of-type(5) { animation-delay: -5.7142857143s; background: var(--border-main); }
-.bauhaus-loader-square:nth-of-type(6) { animation-delay: -7.1428571429s; background: var(--card-bg); }
-.bauhaus-loader-square:nth-of-type(7) { animation-delay: -8.5714285714s; background: #FFC400; }
+.bauhaus-loader-square:nth-of-type(1) {
+  animation-delay: 0s;
+  background: #FFC400;
+}
+
+.bauhaus-loader-square:nth-of-type(2) {
+  animation-delay: -1.4285714286s;
+  background: #2F6BFF;
+}
+
+.bauhaus-loader-square:nth-of-type(3) {
+  animation-delay: -2.8571428571s;
+  background: #FF4D4D;
+}
+
+.bauhaus-loader-square:nth-of-type(4) {
+  animation-delay: -4.2857142857s;
+  background: #19B56B;
+}
+
+.bauhaus-loader-square:nth-of-type(5) {
+  animation-delay: -5.7142857143s;
+  background: var(--border-main);
+}
+
+.bauhaus-loader-square:nth-of-type(6) {
+  animation-delay: -7.1428571429s;
+  background: var(--card-bg);
+}
+
+.bauhaus-loader-square:nth-of-type(7) {
+  animation-delay: -8.5714285714s;
+  background: #FFC400;
+}
 
 /* ==========================================================================
    Comprehensive Dark Theme Utility Overrides for NoteIT AI Inner Sections
    ========================================================================== */
 [data-theme="dark"],
 .dark {
+
   /* Catch all hardcoded white background classes */
   [class*="bg-white"],
   [class*="bg-[#FFFFFF]"],
@@ -446,7 +551,7 @@
 
   /* Yellow badges and buttons keep crisp black text for contrast */
   .bg-\[\#FFC400\],
-  .bg-\[\#FFC400\] > *:not(.sidebar-badge) {
+  .bg-\[\#FFC400\]>*:not(.sidebar-badge) {
     color: #111111 !important;
   }
 
@@ -525,9 +630,7 @@
   color: #0F294A !important;
 }
 
-/* ============================================================
-   TEACHER LMS PORTAL STYLES & UTILITIES
-   ============================================================ */
+
 @theme {
   --color-canvas: rgb(var(--canvas) / <alpha-value>);
   --color-card: rgb(var(--card) / <alpha-value>);
@@ -561,15 +664,13 @@
   inset: 0;
   border-radius: inherit;
   padding: 1.4px;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.45) 0%,
-    rgba(255, 255, 255, 0.15) 20%,
-    rgba(255, 255, 255, 0) 40%,
-    rgba(255, 255, 255, 0) 60%,
-    rgba(255, 255, 255, 0.15) 80%,
-    rgba(255, 255, 255, 0.45) 100%
-  );
+  background: linear-gradient(180deg,
+      rgba(255, 255, 255, 0.45) 0%,
+      rgba(255, 255, 255, 0.15) 20%,
+      rgba(255, 255, 255, 0) 40%,
+      rgba(255, 255, 255, 0) 60%,
+      rgba(255, 255, 255, 0.15) 80%,
+      rgba(255, 255, 255, 0.45) 100%);
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
@@ -590,6 +691,7 @@
 .glass-panel-hover {
   transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
+
 .glass-panel-hover:hover {
   border-color: rgba(56, 189, 248, 0.35);
   box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.06), 0 20px 44px -22px rgba(0, 0, 0, 0.9);
@@ -603,25 +705,34 @@
 }
 
 @keyframes shimmerAnim {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 .shimmer {
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.02) 25%,
-    rgba(255, 255, 255, 0.06) 37%,
-    rgba(255, 255, 255, 0.02) 63%
-  );
+  background: linear-gradient(90deg,
+      rgba(255, 255, 255, 0.02) 25%,
+      rgba(255, 255, 255, 0.06) 37%,
+      rgba(255, 255, 255, 0.02) 63%);
   background-size: 200% 100%;
   animation: shimmerAnim 2.2s linear infinite;
 }
 
 @keyframes drawerIn {
-  from { transform: translateX(-100%); }
-  to { transform: translateX(0); }
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
 }
+
 .animate-drawer {
   animation: drawerIn 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -638,9 +749,9 @@
   color: rgb(var(--muted));
   transition: color 0.15s, background-color 0.15s;
 }
+
 .nav-item:hover,
 .nav-item[data-active='true'] {
   color: rgb(var(--ink));
   background-color: rgb(var(--panel));
 }
-

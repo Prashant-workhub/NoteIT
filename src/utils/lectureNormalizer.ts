@@ -43,7 +43,6 @@ export function normalizeLectureResources(lecture: any): NormalizedLectureResour
     };
   }
 
-  // Handle summaries mapping
   const summaries: Record<string, string> = {};
   if (lecture.summaries && typeof lecture.summaries === 'object') {
     Object.assign(summaries, lecture.summaries);
@@ -60,7 +59,6 @@ export function normalizeLectureResources(lecture: any): NormalizedLectureResour
     summaries['executive_summary'] || 
     (typeof lecture.summary === 'string' ? lecture.summary : '');
 
-  // Handle notes (array vs object vs sections)
   let notes: Array<{ title: string; content: string; keyPoints?: string[] }> = [];
   if (Array.isArray(lecture.notes)) {
     notes = lecture.notes;
@@ -78,12 +76,10 @@ export function normalizeLectureResources(lecture: any): NormalizedLectureResour
     }));
   }
 
-  // Handle quizzes
   const quizzes = Array.isArray(lecture.quizzes) 
     ? lecture.quizzes 
     : (Array.isArray(lecture.quiz) ? lecture.quiz : []);
 
-  // Handle flashcards
   const flashcards = Array.isArray(lecture.flashcards)
     ? lecture.flashcards
     : (Array.isArray(lecture.cards) ? lecture.cards : []);

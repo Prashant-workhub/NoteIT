@@ -199,7 +199,6 @@ export async function searchFacultySuggestions(
   const matches: FacultySearchResult[] = [];
   const seenCodes = new Set<string>();
 
-  // 1. Check preset faculty list first
   PRESET_FACULTY_LIST.forEach(item => {
     if (item.teacherCode.includes(clean) || item.teacherName.toUpperCase().includes(clean)) {
       matches.push(item);
@@ -207,7 +206,6 @@ export async function searchFacultySuggestions(
     }
   });
 
-  // 2. Query Firestore users collection for matching faculty
   try {
     const usersRef = collection(db, 'users');
     const qFaculty = query(usersRef, where('role', '==', 'faculty'));
@@ -234,7 +232,6 @@ export async function searchFacultySuggestions(
     console.warn('Firestore faculty search fallback:', e);
   }
 
-  // 3. If exact code entered is 4+ letters and not yet listed, create dynamic option
   if (clean.length >= 4 && !seenCodes.has(clean)) {
     const part1 = clean.slice(0, 4);
     const part2 = clean.length > 4 ? clean.slice(4) : 'DEPT';
@@ -261,13 +258,11 @@ export async function getFacultyByTeacherCode(
     const cleanCode = teacherCode.trim().toUpperCase();
     if (!cleanCode) return null;
 
-    // 1. Check preset faculty directory for exact match
     const presetMatch = PRESET_FACULTY_LIST.find(f => f.teacherCode === cleanCode);
     if (presetMatch) {
       return presetMatch;
     }
 
-    // 2. Direct query on users collection where teacherCode == cleanCode
     const usersRef = collection(db, 'users');
     try {
       const qUserCode = query(usersRef, where('teacherCode', '==', cleanCode));
@@ -290,7 +285,6 @@ export async function getFacultyByTeacherCode(
       console.warn('Teacher code direct query fallback:', e);
     }
 
-    // 3. Query all faculty users and check if generated teacher code matches
     try {
       const qFaculty = query(usersRef, where('role', '==', 'faculty'));
       const facultySnap = await getDocs(qFaculty);
@@ -315,7 +309,6 @@ export async function getFacultyByTeacherCode(
       console.warn('Faculty list calculation fallback:', e);
     }
 
-    // 4. Dynamic fallback matching any 4+ character Teacher Code entered
     if (cleanCode.length >= 4) {
       const part1 = cleanCode.slice(0, 4);
       const part2 = cleanCode.length > 4 ? cleanCode.slice(4) : '';

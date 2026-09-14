@@ -81,7 +81,6 @@ export const uploadBlobStorage = async (
   const currentUser = auth.currentUser;
   const isSmallAndSecure = (blob.size < SMALL_FILE_SIZE_LIMIT || options?.isSensitive) && currentUser;
 
-  // 1. Firebase Storage Route for small & sensitive files
   if (isSmallAndSecure && options?.fileName && storage) {
     try {
       console.log('[Storage] Storing small/secure file to Firebase Storage...');
@@ -114,7 +113,6 @@ export const uploadBlobStorage = async (
     }
   }
 
-  // 2. Local Backend Disk Storage Route
   if (!uploadUrl || uploadUrl.startsWith('local://')) {
     console.log('[Storage] Local storage fallback active. Upload complete.');
     onProgress(100);
@@ -360,13 +358,21 @@ export const saveTranscriptMultiTier = async (
     transcript?: string;
     sections?: any[];
     summary?: string;
+    summaries?: Record<string, string>;
+    notes?: any[];
+    quizzes?: any[];
+    flashcards?: any[];
+    mindMap?: any;
+    timeline?: any[];
+    storedInBlob?: boolean;
+    title?: string;
+    [key: string]: any;
   }
 ): Promise<{ success: boolean; storageProvider: 'azure' | 'local' | 'client'; blobPath?: string; blobUrl?: string }> => {
   if (!userId || !lectureId) {
     throw new Error('UserId and LectureId are required to save transcript.');
   }
 
-  // Always store a client local copy as zero-data-loss backup
   try {
     const localKey = `noteit_transcript_${userId}_${lectureId}`;
     localStorage.setItem(localKey, JSON.stringify({
@@ -377,7 +383,6 @@ export const saveTranscriptMultiTier = async (
     console.warn('[Storage] Client LocalStorage quota reached or unavailable:', localStorageErr);
   }
 
-  // 1. Send to Backend Azure Blob Storage (with Local backend disk fallback)
   try {
     const currentUser = auth.currentUser;
     if (currentUser) {
@@ -397,7 +402,7 @@ export const saveTranscriptMultiTier = async (
 
         if (response.ok) {
           const resBody = await response.json();
-          console.log(`[Storage] Multi-tier transcript save succeeded via ${resBody.storageProvider.toUpperCase()}`);
+          console.log(`[Storage] Multi-tier transcript & generated content save succeeded via ${resBody.storageProvider.toUpperCase()}`);
           return resBody;
         }
       }
@@ -412,18 +417,17 @@ export const saveTranscriptMultiTier = async (
   };
 };
 
-/**
- * Multi-tiered Transcript Retrieval Strategy:
- * 1. Primary: Attempts to fetch transcript from Azure Blob Storage / Local backend disk via /api/storage/transcripts/read
- * 2. Fallback: Reads from client local storage backup
- */
 export const getTranscriptMultiTier = async (
   userId: string,
   lectureId: string
-): Promise<{ transcriptText: string; cleanTranscript: string; storageProvider: string } | null> => {
+): Promise<{ 
+  transcriptText: string; 
+  cleanTranscript: string; 
+  storageProvider: string;
+  transcriptData?: any;
+} | null> => {
   if (!userId || !lectureId) return null;
 
-  // 1. Try Remote Azure / Backend Local Disk
   try {
     const currentUser = auth.currentUser;
     if (currentUser) {
@@ -445,7 +449,8 @@ export const getTranscriptMultiTier = async (
             return {
               transcriptText: rawText,
               cleanTranscript: cleanText,
-              storageProvider: data.storageProvider || 'azure'
+              storageProvider: data.storageProvider || 'azure',
+              transcriptData: data.transcriptData
             };
           }
         }
@@ -455,7 +460,6 @@ export const getTranscriptMultiTier = async (
     console.warn('[Storage] Remote transcript fetch failed. Checking client cache:', err);
   }
 
-  // 2. Client local storage fallback
   try {
     const localKey = `noteit_transcript_${userId}_${lectureId}`;
     const rawLocal = localStorage.getItem(localKey);
@@ -466,7 +470,8 @@ export const getTranscriptMultiTier = async (
       return {
         transcriptText: rawText,
         cleanTranscript: cleanText,
-        storageProvider: 'client_local'
+        storageProvider: 'client_local',
+        transcriptData: parsed
       };
     }
   } catch (err) {

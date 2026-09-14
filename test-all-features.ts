@@ -547,13 +547,11 @@ async function runHttpTests() {
     const fileName = `smoke-test-${Date.now()}.txt`;
     const fileContents = `NoteIT smoke test file. Random marker: ${Math.random().toString(36).slice(2)}`;
 
-    // 1. Ask for an upload URL
     const sasRes = await fetchWithTimeout(`${BASE_URL}/api/storage/sas?fileName=${encodeURIComponent(fileName)}`, { headers: AUTH_HEADER });
     const sasJson = await readJsonSafely(sasRes);
     assert(sasRes.status === 200, `SAS request failed (${sasRes.status}): ${JSON.stringify(sasJson)}`);
     assert(sasJson?.uploadUrl, `expected an uploadUrl in response: ${JSON.stringify(sasJson)}`);
 
-    // 2. Upload the file to whatever URL we were given
     const uploadUrl = sasJson.uploadUrl.startsWith('http') ? sasJson.uploadUrl : `${BASE_URL}${sasJson.uploadUrl}`;
     const putRes = await fetchWithTimeout(uploadUrl, {
       method: 'PUT',
@@ -562,7 +560,6 @@ async function runHttpTests() {
     });
     assert(putRes.status === 201 || putRes.status === 200, `upload failed with status ${putRes.status}`);
 
-    // 3. Extract text back out via the documented blobPath
     const extractRes = await fetchWithTimeout(`${BASE_URL}/api/storage/extract-text`, {
       method: 'POST',
       headers: { ...AUTH_HEADER, 'Content-Type': 'application/json' },
@@ -572,7 +569,6 @@ async function runHttpTests() {
     assert(extractRes.status === 200, `extract-text failed (${extractRes.status}): ${JSON.stringify(extractJson)}`);
     assert(extractJson?.text === fileContents, 'extracted text does not match what was uploaded');
 
-    // 4. Confirm read-sas + static file serving also round-trips the same bytes
     const readSasRes = await fetchWithTimeout(`${BASE_URL}/api/storage/read-sas?blobPath=${encodeURIComponent(sasJson.blobPath)}`, { headers: AUTH_HEADER });
     const readSasJson = await readJsonSafely(readSasRes);
     assert(readSasRes.status === 200 && readSasJson?.readUrl, `read-sas failed (${readSasRes.status}): ${JSON.stringify(readSasJson)}`);

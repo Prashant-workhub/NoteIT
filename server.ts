@@ -318,14 +318,12 @@ const transcribeWithSpeechmatics = async (
     throw new Error('Speechmatics fallback is not configured. Add SPEECHMATICS_API_KEY to the server environment.');
   }
 
-  // 1. Sanitize base64 payload
   const cleanBase64 = base64Audio.replace(/^data:[^;]+;base64,/, '').replace(/\s+/g, '');
   const audioBuffer = Buffer.from(cleanBase64, 'base64');
   if (audioBuffer.length === 0) {
     throw new Error('Audio data is empty or corrupted.');
   }
 
-  // 2. Clean MIME type and determine valid file extension
   const cleanMimeType = (mimeType || 'audio/webm').split(';')[0].trim().toLowerCase();
   let extension = cleanMimeType.split('/')[1] || 'webm';
   if (extension === 'mpeg') extension = 'mp3';
@@ -334,7 +332,6 @@ const transcribeWithSpeechmatics = async (
 
   const filename = `lecture.${extension}`;
 
-  // 3. Construct FormData compatible with Speechmatics REST API v2
   const form = new FormData();
   
   // Use File constructor if available in Node (v19+), otherwise Blob with explicit filename parameter
@@ -1474,7 +1471,6 @@ app.post('/api/storage/transcripts/upload', authenticateFirebaseUser, async (req
   const user = req.body.user;
   const uid = user.uid;
 
-  // 1. Try Azure Blob Storage first
   if (isAzureBlobConfigured()) {
     try {
       const azureRes = await uploadTranscriptToAzure(uid, lectureId, transcriptData);
@@ -1490,7 +1486,6 @@ app.post('/api/storage/transcripts/upload', authenticateFirebaseUser, async (req
     }
   }
 
-  // 2. Fallback to Local Storage on backend disk
   try {
     const safeLectureId = sanitizeUploadFileName(lectureId);
     const localFileName = `${uid}-transcript-${safeLectureId}.json`;
@@ -1531,7 +1526,6 @@ app.get('/api/storage/transcripts/read', authenticateFirebaseUser, async (req, r
   const user = req.body.user;
   const uid = user.uid;
 
-  // 1. Try Azure Blob Storage first
   if (isAzureBlobConfigured()) {
     try {
       const data = await downloadTranscriptFromAzure(uid, lectureId);
@@ -1541,7 +1535,6 @@ app.get('/api/storage/transcripts/read', authenticateFirebaseUser, async (req, r
     }
   }
 
-  // 2. Fallback to Local Storage on backend disk
   try {
     const safeLectureId = sanitizeUploadFileName(lectureId);
     const localFileName = `${uid}-transcript-${safeLectureId}.json`;
@@ -2035,7 +2028,6 @@ app.post('/api/storage/extract-url', authenticateFirebaseUser, async (req, res) 
         console.warn('[YOUTUBE] Failed to fetch video title, using default:', titleErr);
       }
 
-      // 2. Fetch transcript from YoutubeTranscript with 6s timeout
       try {
         const transcripts = await withTimeout(
           YoutubeTranscript.fetchTranscript(videoId),
@@ -2050,7 +2042,6 @@ app.post('/api/storage/extract-url', authenticateFirebaseUser, async (req, res) 
         console.warn('[YOUTUBE] YoutubeTranscript API failed or timed out:', err?.message || err);
       }
 
-      // 3. Fallback: try timedtext XML endpoint if YoutubeTranscript failed or returned empty
       if (!extractedText || extractedText.trim().length === 0) {
         try {
           const ttRes = await withTimeout(
@@ -2073,7 +2064,6 @@ app.post('/api/storage/extract-url', authenticateFirebaseUser, async (req, res) 
         }
       }
 
-      // 4. Ultimate structured video study context fallback if no captions are available
       if (!extractedText || extractedText.trim().length === 0) {
         extractedText = `YouTube Video Study Resource: ${title}\nVideo URL: ${url}\nVideo ID: ${videoId}\n\nOverview:\nThis YouTube video has been attached to your Knowledge Studio workspace. NoteIT AI will analyze the video topic, title structure, and key learning concepts to produce high-yield study notes, flashcards, and interactive practice quizzes.`;
       }

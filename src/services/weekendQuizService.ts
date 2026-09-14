@@ -86,7 +86,6 @@ export async function getOrGenerateWeekendQuiz(
   const now = new Date();
   const dayLabel = getWeekendDayLabel(now) || 'Saturday';
 
-  // 1. Gather all existing quiz questions, flashcards, & notes content across subjects
   const subjectContentMap: Record<string, string[]> = {};
 
   lectures.forEach(l => {
@@ -116,7 +115,6 @@ export async function getOrGenerateWeekendQuiz(
   const subjects = Object.keys(subjectContentMap);
   let questions: WeekendQuizQuestion[] = [];
 
-  // If user has existing quiz questions, extract and build from existing material
   const allExtractedQuestions: WeekendQuizQuestion[] = [];
   lectures.forEach(l => {
     const subj = l.subject || 'General';
@@ -137,13 +135,11 @@ export async function getOrGenerateWeekendQuiz(
   });
 
   if (allExtractedQuestions.length >= 10) {
-    // Pick 10 questions intelligently with mixed difficulty
     questions = allExtractedQuestions.slice(0, 10).map((q, idx) => ({
       ...q,
       difficulty: idx < 2 ? 'easy' : (idx < 7 ? 'medium' : 'hard')
     }));
   } else {
-    // Attempt Gemini synthesis helper if available
     try {
       const generated = await generateAdditionalQuizQuestions(
         `Generate 10 mixed revision questions for subjects: ${subjects.join(', ')}`,
@@ -167,7 +163,6 @@ export async function getOrGenerateWeekendQuiz(
       console.warn('Gemini weekend quiz synthesis warning, using fallback template:', err);
     }
 
-    // Fallback template questions if student has sparse material
     if (questions.length < 10) {
       const fallbackSubject = subjects[0] || 'General Studies';
       const defaultQuestions: WeekendQuizQuestion[] = [

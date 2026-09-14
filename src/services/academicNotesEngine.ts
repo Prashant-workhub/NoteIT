@@ -170,10 +170,8 @@ CRITICAL MANDATORY INSTRUCTIONS:
   ]
 }`;
 
-  // Build multimodal parts payload for Gemini 3.6 Flash
   const parts: any[] = [];
 
-  // Attach binary files (PDFs, PPTs, Images) as inlineData
   attachments.forEach(att => {
     if (att.base64Data && att.mimeType) {
       parts.push({
@@ -185,7 +183,6 @@ CRITICAL MANDATORY INSTRUCTIONS:
     }
   });
 
-  // Attach pre-sanitized text content from files or web links
   const sanitizedText = attachments
     .map(att => sanitizeDocumentText(att.textContent || ''))
     .filter(t => t && t.trim().length > 10)
@@ -197,7 +194,6 @@ CRITICAL MANDATORY INSTRUCTIONS:
     });
   }
 
-  // Final Prompt text part
   parts.push({ text: prompt });
 
   try {
@@ -215,7 +211,6 @@ CRITICAL MANDATORY INSTRUCTIONS:
       if (text) {
         const parsed: GeneratedAcademicNotes = JSON.parse(text);
         if (parsed && Array.isArray(parsed.conceptCards)) {
-          // JS Post-Filter to remove any noise cards that bypassed LLM rules
           parsed.conceptCards = filterNoiseConceptCards(parsed.conceptCards);
         }
         return parsed;

@@ -81,7 +81,6 @@ export async function fetchUserStreakState(userId: string): Promise<{
   const localSavedStreak = localStorage.getItem(`noteit_streak_data_${userId}`);
   let streakData: UserStreakData = localSavedStreak ? JSON.parse(localSavedStreak) : { ...INITIAL_STREAK_DATA };
 
-  // Revoke 2k+ XP from user accounts (Requirement: revoke all XP from accounts with 2k+ XP)
   if (streakData.totalXp >= 2000 || localStorage.getItem(`noteit_xp_revoke_2k_${userId}`) !== 'true') {
     streakData.totalXp = 0;
     localStorage.setItem(`noteit_streak_data_${userId}`, JSON.stringify(streakData));
@@ -93,7 +92,6 @@ export async function fetchUserStreakState(userId: string): Promise<{
   }
 
   try {
-    // 4-segment Firestore collection paths matching security rules: users/{uid}/{collection}/{doc}
     const streakDocRef = doc(db, 'users', userId, 'rewards', 'summary');
     const claimDocRef = doc(db, 'users', userId, 'rewards_claims', todayStr);
 
@@ -212,11 +210,9 @@ export async function claimDailyXPAtomic(userId: string): Promise<UserStreakData
     wasReset
   };
 
-  // 1. Save to local storage first (instant client resilience)
   localStorage.setItem(`noteit_claim_${userId}_${todayStr}`, 'true');
   localStorage.setItem(`noteit_streak_data_${userId}`, JSON.stringify(updatedStreakData));
 
-  // 2. Attempt Firestore sync with 4-segment security rule paths
   try {
     const streakDocRef = doc(db, 'users', userId, 'rewards', 'summary');
     const claimDocRef = doc(db, 'users', userId, 'rewards_claims', todayStr);

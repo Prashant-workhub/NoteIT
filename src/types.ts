@@ -53,7 +53,6 @@ export interface UserRewardsState {
   redeemedRewards: string[];
 }
 
-
 export interface Citation {
   text: string;
   sourceId: string;
@@ -145,6 +144,9 @@ export interface Lecture {
   notes?: any;
   flashcards?: { q: string; a: string; category?: 'Basic Recall' | 'Concept Understanding' | 'Application Based' }[];
   quiz?: { question: string; options: string[]; correctAnswer: number; explanation: string; difficulty?: 'easy' | 'medium' | 'hard' | 'scenario' | 'application'; sourceCitation?: string }[];
+  quizzes?: any[];
+  mindMap?: any;
+  storedInBlob?: boolean;
   keyConcepts?: { id: string; label: string; desc: string; parent?: string; x: number; y: number; group: string; examples?: string; formula?: string; applications?: string }[];
   weakTopics?: WeakTopic[];
   cleanTranscript?: string;
@@ -428,5 +430,3 @@ export interface QuizAttemptRecord {
   accuracy: number;
   completedAt: any;
 }
-
-

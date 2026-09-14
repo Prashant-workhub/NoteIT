@@ -764,7 +764,6 @@ export function resolveCanonicalSubject(subjectNameOrId: string): CanonicalSubje
   );
   if (aliasMatch) return aliasMatch;
 
-  // Fallback to custom created canonical subject object
   return {
     subjectId: `SUBJ-${subjectNameOrId.toUpperCase().replace(/\s+/g, '-').slice(0, 12)}`,
     canonicalName: subjectNameOrId,

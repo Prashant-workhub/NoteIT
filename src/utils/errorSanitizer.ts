@@ -21,7 +21,6 @@ export function formatUserFriendlyErrorMessage(error: any, actionPrefix?: string
   const msgLower = rawMessage.toLowerCase();
   let friendlyMessage = '';
 
-  // 3. User Unauthenticated / Session Expired / Unauthorized Access
   if (
     msgLower.includes('user not authenticated') ||
     msgLower.includes('not authenticated') ||
@@ -33,7 +32,6 @@ export function formatUserFriendlyErrorMessage(error: any, actionPrefix?: string
   ) {
     friendlyMessage = "Session expired or unauthenticated. Please log in to your account to continue.";
   }
-  // 3b. Firebase Auth Credentials & Sign-In Errors
   else if (msgLower.includes('auth/invalid-credential') || msgLower.includes('auth/wrong-password') || msgLower.includes('auth/user-not-found')) {
     friendlyMessage = "Invalid email or password. Please check your credentials and try again.";
   } else if (msgLower.includes('auth/email-already-in-use')) {
@@ -41,7 +39,6 @@ export function formatUserFriendlyErrorMessage(error: any, actionPrefix?: string
   } else if (msgLower.includes('auth/popup-closed-by-user')) {
     friendlyMessage = "Sign-in popup was closed before completing authentication.";
   }
-  // 3c. Invalid API Key / Provider Unauthorized
   else if (
     msgLower.includes('401') ||
     msgLower.includes('403') ||
@@ -55,7 +52,6 @@ export function formatUserFriendlyErrorMessage(error: any, actionPrefix?: string
   ) {
     friendlyMessage = "Your API key is invalid or unauthorized. Please verify your API key in Settings.";
   }
-  // 1. OpenRouter Credit Limit / HTTP 402 Payment Required
   else if (
     msgLower.includes('402') ||
     msgLower.includes('more credits') ||
@@ -66,7 +62,6 @@ export function formatUserFriendlyErrorMessage(error: any, actionPrefix?: string
   ) {
     friendlyMessage = "OpenRouter credit limit reached. Please add OpenRouter credits or switch your AI Provider to Google Gemini API Key in Settings.";
   }
-  // 1b. General Rate Limit / HTTP 429 / Too Many Requests / Quota Exceeded
   else if (
     msgLower.includes('429') ||
     msgLower.includes('resource_exhausted') ||
@@ -79,7 +74,6 @@ export function formatUserFriendlyErrorMessage(error: any, actionPrefix?: string
   ) {
     friendlyMessage = "Rate limited / API limit reached. Please wait a moment before trying again or check your AI provider quota in Settings.";
   }
-  // 2. Network / Server Connection Failures
   else if (
     msgLower.includes('failed to fetch') ||
     msgLower.includes('networkerror') ||
@@ -93,7 +87,6 @@ export function formatUserFriendlyErrorMessage(error: any, actionPrefix?: string
   ) {
     friendlyMessage = "Unable to reach the server. Please check your internet connection or try again shortly.";
   }
-  // 4. Service Overloaded / Temporarily Unavailable
   else if (
     msgLower.includes('503') ||
     msgLower.includes('500') ||
@@ -105,7 +98,6 @@ export function formatUserFriendlyErrorMessage(error: any, actionPrefix?: string
   ) {
     friendlyMessage = "The AI service is temporarily busy or unavailable. Please try again in a few seconds.";
   }
-  // 5. Missing API Key
   else if (
     msgLower.includes('api key is not configured') ||
     msgLower.includes('api key missing') ||
@@ -114,7 +106,6 @@ export function formatUserFriendlyErrorMessage(error: any, actionPrefix?: string
   ) {
     friendlyMessage = "No API key configured. Please add your API key in Settings to continue.";
   }
-  // 5b. Invalid AI Model ID
   else if (
     msgLower.includes('is not a valid model') ||
     msgLower.includes('invalid model') ||
@@ -123,7 +114,6 @@ export function formatUserFriendlyErrorMessage(error: any, actionPrefix?: string
   ) {
     friendlyMessage = "The AI model specified is invalid. Reverting to the default model for your AI provider.";
   }
-  // 6. Missing Transcript or Source Content
   else if (
     msgLower.includes('transcript is not available') ||
     msgLower.includes('no transcript') ||
@@ -131,7 +121,6 @@ export function formatUserFriendlyErrorMessage(error: any, actionPrefix?: string
   ) {
     friendlyMessage = "Transcript is missing or empty. Please record or transcribe the lecture first.";
   }
-  // 7. Technical stack traces or raw developer errors
   else if (
     msgLower.includes('json') ||
     msgLower.includes('syntaxerror') ||
@@ -143,7 +132,6 @@ export function formatUserFriendlyErrorMessage(error: any, actionPrefix?: string
   ) {
     friendlyMessage = "An unexpected issue occurred while processing the request. Please try again.";
   }
-  // 8. Clean readable prose fallback
   else {
     friendlyMessage = rawMessage.replace(/at\s+[\s\S]+/g, '').replace(/https?:\/\/[^\s]+/g, '').trim();
   }
