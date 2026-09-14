@@ -39,12 +39,10 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 export const getAIConfig = () => {
   const isBrowser = typeof window !== 'undefined';
   const provider = isBrowser ? (localStorage.getItem('noteit_active_ai_provider') || localStorage.getItem('noteit_ai_provider') || 'gemini') : 'gemini';
-  // API keys are deliberately never read from browser storage. Requests that
-  // need a provider key go through the authenticated server-side vault.
-  const customGeminiKey = '';
-  const customOpenAiKey = '';
-  const customNotionKey = '';
-  const model = 'gemini-3.6-flash';
+  const customGeminiKey = isBrowser ? (localStorage.getItem('noteit_user_api_key_gemini') || localStorage.getItem('noteit_user_api_key') || '') : '';
+  const customOpenAiKey = isBrowser ? (localStorage.getItem('noteit_user_api_key_openai') || localStorage.getItem('noteit_user_api_key') || '') : '';
+  const customNotionKey = isBrowser ? (localStorage.getItem('noteit_user_api_key_notion') || localStorage.getItem('noteit_user_api_key') || '') : '';
+  const model = isBrowser ? (localStorage.getItem('noteit_active_ai_model') || 'gemini-3.6-flash') : 'gemini-3.6-flash';
   
   return {
     provider,

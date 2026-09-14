@@ -37,6 +37,7 @@ import { PageId, UserSettings } from '../types';
 import { auth, db } from '../firebaseConfig';
 import { collection, getDocs, doc, setDoc, updateDoc, deleteField } from 'firebase/firestore';
 import { API_BASE_URL } from '../config';
+import { validateApiKeyDirect } from '../providers/ValidationAdapters';
 import { MascotAvatarPicker } from './bauhaus/MascotAvatarPicker';
 import NotificationSettingsSection from './NotificationSettingsSection';
 
@@ -450,6 +451,18 @@ export default function SettingsView({
       }
     } catch (err) {
       console.error('Error fetching AI config status:', err);
+      const localProvider = localStorage.getItem('noteit_active_ai_provider') || 'gemini';
+      const hasLocalKey = !!(localStorage.getItem(`noteit_user_api_key_${localProvider}`) || localStorage.getItem('noteit_user_api_key'));
+      if (hasLocalKey) {
+        setConfigStatus({
+          configured: true,
+          provider: localProvider,
+          maskedKey: '••••••••',
+          selectedModel: localStorage.getItem('noteit_active_ai_model') || 'gemini-3.6-flash'
+        });
+        setAiProvider(localProvider);
+        setSelectedModel(localStorage.getItem('noteit_active_ai_model') || 'gemini-3.6-flash');
+      }
     } finally {
       setIsLoadingConfig(false);
     }
@@ -614,35 +627,61 @@ export default function SettingsView({
     try {
       const currentUser = auth.currentUser;
       if (!currentUser) return;
-      const idToken = await currentUser.getIdToken();
-      const res = await fetch(`${API_BASE_URL}/api/ai/validate-key`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`
-        },
-        body: JSON.stringify({
-          key: newKey.trim(),
-          provider: aiProvider,
-          model: selectedModel
-        })
-      });
-      if (res.ok) {
+      
+      let keyValid = false;
+      try {
+        const idToken = await currentUser.getIdToken();
+        const res = await fetch(`${API_BASE_URL}/api/ai/validate-key`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`
+          },
+          body: JSON.stringify({
+            key: newKey.trim(),
+            provider: aiProvider,
+            model: selectedModel
+          })
+        });
+        if (res.ok) {
+          keyValid = true;
+        } else {
+          const errorData = await res.json().catch(() => ({}));
+          setValidationError(errorData.error || 'Failed to validate API key.');
+          return;
+        }
+      } catch (vaultErr: any) {
+        const isFetchOrNetworkErr = vaultErr.name === 'TypeError' || 
+          vaultErr.message?.toLowerCase().includes('failed to fetch') ||
+          vaultErr.message?.toLowerCase().includes('networkerror');
+
+        if (isFetchOrNetworkErr) {
+          console.warn("Backend API server unreachable, running direct client-side key validation fallback...");
+          await validateApiKeyDirect(newKey.trim(), aiProvider, selectedModel);
+          keyValid = true;
+        } else {
+          throw vaultErr;
+        }
+      }
+
+      if (keyValid) {
         localStorage.setItem('noteit_active_ai_provider', aiProvider);
-        const activeModel = selectedModel.trim() || PROVIDER_METADATA[aiProvider]?.defaultModel || 'gemini-2.5-flash';
+        const activeModel = selectedModel.trim() || PROVIDER_METADATA[aiProvider]?.defaultModel || 'gemini-3.6-flash';
         localStorage.setItem('noteit_active_ai_model', activeModel);
         localStorage.setItem('noteit_selected_model', activeModel);
+        localStorage.setItem(`noteit_user_api_key_${aiProvider}`, newKey.trim());
+        localStorage.setItem('noteit_user_api_key', newKey.trim());
         setNewKey('');
         setShowReplaceForm(false);
         triggerSaveNotification();
-        await fetchConfigStatus();
-      } else {
-        const errorData = await res.json().catch(() => ({}));
-        setValidationError(errorData.error || 'Failed to validate API key.');
+        await fetchConfigStatus().catch(() => {});
       }
     } catch (err: any) {
       console.error('Error saving new key:', err);
-      setValidationError(err.message || 'Failed to validate key. Check your key and connection.');
+      const friendlyMsg = err.message && err.message.toLowerCase().includes('failed to fetch')
+        ? 'Network error connecting to validation server. Please check your internet connection and API key.'
+        : (err.message || 'Failed to validate key. Check your key and connection.');
+      setValidationError(friendlyMsg);
     } finally {
       setSavingKey(false);
     }

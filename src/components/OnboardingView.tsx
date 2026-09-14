@@ -23,6 +23,7 @@ import {
 import { doc, setDoc, serverTimestamp, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db, auth } from '../firebaseConfig';
 import { API_BASE_URL } from '../config';
+import { validateApiKeyDirect } from '../providers/ValidationAdapters';
 
 const PROVIDER_METADATA: Record<string, {
   name: string;
@@ -365,63 +366,85 @@ export default function OnboardingView({
     }
 
     setIsValidatingKey(true);
+    let keyValidated = false;
     try {
       const currentUser = auth.currentUser;
-      // Validate through the authenticated backend. It encrypts the key before
-      // persisting it, so the browser never keeps a reusable copy.
       if (!currentUser) {
         throw new Error('Please sign in before configuring an AI provider.');
       }
-      const idToken = await currentUser.getIdToken();
-      const vaultResponse = await fetch(`${API_BASE_URL}/api/ai/validate-key`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`
-        },
-        body: JSON.stringify({ key: trimmedKey, provider: selectedProvider, model: selectedModel })
-      });
-      if (!vaultResponse.ok) {
-        const body = await vaultResponse.json().catch(() => ({}));
-        throw new Error(body.error || 'Failed to validate and secure the API key.');
-      }
 
-      // Provider/model preferences are not secrets and may be persisted.
-      localStorage.setItem('noteit_active_ai_provider', selectedProvider);
-      localStorage.setItem('noteit_active_ai_model', selectedModel);
+      try {
+        const idToken = await currentUser.getIdToken();
+        const vaultResponse = await fetch(`${API_BASE_URL}/api/ai/validate-key`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`
+          },
+          body: JSON.stringify({ key: trimmedKey, provider: selectedProvider, model: selectedModel })
+        });
+        if (vaultResponse.ok) {
+          keyValidated = true;
+        } else {
+          const body = await vaultResponse.json().catch(() => ({}));
+          throw new Error(body.error || 'Failed to validate and secure the API key.');
+        }
+      } catch (vaultErr: any) {
+        const isFetchOrNetworkErr = vaultErr.name === 'TypeError' || 
+          vaultErr.message?.toLowerCase().includes('failed to fetch') ||
+          vaultErr.message?.toLowerCase().includes('networkerror') ||
+          vaultErr.message?.toLowerCase().includes('network connection');
 
-      // Save onboarding_completed: true in Firestore
-      if (userId) {
-        try {
-          const userDocRef = doc(db, 'users', userId);
-          await setDoc(userDocRef, { onboarding_completed: true, updated_at: serverTimestamp() }, { merge: true });
-        } catch (fErr) {
-          console.warn("Failed to mark onboarding_completed in Firestore:", fErr);
+        if (isFetchOrNetworkErr) {
+          console.warn("Backend API server unreachable; attempting direct client-side key validation fallback...");
+          await validateApiKeyDirect(trimmedKey, selectedProvider, selectedModel);
+          keyValidated = true;
+        } else {
+          throw vaultErr;
         }
       }
 
-      setValidationSuccess(true);
-      
-      // Complete setup and trigger callback
-      setTimeout(() => {
-        onComplete({
-          first_name: firstName,
-          last_name: lastName,
-          email: email,
-          school_or_university: school,
-          country_code: countryCode,
-          phone_number: phoneNumber,
-          onboarding_completed: true,
-          providerConfigured: true,
-          aiProvider: selectedProvider,
-          selectedModel: selectedModel,
-          // Deliberately do not pass the API key onward: it now lives only in
-          // the encrypted server-side vault.
-        });
-      }, 1000);
+      if (keyValidated) {
+        // Provider/model preferences & fallback keys for offline/mobile usage
+        localStorage.setItem('noteit_active_ai_provider', selectedProvider);
+        localStorage.setItem('noteit_active_ai_model', selectedModel);
+        localStorage.setItem(`noteit_user_api_key_${selectedProvider}`, trimmedKey);
+        localStorage.setItem('noteit_user_api_key', trimmedKey);
+
+        // Save onboarding_completed: true in Firestore
+        if (userId) {
+          try {
+            const userDocRef = doc(db, 'users', userId);
+            await setDoc(userDocRef, { onboarding_completed: true, updated_at: serverTimestamp() }, { merge: true });
+          } catch (fErr) {
+            console.warn("Failed to mark onboarding_completed in Firestore:", fErr);
+          }
+        }
+
+        setValidationSuccess(true);
+        
+        // Complete setup and trigger callback
+        setTimeout(() => {
+          onComplete({
+            first_name: firstName,
+            last_name: lastName,
+            email: email,
+            school_or_university: school,
+            country_code: countryCode,
+            phone_number: phoneNumber,
+            onboarding_completed: true,
+            providerConfigured: true,
+            aiProvider: selectedProvider,
+            selectedModel: selectedModel,
+          });
+        }, 1000);
+      }
     } catch (err: any) {
       console.error("Validation error:", err);
-      setError(err.message || 'Failed to validate API key. Please check your key and network connection.');
+      const friendlyMsg = err.message && err.message.toLowerCase().includes('failed to fetch')
+        ? 'Network error connecting to API validation server. Please check your internet connection and API key.'
+        : (err.message || 'Failed to validate API key. Please check your key.');
+      setError(friendlyMsg);
     } finally {
       setIsValidatingKey(false);
     }
