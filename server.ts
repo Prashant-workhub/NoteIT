@@ -10,7 +10,8 @@ import {
   isAzureBlobConfigured, 
   uploadTranscriptToAzure, 
   downloadTranscriptFromAzure,
-  uploadBinaryBlobToAzure 
+  uploadBinaryBlobToAzure,
+  getAzureBlobStatusDetails
 } from './src/server/azureBlobService';
 
 
@@ -1435,6 +1436,16 @@ function sanitizeUploadFileName(fileName: string): string {
   const base = path.basename(decoded);
   return base.replace(/[^\w.\-()+\s]/g, '_');
 }
+
+// Diagnostic endpoint to test live Azure Blob Storage connectivity and environment configuration
+app.get('/api/storage/azure-status', async (_req, res) => {
+  try {
+    const details = await getAzureBlobStatusDetails();
+    res.json(details);
+  } catch (err: any) {
+    res.status(500).json({ configured: false, connected: false, error: err?.message || String(err) });
+  }
+});
 
 // Browser uploads always use this backend instead of Azure SAS URLs. This avoids
 // browser-to-Azure CORS failures and keeps a local copy available for immediate

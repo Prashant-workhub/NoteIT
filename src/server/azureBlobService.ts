@@ -8,34 +8,82 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const CONTAINER_NAME = process.env.AZURE_STORAGE_CONTAINER_NAME || 'noteit-transcripts';
-const CONNECTION_STRING = process.env.AZURE_STORAGE_CONNECTION_STRING || '';
-const ACCOUNT_NAME = process.env.AZURE_STORAGE_ACCOUNT_NAME || '';
-const ACCOUNT_KEY = process.env.AZURE_STORAGE_ACCOUNT_KEY || '';
+function cleanEnvVar(val: string | undefined): string {
+  if (!val) return '';
+  let cleaned = val.trim();
+  if ((cleaned.startsWith('"') && cleaned.endsWith('"')) || (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
+    cleaned = cleaned.slice(1, -1).trim();
+  }
+  return cleaned;
+}
 
-let blobServiceClient: BlobServiceClient | null = null;
+export function getAzureConfig() {
+  const containerName = cleanEnvVar(
+    process.env.AZURE_STORAGE_CONTAINER_NAME || 
+    process.env.AZURE_CONTAINER_NAME || 
+    process.env.AZURE_BLOB_CONTAINER_NAME
+  ) || 'noteit-transcripts';
+
+  const connectionString = cleanEnvVar(
+    process.env.AZURE_STORAGE_CONNECTION_STRING || 
+    process.env.AZURE_CONNECTION_STRING || 
+    process.env.AZURE_BLOB_CONNECTION_STRING ||
+    process.env.AZURE_STORAGE_CONNECTION_STR
+  );
+
+  const accountName = cleanEnvVar(
+    process.env.AZURE_STORAGE_ACCOUNT_NAME || 
+    process.env.AZURE_ACCOUNT_NAME || 
+    process.env.AZURE_BLOB_ACCOUNT_NAME
+  );
+
+  const accountKey = cleanEnvVar(
+    process.env.AZURE_STORAGE_ACCOUNT_KEY || 
+    process.env.AZURE_ACCOUNT_KEY || 
+    process.env.AZURE_BLOB_ACCOUNT_KEY
+  );
+
+  return {
+    containerName,
+    connectionString,
+    accountName,
+    accountKey
+  };
+}
+
+let cachedClient: BlobServiceClient | null = null;
+let lastConnectionStringHash = '';
 
 export function isAzureBlobConfigured(): boolean {
-  return Boolean(CONNECTION_STRING || (ACCOUNT_NAME && ACCOUNT_KEY));
+  const { connectionString, accountName, accountKey } = getAzureConfig();
+  return Boolean(connectionString || (accountName && accountKey));
 }
 
 function getServiceClient(): BlobServiceClient | null {
   if (!isAzureBlobConfigured()) return null;
-  if (blobServiceClient) return blobServiceClient;
+
+  const { connectionString, accountName, accountKey } = getAzureConfig();
+  const currentHash = `${connectionString}:${accountName}:${accountKey}`;
+
+  if (cachedClient && lastConnectionStringHash === currentHash) {
+    return cachedClient;
+  }
 
   try {
-    if (CONNECTION_STRING) {
-      blobServiceClient = BlobServiceClient.fromConnectionString(CONNECTION_STRING);
-    } else if (ACCOUNT_NAME && ACCOUNT_KEY) {
-      const credential = new StorageSharedKeyCredential(ACCOUNT_NAME, ACCOUNT_KEY);
-      blobServiceClient = new BlobServiceClient(
-        `https://${ACCOUNT_NAME}.blob.core.windows.net`,
+    if (connectionString) {
+      cachedClient = BlobServiceClient.fromConnectionString(connectionString);
+    } else if (accountName && accountKey) {
+      const credential = new StorageSharedKeyCredential(accountName, accountKey);
+      cachedClient = new BlobServiceClient(
+        `https://${accountName}.blob.core.windows.net`,
         credential
       );
     }
-    return blobServiceClient;
-  } catch (err) {
-    console.warn('[AzureBlobService] Initialization failed:', err);
+    lastConnectionStringHash = currentHash;
+    return cachedClient;
+  } catch (err: any) {
+    console.warn('[AzureBlobService] Initialization failed:', err?.message || err);
+    cachedClient = null;
     return null;
   }
 }
@@ -43,13 +91,64 @@ function getServiceClient(): BlobServiceClient | null {
 async function getContainerClient() {
   const client = getServiceClient();
   if (!client) return null;
-  const containerClient = client.getContainerClient(CONTAINER_NAME);
+  const { containerName } = getAzureConfig();
+  const containerClient = client.getContainerClient(containerName);
   try {
-    await containerClient.createIfNotExists({ access: 'blob' });
-  } catch (e) {
-    // Container creation may fail if permissions are restricted; continue using container client
+    // Create container without explicit access control so private container creation
+    // succeeds on modern Azure accounts where Public Blob Access is disabled.
+    await containerClient.createIfNotExists();
+  } catch (e: any) {
+    console.warn(`[AzureBlobService] Note on container '${containerName}':`, e?.message || e);
   }
   return containerClient;
+}
+
+/**
+ * Diagnostic test for Azure Blob Storage connection status.
+ */
+export async function getAzureBlobStatusDetails(): Promise<{
+  configured: boolean;
+  connected: boolean;
+  container: string;
+  error?: string;
+}> {
+  const { containerName } = getAzureConfig();
+  const configured = isAzureBlobConfigured();
+  if (!configured) {
+    return {
+      configured: false,
+      connected: false,
+      container: containerName,
+      error: 'Azure environment variables (AZURE_STORAGE_CONNECTION_STRING or AZURE_STORAGE_ACCOUNT_NAME + KEY) are not set.'
+    };
+  }
+
+  try {
+    const container = await getContainerClient();
+    if (!container) {
+      return {
+        configured: true,
+        connected: false,
+        container: containerName,
+        error: 'Failed to obtain container client.'
+      };
+    }
+
+    const exists = await container.exists();
+    return {
+      configured: true,
+      connected: exists,
+      container: containerName,
+      error: exists ? undefined : 'Container does not exist and auto-creation was skipped.'
+    };
+  } catch (err: any) {
+    return {
+      configured: true,
+      connected: false,
+      container: containerName,
+      error: err?.message || String(err)
+    };
+  }
 }
 
 /**
@@ -69,7 +168,7 @@ export async function uploadTranscriptToAzure(
 ): Promise<{ success: boolean; blobPath: string; blobUrl: string }> {
   const container = await getContainerClient();
   if (!container) {
-    throw new Error('Azure Blob Storage is not configured or unavailable.');
+    throw new Error('Azure Blob Storage is not configured or client initialization failed.');
   }
 
   const blobPath = `users/${userId}/transcripts/${lectureId}.json`;
@@ -104,7 +203,7 @@ export async function downloadTranscriptFromAzure(
 ): Promise<any> {
   const container = await getContainerClient();
   if (!container) {
-    throw new Error('Azure Blob Storage is not configured or unavailable.');
+    throw new Error('Azure Blob Storage is not configured or client initialization failed.');
   }
 
   const blobPath = `users/${userId}/transcripts/${lectureId}.json`;
@@ -132,7 +231,7 @@ export async function uploadBinaryBlobToAzure(
 ): Promise<{ success: boolean; blobPath: string; blobUrl: string }> {
   const container = await getContainerClient();
   if (!container) {
-    throw new Error('Azure Blob Storage is not configured or unavailable.');
+    throw new Error('Azure Blob Storage is not configured or client initialization failed.');
   }
 
   const blobPath = `users/${userId}/blobs/${fileName}`;
@@ -162,15 +261,16 @@ export async function generateAzureUploadSasUrl(
     const container = await getContainerClient();
     if (!container) return null;
 
+    const { accountName, accountKey, containerName } = getAzureConfig();
     const blobPath = `users/${userId}/blobs/${fileName}`;
     const blockBlobClient = container.getBlockBlobClient(blobPath);
 
     let sasUrl = blockBlobClient.url;
 
-    if (ACCOUNT_NAME && ACCOUNT_KEY) {
-      const credential = new StorageSharedKeyCredential(ACCOUNT_NAME, ACCOUNT_KEY);
+    if (accountName && accountKey) {
+      const credential = new StorageSharedKeyCredential(accountName, accountKey);
       const sasOptions = {
-        containerName: CONTAINER_NAME,
+        containerName: containerName,
         blobName: blobPath,
         permissions: BlobSASPermissions.parse('cw'), // create, write
         startsOn: new Date(),
