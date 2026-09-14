@@ -142,6 +142,23 @@ npm run dev:vite
 - API: `http://localhost:3002` unless `PORT` is set
 - Health check: `http://localhost:3002/api/health`
 
+## Android app (Capacitor)
+
+The React application is packaged as an Android app with Capacitor. Install Android Studio, Android SDK Platform 36, and a full JDK 21 (not a JRE). The Android project is configured to use JDK 21 because Capacitor 8 requires it.
+
+```bash
+# Build the web app and copy it into the native Android project
+npm run android:sync
+
+# Open the native project in Android Studio
+npm run android:open
+
+# Or create a debug APK from the command line (Windows)
+npm run android:build
+```
+
+In Android Studio, open the `android` folder—not the repository root—and select a device or emulator before pressing Run. When you change the React app, run `npm run android:sync` again before launching it in Android Studio.
+
 ## Verification
 
 ```bash

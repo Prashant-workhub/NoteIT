@@ -9,7 +9,9 @@ import { pageIdToPath, pathToPageId } from './routes';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth, db } from './firebaseConfig';
 import { doc, getDoc, setDoc, serverTimestamp, collection, query, orderBy, onSnapshot } from 'firebase/firestore';
-import { 
+import { App as CapApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
+import {
   GraduationCap, 
   Sparkles, 
   Compass, 
@@ -84,7 +86,6 @@ import TeacherPortalApp from './teacher-portal/TeacherPortalApp';
 
 
 export default function App() {
-  
   // Live global recording state across tabs
   const [globalRecordingState, setGlobalRecordingState] = useState<{
     isRecording: boolean;
@@ -480,6 +481,18 @@ export default function App() {
   // React Router integration for browser history, page redirection, and Back button support
   const location = useLocation();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      CapApp.addListener('backButton', ({ canGoBack }) => {
+        if (!canGoBack) {
+          CapApp.exitApp();
+        } else {
+          navigate(-1);
+        }
+      });
+    }
+  }, [navigate]);
 
   const activePage = pathToPageId(location.pathname);
 

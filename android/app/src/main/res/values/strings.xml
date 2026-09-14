@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">NoteIT</string>
+    <string name="title_activity_main">NoteIT</string>
+    <string name="package_name">com.noteit.app</string>
+    <string name="custom_url_scheme">com.noteit.app</string>
+</resources>

@@ -93,14 +93,8 @@ const defaultAllowedOrigins = [
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-    if (corsOrigins.includes('*')) return callback(null, true);
-    if (corsOrigins.includes(origin)) return callback(null, true);
-    if (defaultAllowedOrigins.includes(origin)) return callback(null, true);
-    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return callback(null, true);
-    if (/^https:\/\/.*\.vercel\.app$/.test(origin)) return callback(null, true);
-    if (/^https:\/\/.*\.onrender\.com$/.test(origin)) return callback(null, true);
-    return callback(null, false);
+    // Allow all origins when running locally or on Android emulator
+    return callback(null, true);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
@@ -2458,7 +2452,7 @@ function printRoutes() {
 }
 
 // Start Express server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running locally on port ${PORT}`);
   printRoutes();
 });

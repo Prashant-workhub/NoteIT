@@ -8,6 +8,7 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
   GoogleAuthProvider,
   GithubAuthProvider,
   sendPasswordResetEmail,
@@ -16,6 +17,7 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, getDocs, collection, query, where, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
+import { Capacitor } from '@capacitor/core';
 import {
   GraduationCap,
   ArrowRight,
@@ -292,7 +294,16 @@ export default function AuthView({
     setLoading(true);
     try {
       const provider = new GoogleAuthProvider();
-      const userCredential = await signInWithPopup(auth, provider);
+
+      let userCredential;
+      if (Capacitor.isNativePlatform()) {
+        // Native platforms have issues with signInWithPopup because it tries to open Chrome
+        // signInWithRedirect is the web fallback for mobile webviews, but native plugins are recommended.
+        await signInWithRedirect(auth, provider);
+        return; // The app will reload after redirect
+      } else {
+        userCredential = await signInWithPopup(auth, provider);
+      }
 
       const detectedRole: 'student' | 'faculty' = isFacultyMode ? 'faculty' : 'student';
       const userRef = doc(db, 'users', userCredential.user.uid);
@@ -329,7 +340,14 @@ export default function AuthView({
     setLoading(true);
     try {
       const provider = new GithubAuthProvider();
-      const userCredential = await signInWithPopup(auth, provider);
+
+      let userCredential;
+      if (Capacitor.isNativePlatform()) {
+        await signInWithRedirect(auth, provider);
+        return; // The app will reload after redirect
+      } else {
+        userCredential = await signInWithPopup(auth, provider);
+      }
 
       const detectedRole: 'student' | 'faculty' = isFacultyMode ? 'faculty' : 'student';
       const userRef = doc(db, 'users', userCredential.user.uid);

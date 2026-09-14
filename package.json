@@ -10,11 +10,18 @@
     "build": "vite build",
     "start": "tsx server.ts",
     "preview": "vite preview",
+    "android:sync": "npm run build && npx cap sync android",
+    "android:build": "npm run android:sync && cd android && gradlew.bat :app:assembleDebug",
+    "android:open": "npm run android:sync && npx cap open android",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
     "@azure/storage-blob": "^12.33.0",
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/cli": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
     "@dataconnect/admin-generated": "file:src/dataconnect-admin-generated",
     "@dataconnect/generated": "file:src/dataconnect-generated",
     "@mozilla/readability": "^0.6.0",
