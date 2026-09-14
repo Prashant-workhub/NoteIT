@@ -243,7 +243,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
   const [outputStudioWidth, setOutputStudioWidth] = useState<number>(550);
   const [isResizing, setIsResizing] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [mobilePanelTab, setMobilePanelTab] = useState<'sources' | 'chat' | 'outputs'>('sources');
+  const [mobilePanelTab, setMobilePanelTab] = useState<'sources' | 'outputs'>('sources');
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -2650,8 +2650,8 @@ ${queryText}`;
       {/* MOBILE WORKSPACE NAVIGATION */}
       {isMobile && (
         <div className="px-4 py-2 border-b flex gap-1 bg-[var(--panel-bg)] border-[var(--border-main)]">
-          {(['sources', 'chat', 'outputs'] as const).map((tab) => {
-            const label = tab === 'sources' ? `Sources (${sources.length})` : tab === 'chat' ? 'AI Chat' : 'Output Studio';
+          {(['sources', 'outputs'] as const).map((tab) => {
+            const label = tab === 'sources' ? `Sources (${sources.length})` : 'Studio Workspace';
             const isActive = mobilePanelTab === tab;
             return (
               <button
@@ -2929,130 +2929,9 @@ ${queryText}`;
           </div>
         </div>
 
-        {/* PANEL 2: CENTER - AI WORKSPACE */}
-        <div className={`flex-1 flex flex-col overflow-hidden p-4 space-y-4 bg-[var(--panel-bg)] text-[var(--text-primary)] ${isMobile && mobilePanelTab !== 'chat' ? 'hidden' : 'flex'
-          }`}>
-          <div>
-            <h2 className="section-label text-xs font-bold text-[var(--text-primary)] uppercase tracking-[3px]">AI Workspace</h2>
-            <p className="text-[11px] text-[var(--text-secondary)] font-mono mt-0.5">Synthesize outlines, check contradictions, or query sources.</p>
-          </div>
-
-          {/* Quick Prompts Pills */}
-          <div className="flex flex-wrap gap-1.5">
-            {[
-              "Summarize selected sources",
-              "Compare all sources",
-              "Find contradictions in documents",
-              "Explain difficult formulas/methods",
-              "Generate interview checklist"
-            ].map((prompt, idx) => (
-              <button
-                key={idx}
-                onClick={() => handleQuickPrompt(prompt)}
-                style={{ color: 'var(--text-primary)' }}
-                className="px-2.5 py-1 rounded-[4px] border-2 border-[var(--border-main)] bg-[var(--card-bg)] font-mono text-[10px] font-bold uppercase shadow-paper-sm hover:bg-[#FFC400] transition-colors cursor-pointer"
-              >
-                {prompt}
-              </button>
-            ))}
-          </div>
-
-          {/* Chat Messages Log */}
-          <div className="flex-1 rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--card-bg)] p-4 overflow-y-auto space-y-4 font-sans text-[var(--text-primary)] shadow-paper-sm">
-            {chatMessages.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-2">
-                <Sparkles className="h-8 w-8 text-[#FFC400] animate-pulse" />
-                <h3 className="text-xs font-bold text-[var(--text-primary)] uppercase">Search Workspace Active</h3>
-                <p className="text-[11px] font-mono text-[var(--text-secondary)] max-w-xs leading-relaxed">
-                  Enter a query below. AI will reference all selected sources ({selectedSourceIds.length} active) to answer.
-                </p>
-              </div>
-            ) : (
-              chatMessages.map((msg, i) => (
-                <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] rounded-[6px] border-2 border-[var(--border-main)] p-3 text-xs leading-relaxed select-text font-mono ${msg.sender === 'user'
-                    ? 'bg-[#FFC400] text-[#111111] shadow-paper-sm font-bold'
-                    : 'bg-[var(--panel-bg)] text-[var(--text-primary)]'
-                    }`}>
-                    <span className="text-[9px] font-bold uppercase tracking-wider block text-[var(--text-secondary)] mb-1">
-                      {msg.sender === 'user' ? 'STUDENT QUERY' : 'NOTEIT INTELLIGENCE'}
-                    </span>
-                    {(() => {
-                      const parts = msg.text.split(/Sources:\s*/i);
-                      const answerText = parts[0];
-                      const sourcesBlock = parts[1];
-                      return (
-                        <div>
-                          <p className="whitespace-pre-wrap">{answerText.trim()}</p>
-                          {sourcesBlock && (
-                            <div className="mt-3 pt-2 border-t-2 border-[var(--border-main)]">
-                              <span className="text-[9px] font-bold uppercase text-[var(--text-primary)] block mb-1">Sources:</span>
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {sourcesBlock.split('\n').map(l => l.trim()).filter(l => l.length > 0).map((line, idx) => {
-                                  const cleanLine = line.replace(/^-\s*/, '').trim();
-                                  return (
-                                    <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded-[3px] text-[9px] font-bold bg-[var(--card-bg)] text-[var(--text-primary)] border-2 border-[var(--border-main)]">
-                                      {cleanLine}
-                                    </span>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                </div>
-              ))
-            )}
-            {isChatLoading && (
-              <div className="flex justify-start">
-                <div className="rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--card-bg)] p-3 flex items-center gap-3 text-[var(--text-primary)]">
-                  <BruteLoader size="xs" message="" />
-                  <span className="text-xs font-mono font-bold tracking-wider animate-pulse">Synthesizing logical layers...</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Input Form */}
-          <form onSubmit={handleChatSubmit} className="flex gap-2">
-            <input
-              type="text"
-              required
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              placeholder="Ask anything about your selected sources..."
-              className="flex-grow rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--card-bg)] text-[var(--text-primary)] placeholder-[var(--text-secondary)] text-xs font-mono font-bold outline-none p-3 focus:bg-[var(--panel-bg)] transition-all"
-            />
-            <button
-              type="submit"
-              disabled={isChatLoading || selectedSourceIds.length === 0}
-              className="rounded-[6px] border-2 border-[var(--border-main)] bg-[#FFC400] text-[#111111] px-5 py-3 text-xs font-mono font-extrabold uppercase shadow-paper-sm hover:bg-[#ffe066] transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Ask
-            </button>
-          </form>
-        </div>
-
-        {/* DRAGGABLE RESIZER HANDLE */}
-        {activeSourceId && !isMobile && (
-          <div
-            onMouseDown={startResizing}
-            className="w-2 cursor-col-resize hover:bg-[#FFC400] active:bg-[#FFC400] transition-all flex-shrink-0 flex items-center justify-center border-l-2 border-r-2 border-[#111111] bg-[#F6F2EA]"
-            title="Drag to resize Output Studio"
-          >
-            <div className="h-8 w-0.5 bg-[#111111]" />
-          </div>
-        )}
-
-        {/* PANEL 3: RIGHT - OUTPUT STUDIO */}
+        {/* RIGHT PANEL - STUDIO WORKSPACE & DOCUMENT READER */}
         <div
-          style={activeSourceId && !isMobile ? { width: `${outputStudioWidth}px` } : undefined}
-          className={`flex-col overflow-y-auto p-4 space-y-4 bg-[var(--card-bg)] border-l-2 border-[var(--border-main)] text-[var(--text-primary)] ${isMobile && mobilePanelTab !== 'outputs' ? 'hidden' : 'flex'
-            } ${activeSourceId ? '' : 'w-full md:w-[420px] shrink-0'
-            }`}
+          className={`flex-1 flex flex-col overflow-y-auto p-4 space-y-4 bg-[var(--card-bg)] text-[var(--text-primary)] ${isMobile && mobilePanelTab !== 'outputs' ? 'hidden' : 'flex'}`}
         >
           <div className="flex items-center justify-between gap-2">
             <div>
