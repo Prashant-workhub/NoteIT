@@ -4,7 +4,7 @@
  */
 
 import React, { useRef } from 'react';
-import { Download, Printer, ArrowRight } from 'lucide-react';
+import { Download, Printer, ArrowRight, Sparkles, BookOpen, CheckCircle, FileText } from 'lucide-react';
 
 interface HandwrittenNotesViewerProps {
   lectureData: any;
@@ -24,10 +24,7 @@ function cleanMarkdownText(str: string): string {
 }
 
 /**
- * The resource API stores notes as `{ title, content }[]`, while older
- * lectures store one Markdown document.  Convert the structured form back to
- * Markdown before parsing it so both formats keep headings, lists, tables and
- * line breaks instead of being rendered as a single dense paragraph.
+ * Converts structured notes arrays or markdown strings into standardized Markdown text.
  */
 function notesToMarkdown(notes: unknown, fallbackTitle = 'Lecture Study Notes'): string {
   if (typeof notes === 'string') return notes;
@@ -56,22 +53,36 @@ function notesToMarkdown(notes: unknown, fallbackTitle = 'Lecture Study Notes'):
   return topics.length ? `# ${fallbackTitle}\n\n${topics.join('\n\n')}` : '';
 }
 
+interface HandwrittenItem {
+  id?: string;
+  title?: string;
+  type: 'text' | 'concept' | 'diagram' | 'formula' | 'terms' | 'bullets' | 'table' | 'remember' | 'examFocus' | 'definition' | 'example';
+  content: any;
+  table?: Array<{ col1: string; col2: string }>;
+  weight: number; // Height budget weight units
+}
+
+interface HandwrittenSectionData {
+  title: string;
+  items: HandwrittenItem[];
+}
+
 function parseMarkdownToHandwrittenSections(rawMarkdown: string) {
   if (!rawMarkdown || typeof rawMarkdown !== 'string') {
-    return { title: '', overview: '', keyPoints: [], sections: [], remember: '', examFocus: '' };
+    return { title: '', overview: '', keyPoints: [], sections: [], remember: '', examFocus: '', formulas: [], definitions: [], examples: [] };
   }
 
   const lines = rawMarkdown.split('\n');
   let title = '';
   let overview = '';
   const keyPoints: string[] = [];
-  const sections: Array<{
-    title: string;
-    content: string[];
-    table?: Array<{ col1: string; col2: string }>;
-  }> = [];
+  const formulas: string[] = [];
+  const definitions: string[] = [];
+  const examples: string[] = [];
   let remember = '';
   let examFocus = '';
+
+  const sections: HandwrittenSectionData[] = [];
 
   let currentTitle = '';
   let currentContentLines: string[] = [];
@@ -79,11 +90,63 @@ function parseMarkdownToHandwrittenSections(rawMarkdown: string) {
 
   const flushSection = () => {
     if (currentTitle || currentContentLines.length > 0 || currentTable.length > 0) {
-      sections.push({
-        title: cleanMarkdownText(currentTitle) || 'Key Concepts',
-        content: currentContentLines.map(l => cleanMarkdownText(l)).filter(Boolean),
-        table: currentTable.length > 0 ? [...currentTable] : undefined
+      const items: HandwrittenItem[] = [];
+      const linesArr = currentContentLines.map(l => cleanMarkdownText(l)).filter(Boolean);
+
+      // Separate definitions, examples, formulas, and general text
+      const textLines: string[] = [];
+      let currentExampleText = '';
+      let currentDefText = '';
+
+      linesArr.forEach((line) => {
+        if (/^(definition|defined as|principle):/i.test(line)) {
+          definitions.push(line.replace(/^(definition|defined as|principle):\s*/i, ''));
+          items.push({
+            type: 'definition',
+            title: 'CORE DEFINITION & PRINCIPLE',
+            content: line.replace(/^(definition|defined as|principle):\s*/i, ''),
+            weight: 3.5
+          });
+        } else if (/^(example|e\.g\.|worked example|sample problem):/i.test(line)) {
+          examples.push(line.replace(/^(example|e\.g\.|worked example|sample problem):\s*/i, ''));
+          items.push({
+            type: 'example',
+            title: 'WORKED EXAMPLE & APPLICATION',
+            content: line.replace(/^(example|e\.g\.|worked example|sample problem):\s*/i, ''),
+            weight: 3.5
+          });
+        } else if (/^(formula|equation|math|expression):/i.test(line) || /^[A-Z][a-z0-9_\s]*\s*=\s*[\w\d\s\+\-\*\/\(\)\^\.]+/i.test(line)) {
+          formulas.push(line.replace(/^(formula|equation|math|expression):\s*/i, ''));
+          items.push({
+            type: 'formula',
+            title: 'EQUATION & FORMULA BOX',
+            content: [line.replace(/^(formula|equation|math|expression):\s*/i, '')],
+            weight: 2.5
+          });
+        } else {
+          textLines.push(line);
+        }
       });
+
+      if (textLines.length > 0 || currentTable.length > 0) {
+        // Estimate line units: 1 unit per line plus table height
+        const lineUnits = Math.ceil(textLines.length * 0.9);
+        const tableUnits = currentTable.length > 0 ? (2.5 + currentTable.length * 0.8) : 0;
+        
+        items.unshift({
+          type: 'concept',
+          title: cleanMarkdownText(currentTitle) || 'Key Concepts',
+          content: textLines,
+          table: currentTable.length > 0 ? [...currentTable] : undefined,
+          weight: Math.max(3, lineUnits + tableUnits)
+        });
+      }
+
+      sections.push({
+        title: cleanMarkdownText(currentTitle) || 'Key Concept Section',
+        items
+      });
+
       currentTitle = '';
       currentContentLines = [];
       currentTable = [];
@@ -175,7 +238,7 @@ function parseMarkdownToHandwrittenSections(rawMarkdown: string) {
 
   flushSection();
 
-  return { title, overview, keyPoints, sections, remember, examFocus };
+  return { title, overview, keyPoints, sections, remember, examFocus, formulas, definitions, examples };
 }
 
 export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
@@ -185,7 +248,6 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Check compiling / processing status
   const isCompilingState = 
     isCompiling ||
     lectureData?.isGeneratingNotes ||
@@ -202,7 +264,6 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
     lectureData?.status === 'generating' ||
     lectureData?.status === 'processing';
 
-  // Extract raw text sources
   const rawNotesString =
     notesToMarkdown(lectureData?.notes, lectureData?.title || 'Lecture Study Notes') ||
     lectureData?.notes?.academic ||
@@ -217,136 +278,206 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
   const title = cleanMarkdownText(parsedMarkdown.title || lectureData?.title || 'Lecture Study Notes');
   const overview = cleanMarkdownText(parsedMarkdown.overview || lectureData?.summary || lectureData?.notes?.overview || '');
 
-  // Build sections list dynamically
-  let sections: Array<{ title: string; content: string | string[]; table?: Array<{ col1: string; col2: string }> }> = [];
-
+  let sections: HandwrittenSectionData[] = [];
   if (parsedMarkdown.sections.length > 0) {
     sections = parsedMarkdown.sections;
   } else if (Array.isArray(lectureData?.sections) && lectureData.sections.length > 0) {
     sections = lectureData.sections.map((s: any) => ({
       title: cleanMarkdownText(s.title || s.heading || 'Topic Section'),
-      content: cleanMarkdownText(s.content || s.explanation || s.summary || '')
+      items: [{
+        type: 'concept' as const,
+        title: cleanMarkdownText(s.title || s.heading || 'Topic Section'),
+        content: cleanMarkdownText(s.content || s.explanation || s.summary || '').split('\n').filter(Boolean),
+        weight: Math.max(3, Math.ceil((s.content || '').split('\n').length * 0.9))
+      }]
     }));
   } else if (overview) {
-    sections = [{ title: 'Overview & Foundations', content: overview }];
+    sections = [{
+      title: 'Overview & Foundations',
+      items: [{
+        type: 'concept' as const,
+        title: 'Overview & Foundations',
+        content: [overview],
+        weight: 4
+      }]
+    }];
   }
 
-  // Key terms & formulas
   const sourceIntel = lectureData?.sourceIntelligence || {};
   const keyTerms: string[] = (sourceIntel.keyTerms || []).map(cleanMarkdownText);
-  const formulas: string[] = (sourceIntel.formulas || []).map(cleanMarkdownText);
+  const formulas: string[] = [
+    ...(sourceIntel.formulas || []).map(cleanMarkdownText),
+    ...parsedMarkdown.formulas
+  ];
   const keyPoints: string[] = (parsedMarkdown.keyPoints || []).map(cleanMarkdownText);
 
   const hasNotesContent = sections.length > 0 || (overview && overview.trim().length > 0);
 
-  // Build handwritten notes pages dynamically covering ALL real academic topics
+  // DYNAMIC A4 HEIGHT-BUDGET BIN PACKING ALGORITHM
   const pages = React.useMemo(() => {
     if (!hasNotesContent) return [];
 
+    const noiseRegex = /co-po|course outcome|program outcome|\bco[1-6]\b|\bpo[1-6]\b|table of content|\bindex\b|syllabus|faculty|office hour|grading|prerequisites|unit details/i;
+    const cleanSections = sections.filter(s => !noiseRegex.test(s.title || ''));
+
+    const allSections = cleanSections.length > 0 ? cleanSections : [
+      {
+        title: 'Core Concepts & Overview',
+        items: [{
+          type: 'concept' as const,
+          title: 'Core Concepts & Overview',
+          content: [overview || 'High-yield revision sheet compiled from source material.'],
+          weight: 4
+        }]
+      }
+    ];
+
+    // Target height units budget per A4 page (at 28px ruled line height, ~26 units max)
+    const MAX_PAGE_UNITS = 25;
+
+    // Collect all discrete items to be rendered across pages
+    const flattenedItems: HandwrittenItem[] = [];
+
+    // Page 1 Synthesis Box if available
+    if (overview && !noiseRegex.test(overview)) {
+      flattenedItems.push({
+        type: 'text',
+        title: 'CORE TOPIC SYNTHESIS',
+        content: overview,
+        weight: 4
+      });
+    }
+
+    // Page 1 Key Points if available
+    if (keyPoints.length > 0) {
+      flattenedItems.push({
+        type: 'bullets',
+        title: 'KEY REVISION POINTS',
+        content: keyPoints,
+        weight: Math.min(6, 1 + keyPoints.length * 0.9)
+      });
+    }
+
+    // Add all section items
+    allSections.forEach(sec => {
+      sec.items.forEach(item => {
+        flattenedItems.push(item);
+      });
+    });
+
+    // Prepare supplementary revision callouts to distribute into available page budgets
+    const supplementaryItems: HandwrittenItem[] = [];
+
+    if (parsedMarkdown.remember) {
+      supplementaryItems.push({
+        type: 'remember',
+        title: 'REMEMBER FOR EXAMS',
+        content: parsedMarkdown.remember,
+        weight: 3.5
+      });
+    }
+
+    if (parsedMarkdown.examFocus) {
+      supplementaryItems.push({
+        type: 'examFocus',
+        title: 'EXAM FOCUS & TIP',
+        content: parsedMarkdown.examFocus,
+        weight: 3.5
+      });
+    }
+
+    if (formulas.length > 0) {
+      supplementaryItems.push({
+        type: 'formula',
+        title: 'KEY FORMULAS & EQUATIONS',
+        content: Array.from(new Set(formulas)).slice(0, 6),
+        weight: Math.min(6, 2 + formulas.length * 1.2)
+      });
+    }
+
+    if (keyTerms.length > 0) {
+      supplementaryItems.push({
+        type: 'terms',
+        title: 'KEY TERMINOLOGY',
+        content: Array.from(new Set(keyTerms)).slice(0, 10),
+        weight: 3
+      });
+    }
+
+    // Bin-pack items into A4 pages to achieve ~85-95% page fill ratio
     const pagesResult: Array<{
       pageNumber: number;
       header: string;
-      items: Array<{
-        title: string;
-        type: 'text' | 'concept' | 'diagram' | 'formula' | 'terms' | 'bullets' | 'table' | 'remember' | 'examFocus';
-        content: any;
-        table?: Array<{ col1: string; col2: string }>;
-      }>;
+      items: HandwrittenItem[];
     }> = [];
 
-    // STRICT ADMINISTRATIVE NOISE FILTER
-    const noiseRegex = /co-po|course outcome|program outcome|\bco[1-6]\b|\bpo[1-6]\b|table of content|\bindex\b|syllabus|faculty|office hour|grading|prerequisites|unit details/i;
-    const cleanSections = sections.filter(s => !noiseRegex.test(s.title || '') && !noiseRegex.test(Array.isArray(s.content) ? s.content.join(' ') : s.content || ''));
+    let currentPageItems: HandwrittenItem[] = [];
+    let currentUnits = 0;
 
-    const allSections = cleanSections.length > 0 ? cleanSections : [
-      { title: 'Core Concepts & Overview', content: overview || 'High-yield revision sheet compiled from source material.' }
-    ];
+    const commitPage = () => {
+      if (currentPageItems.length === 0) return;
+      const pageNum = pagesResult.length + 1;
+      const sectionNum = String(pageNum).padStart(2, '0');
+      const headerTitle = pageNum === 1
+        ? 'CONCEPTUAL FOUNDATIONS'
+        : pageNum === 2
+          ? 'ADVANCED TOPICS & ARCHITECTURE'
+          : 'REVISION & EXAM CHEAT SHEET';
 
-    // DETERMINISTIC PACKING: Exactly 2 concept sections per A4 sheet
-    const SECTIONS_PER_PAGE = 2;
-    const pageCount = Math.ceil(allSections.length / SECTIONS_PER_PAGE);
-
-    for (let p = 0; p < pageCount; p++) {
-      const pageSections = allSections.slice(p * SECTIONS_PER_PAGE, (p + 1) * SECTIONS_PER_PAGE);
-      const pageItems: any[] = [];
-
-      // Include Overview synthesis on page 1 if available
-      if (p === 0 && overview && !noiseRegex.test(overview)) {
-        pageItems.push({
-          title: 'CORE TOPIC SYNTHESIS',
-          type: 'text',
-          content: overview
-        });
-      }
-
-      // Include Key Points if available
-      if (p === 0 && keyPoints.length > 0) {
-        pageItems.push({
-          title: 'KEY REVISION POINTS',
-          type: 'bullets',
-          content: keyPoints
-        });
-      }
-
-      // Add each real academic section topic for this page
-      pageSections.forEach((sec) => {
-        pageItems.push({
-          title: sec.title.toUpperCase(),
-          type: 'concept',
-          content: sec.content,
-          table: sec.table
-        });
-      });
-
-      // Include Remember Sticky Note on final page if present
-      if (p === pageCount - 1 && parsedMarkdown.remember) {
-        pageItems.push({
-          title: 'REMEMBER FOR EXAMS',
-          type: 'remember',
-          content: parsedMarkdown.remember
-        });
-      }
-
-      // Include Exam Focus Card on final page if present
-      if (p === pageCount - 1 && parsedMarkdown.examFocus) {
-        pageItems.push({
-          title: 'EXAM FOCUS & TIP',
-          type: 'examFocus',
-          content: parsedMarkdown.examFocus
-        });
-      }
-
-      // Include Formulas ONLY ONCE on final page if present
-      if (p === pageCount - 1 && formulas.length > 0) {
-        pageItems.push({
-          title: 'KEY FORMULAS & EQUATIONS',
-          type: 'formula',
-          content: formulas
-        });
-      }
-
-      // Include Key Terminology ONLY ONCE on final page if present
-      if (p === pageCount - 1 && keyTerms.length > 0) {
-        pageItems.push({
-          title: 'KEY TERMINOLOGY',
-          type: 'terms',
-          content: keyTerms.slice(0, 10)
-        });
-      }
-
-      const sectionNum = String(p + 1).padStart(2, '0');
       pagesResult.push({
-        pageNumber: p + 1,
-        header: `SECTION ${sectionNum} — ${p === 0 ? 'CONCEPTUAL FOUNDATIONS' : p === 1 ? 'ADVANCED TOPICS & ARCHITECTURE' : 'REVISION & EXAM CHEAT SHEET'}`,
-        items: pageItems
+        pageNumber: pageNum,
+        header: `SECTION ${sectionNum} — ${headerTitle}`,
+        items: [...currentPageItems]
       });
-    }
+
+      currentPageItems = [];
+      currentUnits = 0;
+    };
+
+    // Item placement loop
+    flattenedItems.forEach(item => {
+      // First page accounts for 4 units for the Document Title Banner
+      const effectiveMaxUnits = (pagesResult.length === 0 && currentPageItems.length === 0)
+        ? (MAX_PAGE_UNITS - 4)
+        : MAX_PAGE_UNITS;
+
+      if (currentUnits + item.weight > effectiveMaxUnits && currentPageItems.length > 0) {
+        // Check if we can fit a supplementary item into remaining page space before committing page
+        if (supplementaryItems.length > 0) {
+          const spaceRemaining = effectiveMaxUnits - currentUnits;
+          const fitIndex = supplementaryItems.findIndex(supp => supp.weight <= spaceRemaining);
+          if (fitIndex !== -1) {
+            const [suppItem] = supplementaryItems.splice(fitIndex, 1);
+            currentPageItems.push(suppItem);
+            currentUnits += suppItem.weight;
+          }
+        }
+        commitPage();
+      }
+
+      currentPageItems.push(item);
+      currentUnits += item.weight;
+    });
+
+    // Append any leftover supplementary revision callout boxes into the last page or create final page if needed
+    supplementaryItems.forEach(suppItem => {
+      const effectiveMaxUnits = (pagesResult.length === 0 && currentPageItems.length === 0)
+        ? (MAX_PAGE_UNITS - 4)
+        : MAX_PAGE_UNITS;
+
+      if (currentUnits + suppItem.weight > effectiveMaxUnits && currentPageItems.length > 0) {
+        commitPage();
+      }
+
+      currentPageItems.push(suppItem);
+      currentUnits += suppItem.weight;
+    });
+
+    commitPage();
 
     return pagesResult;
   }, [sections, overview, keyPoints, formulas, keyTerms, hasNotesContent, parsedMarkdown]);
 
-  // RENDERING GATES: If notes content is ALREADY available, display handwritten notes INSTANTLY!
-  // Only display the compilation spinner if notes content is missing and notes generation is actively running.
   const showLoading = !hasNotesContent && isCompilingState;
 
   if (showLoading) {
@@ -438,16 +569,14 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
 
       {/* HANDWRITTEN QUALITY + PRINT/PDF-SPECIFIC CSS */}
       <style>{`
-        /* Authentic handwriting font stack with sane local fallbacks */
         .a4-page {
           font-family: 'Kalam', 'Caveat', 'Patrick Hand', 'Segoe Print', 'Comic Sans MS', cursive !important;
-          font-synthesis: none !important;              /* NEVER fake-bold handwriting fonts (looks blurry) */
+          font-synthesis: none !important;
           text-rendering: optimizeLegibility;
           -webkit-font-smoothing: antialiased;
           -moz-osx-font-smoothing: grayscale;
           letter-spacing: 0.015em;
         }
-        /* Snap all paragraph / list / table text exactly onto the 28px ruled-line grid */
         .a4-page p,
         .a4-page li,
         .a4-page td,
@@ -507,7 +636,7 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
         {pages.map((pg) => (
           <div
             key={pg.pageNumber}
-            className="a4-page relative w-[210mm] min-h-[297mm] !bg-white !text-slate-900 p-[16mm] rounded-[2px] border-[5px] border-[#2563EB] shadow-2xl font-handwritten select-text"
+            className="a4-page relative w-[210mm] min-h-[297mm] !bg-white !text-slate-900 p-[16mm] rounded-[2px] border-[5px] border-[#2563EB] shadow-2xl font-handwritten select-text flex flex-col justify-between"
             style={{
               fontFamily: "'Kalam', 'Caveat', 'Patrick Hand', 'Segoe Print', 'Comic Sans MS', cursive",
               backgroundColor: '#FFFFFF',
@@ -517,161 +646,187 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
               color: '#0F294A'
             }}
           >
-            {/* HEADER METADATA */}
-            <div className="flex justify-between items-center pb-2 border-b-2 border-[#2563EB] mb-6 text-sm font-bold tracking-wide">
-              <div>
-                <span className="text-[#0F294A] uppercase tracking-wider text-xs font-mono font-bold">{pg.header}</span>
-              </div>
-              <div className="text-xs font-mono font-bold text-[#475569]">
-                PAGE {String(pg.pageNumber).padStart(2, '0')} OF {String(pages.length).padStart(2, '0')}
-              </div>
-            </div>
-
-            {/* DOCUMENT TITLE (ON PAGE 1) */}
-            {pg.pageNumber === 1 && (
-              <div className="mb-6">
-                <h1 className="text-3xl sm:text-4xl font-bold uppercase tracking-tight text-[#0F294A] leading-none mb-2 decoration-wavy underline underline-offset-8">
-                  {title}
-                </h1>
-                <div className="text-xs font-mono font-bold text-[#334155] mt-2 italic flex items-center gap-2">
-                  <span className="inline-block h-2 w-2 rounded-full bg-[#2563EB]" />
-                  <span>University Revision Sheet • Hand-annotated Study Notes</span>
+            <div>
+              {/* HEADER METADATA */}
+              <div className="flex justify-between items-center pb-2 border-b-2 border-[#2563EB] mb-6 text-sm font-bold tracking-wide">
+                <div>
+                  <span className="text-[#0F294A] uppercase tracking-wider text-xs font-mono font-bold">{pg.header}</span>
+                </div>
+                <div className="text-xs font-mono font-bold text-[#475569]">
+                  PAGE {String(pg.pageNumber).padStart(2, '0')} OF {String(pages.length).padStart(2, '0')}
                 </div>
               </div>
-            )}
 
-            {/* PAGE SECTION CONTENT */}
-            <div className="space-y-6 text-base leading-relaxed text-[#0F294A]">
-              {pg.items.map((item, idx) => (
-                <div key={idx} className="space-y-2">
-                  {/* SECTION TITLE WITH HANDWRITTEN HIGHLIGHT */}
-                  <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-0.5 rounded bg-[#FFD54F] text-[#0F294A] text-lg font-bold shadow-sm border border-amber-400">
-                      ✏ {item.title}
-                    </span>
+              {/* DOCUMENT TITLE (ON PAGE 1) */}
+              {pg.pageNumber === 1 && (
+                <div className="mb-6">
+                  <h1 className="text-3xl sm:text-4xl font-bold uppercase tracking-tight text-[#0F294A] leading-none mb-2 decoration-wavy underline underline-offset-8">
+                    {title}
+                  </h1>
+                  <div className="text-xs font-mono font-bold text-[#334155] mt-2 italic flex items-center gap-2">
+                    <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#2563EB]" />
+                    <span>University Revision Sheet • Hand-annotated Study Notes</span>
                   </div>
+                </div>
+              )}
 
-                  {/* ITEM CONTENT BASED ON TYPE */}
-                  {(item.type === 'text' || item.type === 'concept') && (
-                    <div className="pl-2 space-y-2 text-lg font-bold leading-[28px] text-[#0F294A]">
-                      {Array.isArray(item.content) ? (
-                        item.content.map((pLine: string, pIdx: number) => (
-                          <p key={pIdx} className="leading-[28px]">
-                            {pLine.startsWith('- ') || pLine.startsWith('* ') ? (
-                              <span className="flex items-start gap-2">
-                                <span className="text-amber-500 font-bold">•</span>
-                                <span>{pLine.replace(/^[-*]\s+/, '')}</span>
-                              </span>
-                            ) : (
-                              pLine
-                            )}
-                          </p>
-                        ))
-                      ) : (
-                        <p className="whitespace-pre-line">{item.content}</p>
-                      )}
+              {/* PAGE SECTION CONTENT */}
+              <div className="space-y-6 text-base leading-relaxed text-[#0F294A]">
+                {pg.items.map((item, idx) => (
+                  <div key={idx} className="space-y-2">
+                    {/* SECTION TITLE WITH HIGHLIGHTER BADGE */}
+                    {item.title && (
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-0.5 rounded bg-[#FFD54F] text-[#0F294A] text-lg font-bold shadow-sm border border-amber-400 inline-block">
+                          ✏ {item.title}
+                        </span>
+                      </div>
+                    )}
 
-                      {/* RENDER HANDWRITTEN TABLE IF PRESENT */}
-                      {item.table && item.table.length > 0 && (
-                        <div className="my-4 overflow-hidden rounded-[6px] border-2 border-[#2563EB] bg-[#FAF8F5] p-3 shadow-sm">
-                          <div className="text-xs font-mono font-bold uppercase text-[#2563EB] mb-2">Structured Reference Table</div>
-                          <table className="w-full text-left border-collapse text-base font-bold">
-                            <thead>
-                              <tr className="border-b-2 border-[#2563EB] bg-[#E2E8F0] text-[#0F294A]">
-                                <th className="p-2 border-r border-[#CBD5E1] font-bold">{item.table[0]?.col1 || 'Field'}</th>
-                                <th className="p-2 font-bold">{item.table[0]?.col2 || 'Value'}</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {item.table.slice(1).map((row: any, rIdx: number) => (
-                                <tr key={rIdx} className="border-b border-[#CBD5E1] last:border-b-0 hover:bg-[#F1F5F9]">
-                                  <td className="p-2 border-r border-[#CBD5E1] font-bold text-[#1E293B]">{row.col1}</td>
-                                  <td className="p-2 font-bold text-[#0F294A]">{row.col2}</td>
+                    {/* TEXT / CONCEPT ITEMS */}
+                    {(item.type === 'text' || item.type === 'concept') && (
+                      <div className="pl-2 space-y-2 text-lg font-bold leading-[28px] text-[#0F294A]">
+                        {Array.isArray(item.content) ? (
+                          item.content.map((pLine: string, pIdx: number) => (
+                            <p key={pIdx} className="leading-[28px]">
+                              {pLine.startsWith('- ') || pLine.startsWith('* ') ? (
+                                <span className="flex items-start gap-2">
+                                  <span className="text-amber-500 font-bold">•</span>
+                                  <span>{pLine.replace(/^[-*]\s+/, '')}</span>
+                                </span>
+                              ) : (
+                                pLine
+                              )}
+                            </p>
+                          ))
+                        ) : (
+                          <p className="whitespace-pre-line leading-[28px]">{item.content}</p>
+                        )}
+
+                        {/* HANDWRITTEN COMPARISON TABLE */}
+                        {item.table && item.table.length > 0 && (
+                          <div className="my-4 overflow-hidden rounded-[6px] border-2 border-[#2563EB] bg-[#FAF8F5] p-3 shadow-sm">
+                            <div className="text-xs font-mono font-bold uppercase text-[#2563EB] mb-2">Structured Reference Table</div>
+                            <table className="w-full text-left border-collapse text-base font-bold">
+                              <thead>
+                                <tr className="border-b-2 border-[#2563EB] bg-[#E2E8F0] text-[#0F294A]">
+                                  <th className="p-2 border-r border-[#CBD5E1] font-bold">{item.table[0]?.col1 || 'Field'}</th>
+                                  <th className="p-2 font-bold">{item.table[0]?.col2 || 'Value'}</th>
                                 </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                              </thead>
+                              <tbody>
+                                {item.table.slice(1).map((row: any, rIdx: number) => (
+                                  <tr key={rIdx} className="border-b border-[#CBD5E1] last:border-b-0 hover:bg-[#F1F5F9]">
+                                    <td className="p-2 border-r border-[#CBD5E1] font-bold text-[#1E293B]">{row.col1}</td>
+                                    <td className="p-2 font-bold text-[#0F294A]">{row.col2}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* DEFINITION CARD */}
+                    {item.type === 'definition' && (
+                      <div className="my-3 p-4 rounded-[6px] border-2 border-emerald-500 bg-[#ECFDF5] text-[#065F46] shadow-sm space-y-1">
+                        <div className="text-xs font-mono font-bold uppercase text-emerald-800 tracking-wider">⚡ DEFINITION & PRINCIPLE</div>
+                        <p className="text-lg font-bold leading-[28px]">{item.content}</p>
+                      </div>
+                    )}
+
+                    {/* WORKED EXAMPLE CARD */}
+                    {item.type === 'example' && (
+                      <div className="my-3 p-4 rounded-[6px] border-2 border-amber-500 bg-[#FFFBEB] text-[#92400E] shadow-sm space-y-1">
+                        <div className="text-xs font-mono font-bold uppercase text-amber-900 tracking-wider">💡 WORKED EXAMPLE & APPLICATION</div>
+                        <p className="text-lg font-bold leading-[28px]">{item.content}</p>
+                      </div>
+                    )}
+
+                    {/* REMEMBER STICKY NOTE */}
+                    {item.type === 'remember' && (
+                      <div className="my-3 p-4 rounded-[6px] border-2 border-amber-400 bg-[#FEF3C7] text-[#78350F] shadow-sm space-y-1">
+                        <div className="text-xs font-mono font-bold uppercase text-amber-800 tracking-wider">📌 REMEMBER FOR EXAMS</div>
+                        <p className="text-lg font-bold leading-[28px]">{item.content}</p>
+                      </div>
+                    )}
+
+                    {/* EXAM FOCUS CARD */}
+                    {item.type === 'examFocus' && (
+                      <div className="my-3 p-4 rounded-[6px] border-2 border-blue-400 bg-[#EFF6FF] text-[#1E3A8A] shadow-sm space-y-1">
+                        <div className="text-xs font-mono font-bold uppercase text-blue-800 tracking-wider">🎯 EXAM FOCUS & HIGH-YIELD TIP</div>
+                        <p className="text-lg font-bold leading-[28px]">{item.content}</p>
+                      </div>
+                    )}
+
+                    {/* DIAGRAM FLOW CARD */}
+                    {item.type === 'diagram' && (
+                      <div className="my-3 p-4 rounded-[6px] border-2 border-dashed border-[#2563EB] bg-[#F8FAFC]">
+                        <div className="text-xs font-bold uppercase text-[#2563EB] mb-2 font-mono">Process Flow Diagram</div>
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-center">
+                          {Array.isArray(item.content) && item.content.map((step: string, sIdx: number) => (
+                            <React.Fragment key={sIdx}>
+                              <div 
+                                className="p-2.5 bg-white rounded-md border-2 border-[#2563EB] shadow-sm font-bold text-sm flex-1 text-center"
+                                style={{ backgroundColor: '#FFFFFF', color: '#0F294A' }}
+                              >
+                                {step}
+                              </div>
+                              {sIdx < item.content.length - 1 && (
+                                <ArrowRight className="h-5 w-5 text-[#2563EB] shrink-0 sm:rotate-0 rotate-90" />
+                              )}
+                            </React.Fragment>
+                          ))}
                         </div>
-                      )}
-                    </div>
-                  )}
+                      </div>
+                    )}
 
-                  {item.type === 'remember' && (
-                    <div className="my-3 p-4 rounded-[6px] border-2 border-amber-400 bg-[#FEF3C7] text-[#78350F] shadow-sm space-y-1">
-                      <div className="text-xs font-mono font-bold uppercase text-amber-800 tracking-wider">REMEMBER FOR EXAMS</div>
-                      <p className="text-lg font-bold leading-[28px]">{item.content}</p>
-                    </div>
-                  )}
-
-                  {item.type === 'examFocus' && (
-                    <div className="my-3 p-4 rounded-[6px] border-2 border-blue-400 bg-[#EFF6FF] text-[#1E3A8A] shadow-sm space-y-1">
-                      <div className="text-xs font-mono font-bold uppercase text-blue-800 tracking-wider">EXAM FOCUS & HIGHLIGHT</div>
-                      <p className="text-lg font-bold leading-[28px]">{item.content}</p>
-                    </div>
-                  )}
-
-                  {item.type === 'diagram' && (
-                    <div className="my-3 p-4 rounded-[6px] border-2 border-dashed border-[#2563EB] bg-[#F8FAFC]">
-                      <div className="text-xs font-bold uppercase text-[#2563EB] mb-2 font-mono">Process Flow Diagram</div>
-                      <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-center">
-                        {Array.isArray(item.content) && item.content.map((step: string, sIdx: number) => (
-                          <React.Fragment key={sIdx}>
-                            <div 
-                              className="p-2.5 bg-white rounded-md border-2 border-[#2563EB] shadow-sm font-bold text-sm flex-1 text-center"
-                              style={{ backgroundColor: '#FFFFFF', color: '#0F294A' }}
-                            >
-                              {step}
+                    {/* EQUATION / FORMULA BOX */}
+                    {item.type === 'formula' && (
+                      <div className="my-3 space-y-2">
+                        {Array.isArray(item.content) && item.content.map((f: string, fIdx: number) => (
+                          <div key={fIdx} className="p-3 rounded-[6px] border-2 border-[#2563EB] bg-[#F1F5F9] shadow-sm relative">
+                            <span className="absolute top-1 right-2 text-[10px] font-mono text-blue-700 uppercase font-bold">📐 Equation Box</span>
+                            <div className="text-xl font-bold text-[#0F294A] tracking-wider font-mono">
+                              {f}
                             </div>
-                            {sIdx < item.content.length - 1 && (
-                              <ArrowRight className="h-5 w-5 text-[#2563EB] shrink-0 sm:rotate-0 rotate-90" />
-                            )}
-                          </React.Fragment>
+                          </div>
                         ))}
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {item.type === 'formula' && (
-                    <div className="my-3 space-y-2">
-                      {Array.isArray(item.content) && item.content.map((f: string, fIdx: number) => (
-                        <div key={fIdx} className="p-3 rounded-[6px] border-2 border-[#2563EB] bg-[#F1F5F9] shadow-sm relative">
-                          <span className="absolute top-1 right-2 text-[10px] font-mono text-blue-700 uppercase font-bold">Equation Box</span>
-                          <div className="text-xl font-bold text-[#0F294A] tracking-wider font-mono">
-                            {f}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                    {/* TERMINOLOGY TAGS */}
+                    {item.type === 'terms' && (
+                      <div className="flex flex-wrap gap-2 my-2 pl-2">
+                        {Array.isArray(item.content) && item.content.map((term: string, tIdx: number) => (
+                          <span key={tIdx} className="px-3 py-1 bg-amber-100 rounded-full border border-amber-400 text-amber-950 font-bold text-sm">
+                            🏷 {term}
+                          </span>
+                        ))}
+                      </div>
+                    )}
 
-                  {item.type === 'terms' && (
-                    <div className="flex flex-wrap gap-2 my-2 pl-2">
-                      {Array.isArray(item.content) && item.content.map((term: string, tIdx: number) => (
-                        <span key={tIdx} className="px-3 py-1 bg-amber-100 rounded-full border border-amber-400 text-amber-950 font-bold text-sm">
-                          📌 {term}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  {item.type === 'bullets' && (
-                    <ul className="space-y-1.5 pl-2 text-lg">
-                      {Array.isArray(item.content) && item.content.map((bullet: string, bIdx: number) => (
-                        <li key={bIdx} className="flex items-start gap-2">
-                          <span className="text-amber-500 font-bold">•</span>
-                          <span className="font-bold text-[#0F294A] leading-[28px]">{bullet}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              ))}
+                    {/* BULLET POINTS */}
+                    {item.type === 'bullets' && (
+                      <ul className="space-y-1.5 pl-2 text-lg">
+                        {Array.isArray(item.content) && item.content.map((bullet: string, bIdx: number) => (
+                          <li key={bIdx} className="flex items-start gap-2">
+                            <span className="text-amber-500 font-bold">•</span>
+                            <span className="font-bold text-[#0F294A] leading-[28px]">{bullet}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* PAGE FOOTER */}
             <div className="mt-8 pt-3 border-t border-slate-300 flex justify-between items-center text-xs font-mono font-bold text-slate-600">
-              <span>NOTEIT — HANDWRITTEN STUDY ENGINE</span>
-              <span>A4 PORTRAIT (210mm × 297mm)</span>
+              <span>NOTEIT — HANDWRITTEN REVISION ENGINE</span>
+              <span>A4 PORTRAIT (210mm × 297mm) • PAGE {pg.pageNumber} OF {pages.length}</span>
             </div>
           </div>
         ))}
