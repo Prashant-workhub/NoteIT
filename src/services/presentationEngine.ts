@@ -123,8 +123,25 @@ const executeLlmCall = async (
   apiKey: string,
   responseSchema?: any
 ): Promise<any> => {
-  return executeGeminiCall(prompt, apiKey, undefined, responseSchema, undefined, model || getAIConfig().model || 'gemini-3.6-flash');
+  return executeGeminiCall(prompt, apiKey, undefined, responseSchema, undefined, model || getAIConfig().model || 'gemini-2.5-flash');
 };
+
+export async function processAiStreamResponse(
+  stream: ReadableStream<Uint8Array>,
+  onChunk: (text: string) => void
+): Promise<string> {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let fullText = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const chunk = decoder.decode(value, { stream: true });
+    fullText += chunk;
+    onChunk(fullText);
+  }
+  return fullText;
+}
 
 export const generatePresentationBlueprint = async (
   transcriptOrNotes: string,
@@ -134,7 +151,7 @@ export const generatePresentationBlueprint = async (
   level: 'quick' | 'balanced' | 'premium',
   apiKey: string
 ): Promise<SlideBlueprint[]> => {
-  const model = getAIConfig().model || 'gemini-3.6-flash';
+  const model = getAIConfig().model || 'gemini-2.5-flash';
 
   const schema = {
     type: 'OBJECT',

@@ -416,7 +416,7 @@ function getDefaultModelForProvider(provider?: string): string {
   if (p === 'grok' || p === 'xai') return 'grok-2';
   if (p === 'mistral') return 'mistral-large-latest';
   if (p === 'nvidia') return 'z-ai/glm-5.2';
-  return 'gemini-3.6-flash';
+  return 'gemini-2.5-flash';
 }
 
 function sanitizeModelName(model?: string, providerName?: string): string {
@@ -440,7 +440,7 @@ function sanitizeModelName(model?: string, providerName?: string): string {
     return defaultModel;
   }
 
-  if (trimmed === 'gemini-2.5-flash') return 'gemini-3.6-flash';
+  if (trimmed === 'gemini-3.6-flash' || trimmed === 'gemini-3.0-flash') return 'gemini-2.5-flash';
   return trimmed;
 }
 

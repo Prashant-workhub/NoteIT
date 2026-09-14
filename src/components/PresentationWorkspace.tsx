@@ -194,7 +194,7 @@ export default function PresentationWorkspace({
     setIsRefreshingSlide(prev => ({ ...prev, [idx]: true }));
     try {
       const { getAIConfig } = await import('../services/gemini');
-      const model = getAIConfig().model || 'gemini-3.6-flash';
+      const model = getAIConfig().model || 'gemini-2.5-flash';
       const prompt = `You are Gamma AI and Gemini Presentations.
 Regenerate a single slide about the topic "${slide.title}" for a "${selectedPurpose}" presentation.
 Keep total body word count strictly under 40 words.

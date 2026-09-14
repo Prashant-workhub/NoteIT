@@ -198,7 +198,7 @@ CRITICAL MANDATORY INSTRUCTIONS:
       }
     };
 
-    const response = await fetchGeminiApi(apiKey, getAIConfig().model || 'gemini-3.6-flash', body);
+    const response = await fetchGeminiApi(apiKey, getAIConfig().model || 'gemini-2.5-flash', body);
     if (response && response.ok) {
       const data = await response.json();
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
