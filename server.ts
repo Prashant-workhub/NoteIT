@@ -75,14 +75,27 @@ const corsOrigins = (process.env.CORS_ORIGINS || '')
   .map((o) => o.trim())
   .filter(Boolean);
 
+const defaultAllowedOrigins = [
+  'https://noteitai-testing.vercel.app',
+  process.env.FRONTEND_URL,
+  process.env.CLIENT_URL,
+  process.env.APP_URL,
+].filter(Boolean) as string[];
+
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
     if (corsOrigins.includes('*')) return callback(null, true);
     if (corsOrigins.includes(origin)) return callback(null, true);
+    if (defaultAllowedOrigins.includes(origin)) return callback(null, true);
     if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return callback(null, true);
-    return callback(new Error(`Origin ${origin} not allowed by CORS`));
+    if (/^https:\/\/.*\.vercel\.app$/.test(origin)) return callback(null, true);
+    if (/^https:\/\/.*\.onrender\.com$/.test(origin)) return callback(null, true);
+    return callback(null, false);
   },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-admin-secret', 'Accept']
 }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
@@ -614,7 +627,7 @@ app.post('/api/ai/provider-proxy', authenticateFirebaseUser, async (req, res) =>
       avgResponseTime: parseFloat(newAvgTime.toFixed(2))
     };
 
-    const monthlyTokens = (data.estimatedMonthlyTokens || 0) + tokenUsage.totalTokens;
+    const monthlyTokens = ((data && data.estimatedMonthlyTokens) || 0) + tokenUsage.totalTokens;
 
     try {
       if (data) {
@@ -768,16 +781,21 @@ app.post('/api/ai/revalidate', authenticateFirebaseUser, async (req, res) => {
   const uid = user.uid;
 
   try {
-    const adminDb = getFirestore();
-    const userDocRef = adminDb.collection('users').doc(uid);
-    const userDoc = await userDocRef.get();
+    let data: any = null;
+    try {
+      const adminDb = getFirestore();
+      const userDocRef = adminDb.collection('users').doc(uid);
+      const userDoc = await userDocRef.get();
+      if (userDoc.exists) data = userDoc.data();
+    } catch (fsErr) {
+      console.warn('[revalidate] Firestore read skipped/failed:', fsErr);
+    }
 
-    if (!userDoc.exists || !userDoc.data()?.providerConfigured) {
+    if (!data || !data.providerConfigured) {
       res.status(400).json({ error: 'AI provider is not configured. Nothing to validate.' });
       return;
     }
 
-    const data = userDoc.data();
     const provider = data?.aiProvider || 'gemini';
     const encryptedKey = data?.encryptedApiKey;
 
@@ -795,12 +813,15 @@ app.post('/api/ai/revalidate', authenticateFirebaseUser, async (req, res) => {
       return;
     }
 
-    await userDocRef.set({ providerLastValidated: new Date() }, { merge: true });
+    try {
+      const adminDb = getFirestore();
+      await adminDb.collection('users').doc(uid).set({ providerLastValidated: new Date() }, { merge: true });
+    } catch (fsErr) {}
 
     res.json({ success: true, message: 'API key revalidated successfully.' });
   } catch (error: any) {
     console.error('Error revalidating key:', error);
-    res.status(500).json({ error: error.message || 'Error revalidating key' });
+    res.status(400).json({ error: error.message || 'Error revalidating key' });
   }
 });
 
@@ -809,20 +830,24 @@ app.delete('/api/ai/config', authenticateFirebaseUser, async (req, res) => {
   const uid = user.uid;
 
   try {
-    const adminDb = getFirestore();
-    const userDocRef = adminDb.collection('users').doc(uid);
-    await userDocRef.set({
-      geminiApiKey: '',
-      openaiApiKey: '',
-      encryptedApiKey: '',
-      encryptedGeminiTranscriptionKey: '',
-      providerConfigured: false,
-      providerLastValidated: null,
-      selectedModel: '',
-      estimatedMonthlyTokens: 0,
-      usageStats: null,
-      lastHealthCheck: null
-    }, { merge: true });
+    try {
+      const adminDb = getFirestore();
+      const userDocRef = adminDb.collection('users').doc(uid);
+      await userDocRef.set({
+        geminiApiKey: '',
+        openaiApiKey: '',
+        encryptedApiKey: '',
+        encryptedGeminiTranscriptionKey: '',
+        providerConfigured: false,
+        providerLastValidated: null,
+        selectedModel: '',
+        estimatedMonthlyTokens: 0,
+        usageStats: null,
+        lastHealthCheck: null
+      }, { merge: true });
+    } catch (fsErr) {
+      console.warn('[delete-config] Firestore update skipped/failed:', fsErr);
+    }
 
     res.json({ success: true, message: 'AI API key configuration removed successfully' });
   } catch (error: any) {
@@ -918,16 +943,22 @@ app.post(['/api/lectures/:lectureId/generate-resources', '/api/lectures/generate
 
     if (!rawKey) {
       const errMsg = 'AI provider API key is not configured. Please configure an API key in Settings.';
-      await lectureRef.set({
-        resourceGenerationStatus: 'failed',
-        resourceGenerationError: {
-          code: '400',
-          message: errMsg,
-          provider: userData?.aiProvider || 'none',
-          timestamp: new Date()
-        },
-        updatedAt: new Date()
-      }, { merge: true });
+      try {
+        if (lectureRef) {
+          await lectureRef.set({
+            resourceGenerationStatus: 'failed',
+            resourceGenerationError: {
+              code: '400',
+              message: errMsg,
+              provider: userData?.aiProvider || 'none',
+              timestamp: new Date()
+            },
+            updatedAt: new Date()
+          }, { merge: true });
+        }
+      } catch (fsErr) {
+        console.warn('[GENERATE-RESOURCES] Firestore error status set skipped/failed:', fsErr);
+      }
 
       res.status(400).json({ error: errMsg });
       return;
@@ -1201,6 +1232,29 @@ app.post('/api/ai/explain-bhailang', authenticateFirebaseUser, async (req, res) 
       return res.status(400).json({ error: 'Text selection is required.' });
     }
 
+    const user = req.body.user;
+    const uid = user?.uid;
+    let data: any = null;
+    if (uid) {
+      try {
+        const adminDb = getFirestore();
+        const userDoc = await adminDb.collection('users').doc(uid).get();
+        if (userDoc.exists) data = userDoc.data();
+      } catch (fsErr) {}
+    }
+
+    const rawKey = data?.encryptedApiKey || data?.geminiApiKey || data?.openaiApiKey || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || '';
+
+    if (!rawKey) {
+      return res.status(400).json({ error: 'AI provider key is not configured. Please enter an API key in Settings.' });
+    }
+
+    const providerName = data?.aiProvider || 'gemini';
+    let decryptedKey = rawKey;
+    try {
+      decryptedKey = decryptKey(rawKey);
+    } catch (e) {}
+
     const prompt = `You are NoteIT AI's friendly, genius engineering senior/mentor.
 Explain the following concept or text snippet in natural, ultra-intuitive Indian student Hinglish (Bhai Lang format).
 
@@ -1215,14 +1269,15 @@ Subject: ${subjectName || 'Engineering'}
 Text snippet to explain:
 "${text.trim().slice(0, 1500)}"`;
 
-    const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || '';
-    const providerInstance = ProviderFactory.getProvider('gemini', apiKey);
-    const explanation = await providerInstance.generateText(prompt, 'gemini-3.6-flash');
+    const providerInstance = ProviderFactory.getProvider(providerName, decryptedKey);
+    const selectedModel = sanitizeModelName(data?.selectedModel, providerName);
+    const explanation = await providerInstance.generateText(prompt, selectedModel);
 
     res.json({ explanation });
   } catch (err: any) {
     console.error('[BHAI-LANG] Error generating explanation:', err);
-    res.status(500).json({ error: formatUserFriendlyErrorMessage(err, 'Failed to generate Bhai Lang explanation') });
+    const status = err.status || (err.name === 'ProviderValidationError' ? 400 : 500);
+    res.status(status).json({ error: formatUserFriendlyErrorMessage(err, 'Failed to generate Bhai Lang explanation') });
   }
 });
 
@@ -1507,49 +1562,54 @@ app.post('/api/storage/ground-source', authenticateFirebaseUser, async (req, res
     const uid = user.uid;
     const chunks = performChunking(text, sourceType);
     
-    const adminDb = getFirestore();
-    const collectionName = sourceType === 'lecture' ? 'lectures' : 'sources';
-    const chunksRef = adminDb.collection('users').doc(uid).collection(collectionName).doc(sourceId).collection('chunks');
-    
-    // Clean old chunks if present
-    const existing = await chunksRef.get();
-    if (!existing.empty) {
-      const batch = adminDb.batch();
-      existing.forEach(docSnap => batch.delete(docSnap.ref));
-      await batch.commit();
-    }
-    
-    // Batch write chunks (limit 500 per batch)
-    let currentBatch = adminDb.batch();
-    let count = 0;
-    
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i];
-      const docRef = chunksRef.doc(`chunk-${i}`);
-      currentBatch.set(docRef, {
-        chunkId: `chunk-${i}`,
-        sourceId,
-        content: chunk.content,
-        page: chunk.page || null,
-        timestamp: chunk.timestamp || null,
-        chapter: chunk.chapter || null,
-        keywords: chunk.keywords,
-        createdAt: new Date()
-      });
-      count++;
+    try {
+      const adminDb = getFirestore();
+      const collectionName = sourceType === 'lecture' ? 'lectures' : 'sources';
+      const chunksRef = adminDb.collection('users').doc(uid).collection(collectionName).doc(sourceId).collection('chunks');
       
-      if (count === 400) {
-        await currentBatch.commit();
-        currentBatch = adminDb.batch();
-        count = 0;
+      // Clean old chunks if present
+      const existing = await chunksRef.get();
+      if (!existing.empty) {
+        const batch = adminDb.batch();
+        existing.forEach(docSnap => batch.delete(docSnap.ref));
+        await batch.commit();
       }
+      
+      // Batch write chunks (limit 500 per batch)
+      let currentBatch = adminDb.batch();
+      let count = 0;
+      
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        const docRef = chunksRef.doc(`chunk-${i}`);
+        currentBatch.set(docRef, {
+          chunkId: `chunk-${i}`,
+          sourceId,
+          content: chunk.content,
+          page: chunk.page || null,
+          timestamp: chunk.timestamp || null,
+          chapter: chunk.chapter || null,
+          keywords: chunk.keywords,
+          createdAt: new Date()
+        });
+        count++;
+        
+        if (count === 400) {
+          await currentBatch.commit();
+          currentBatch = adminDb.batch();
+          count = 0;
+        }
+      }
+      
+      if (count > 0) {
+        await currentBatch.commit();
+      }
+      
+      console.log(`[RAG] Ingested ${chunks.length} chunks for ${sourceType} ${sourceId}`);
+    } catch (fsErr) {
+      console.warn('[RAG] Firestore chunk save skipped/failed:', fsErr);
     }
     
-    if (count > 0) {
-      await currentBatch.commit();
-    }
-    
-    console.log(`[RAG] Ingested ${chunks.length} chunks for ${sourceType} ${sourceId}`);
     res.json({ success: true, count: chunks.length });
   } catch (error: any) {
     console.error('[RAG] Grounding failed:', error);
@@ -1958,14 +2018,18 @@ app.post('/api/notifications/send-test', authenticateFirebaseUser, async (req, r
   const { title, body, route } = req.body;
 
   try {
-    const adminDb = getFirestore();
     let tokenDocs: any[] = [];
-    const devicesSnap = await adminDb.collection('users').doc(uid).collection('devices').where('enabled', '==', true).get();
-    if (!devicesSnap.empty) {
-      tokenDocs = devicesSnap.docs;
-    } else {
-      const fallbackSnap = await adminDb.collection('users').doc(uid).collection('notificationTokens').where('enabled', '==', true).get();
-      tokenDocs = fallbackSnap.docs;
+    try {
+      const adminDb = getFirestore();
+      const devicesSnap = await adminDb.collection('users').doc(uid).collection('devices').where('enabled', '==', true).get();
+      if (!devicesSnap.empty) {
+        tokenDocs = devicesSnap.docs;
+      } else {
+        const fallbackSnap = await adminDb.collection('users').doc(uid).collection('notificationTokens').where('enabled', '==', true).get();
+        tokenDocs = fallbackSnap.docs;
+      }
+    } catch (fsErr) {
+      console.warn('[send-test] Firestore token lookup skipped/failed:', fsErr);
     }
 
     if (tokenDocs.length === 0) {
