@@ -79,16 +79,17 @@ export const uploadBlobStorage = async (
   options?: { isSensitive?: boolean; fileName?: string }
 ): Promise<{ storageUrl?: string }> => {
   const currentUser = auth.currentUser;
-  const isSmallAndSecure = (blob.size < SMALL_FILE_SIZE_LIMIT || options?.isSensitive) && currentUser;
+  const isSensitiveOnly = options?.isSensitive === true && currentUser && storage;
+  const shouldTryFirebase = isSensitiveOnly || (!uploadUrl && currentUser && storage);
 
-  if (isSmallAndSecure && options?.fileName && storage) {
+  if (shouldTryFirebase && options?.fileName && storage) {
     try {
-      console.log('[Storage] Storing small/secure file to Firebase Storage...');
+      console.log('[Storage] Storing sensitive file to Firebase Storage...');
       onProgress(5);
       const fileRef = ref(storage, `users/${currentUser.uid}/secure_files/${Date.now()}_${options.fileName}`);
       const uploadTask = uploadBytesResumable(fileRef, blob);
 
-      return await new Promise((resolve, reject) => {
+      const firebaseRes = await new Promise<{ storageUrl?: string }>((resolve) => {
         uploadTask.on(
           'state_changed',
           (snapshot) => {
@@ -98,18 +99,27 @@ export const uploadBlobStorage = async (
             }
           },
           (error) => {
-            console.warn('[Storage] Firebase upload task error:', error);
-            reject(error);
+            console.warn('[Storage] Firebase upload task warning (will use target uploadUrl fallback if available):', error);
+            resolve({});
           },
           async () => {
-            const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-            onProgress(100);
-            resolve({ storageUrl: downloadUrl });
+            try {
+              const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+              onProgress(100);
+              resolve({ storageUrl: downloadUrl });
+            } catch (dlErr) {
+              console.warn('[Storage] Failed to resolve Firebase download URL:', dlErr);
+              resolve({});
+            }
           }
         );
       });
+
+      if (firebaseRes.storageUrl) {
+        return firebaseRes;
+      }
     } catch (firebaseErr) {
-      console.warn('[Storage] Firebase upload failed, falling back to local backend disk:', firebaseErr);
+      console.warn('[Storage] Firebase upload failed, using target uploadUrl:', firebaseErr);
     }
   }
 
@@ -125,11 +135,18 @@ export const uploadBlobStorage = async (
     idToken = await currentUser.getIdToken().catch(() => '');
   }
 
+  const isAzureSasUrl = sanitizedUrl.includes('.blob.core.windows.net') || sanitizedUrl.includes('sig=');
+
   return new Promise((resolve) => {
     const xhr = new XMLHttpRequest();
     xhr.open('PUT', sanitizedUrl, true);
     xhr.setRequestHeader('Content-Type', blob.type || 'application/octet-stream');
-    if (idToken) {
+
+    if (isAzureSasUrl) {
+      // Required header for Azure Blob Storage REST API
+      xhr.setRequestHeader('x-ms-blob-type', 'BlockBlob');
+    } else if (idToken) {
+      // Authorization header for local backend upload endpoint
       xhr.setRequestHeader('Authorization', `Bearer ${idToken}`);
     }
 
@@ -141,12 +158,18 @@ export const uploadBlobStorage = async (
     };
 
     xhr.onload = () => {
-      onProgress(100);
-      resolve({});
+      if (xhr.status >= 200 && xhr.status < 300) {
+        onProgress(100);
+        resolve({});
+      } else {
+        console.warn(`[Storage] Upload completed with HTTP status ${xhr.status}. Continuing process...`);
+        onProgress(100);
+        resolve({});
+      }
     };
 
     xhr.onerror = () => {
-      console.warn('[Storage] Local upload error. Using memory fallback...');
+      console.warn('[Storage] Network error during storage upload. Proceeding with inline fallback...');
       onProgress(100);
       resolve({});
     };
