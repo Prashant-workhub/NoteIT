@@ -1,15 +1,8 @@
 import { BaseProvider } from './AIProvider';
 import { GeminiAdapter } from './ValidationAdapters';
 
-function sanitizeGeminiModel(model?: string): string {
-  if (model && model.trim()) {
-    const clean = model.trim().replace(/^models\//, '');
-    if (clean === 'gemini-3.6-flash' || clean === 'gemini-3.0-flash') {
-      return 'gemini-2.5-flash';
-    }
-    return clean;
-  }
-  return 'gemini-2.5-flash';
+function sanitizeGeminiModel(_model?: string): string {
+  return 'gemini-3.6-flash';
 }
 
 export async function fetchGeminiApi(apiKey: string, requestedModel: string, bodyObj: any): Promise<Response> {
@@ -78,11 +71,11 @@ export async function fetchGeminiApi(apiKey: string, requestedModel: string, bod
 
 export class GeminiProvider extends BaseProvider {
   constructor(apiKey: string) {
-    super(apiKey, 'gemini-2.5-flash');
+    super(apiKey, 'gemini-3.6-flash');
   }
 
   getAvailableModels(): string[] {
-    return ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+    return ['gemini-3.6-flash'];
   }
 
   async validateKey(): Promise<boolean> {

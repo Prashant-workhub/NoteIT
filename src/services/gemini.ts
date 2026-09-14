@@ -42,7 +42,7 @@ export const getAIConfig = () => {
   const customGeminiKey = isBrowser ? (localStorage.getItem('noteit_gemini_api_key') || '') : '';
   const customOpenAiKey = isBrowser ? (localStorage.getItem('noteit_openai_api_key') || '') : '';
   const customNotionKey = isBrowser ? (localStorage.getItem('noteit_notion_api_key') || '') : '';
-  const model = isBrowser ? (localStorage.getItem('noteit_active_gemini_model') || localStorage.getItem('noteit_gemini_model') || 'gemini-2.5-flash') : 'gemini-2.5-flash';
+  const model = 'gemini-3.6-flash';
   
   const envGeminiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
   const envOpenAiKey = import.meta.env.VITE_OPENAI_API_KEY || '';
@@ -138,7 +138,7 @@ export const executeGeminiCall = async (
     const idToken = await currentUser.getIdToken(true);
     const proxyUrl = `${API_BASE_URL}/api/ai/provider-proxy`;
 
-    let targetModel = 'gemini-2.5-flash';
+    let targetModel = 'gemini-3.6-flash';
 
     const response = await fetch(proxyUrl, {
       method: 'POST',
@@ -312,7 +312,7 @@ ${transcript}`;
     required: ['title', 'overview', 'keyConcepts', 'importantPoints', 'examples', 'formulas', 'definitions', 'takeaways']
   };
 
-  const rawResult = await executeGeminiCall(prompt, customGeminiApiKey || '', undefined, schema, onBusy, 'gemini-2.5-flash', 'generate-notes');
+  const rawResult = await executeGeminiCall(prompt, customGeminiApiKey || '', undefined, schema, onBusy, 'gemini-3.6-flash', 'generate-notes');
 
   const title = rawResult.title || 'Lecture Study Notes';
   const overview = rawResult.overview || '';

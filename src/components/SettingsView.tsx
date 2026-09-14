@@ -53,10 +53,10 @@ const PROVIDER_METADATA: Record<string, {
   gemini: {
     name: 'Google Gemini',
     description: 'Highly capable multimodal model for fast note synthesis, quizzes, and mind maps.',
-    defaultModel: 'gemini-2.5-flash',
+    defaultModel: 'gemini-3.6-flash',
     docLink: 'https://ai.google.dev/gemini-api/docs',
     getKeyLink: 'https://aistudio.google.com/apikey',
-    models: ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'],
+    models: ['gemini-3.6-flash'],
     endpoint: 'generativelanguage.googleapis.com'
   },
   notion: {
@@ -214,7 +214,7 @@ export default function SettingsView({
 
   // AI Provider & API Keys state
   const [aiProvider, setAiProvider] = useState<string>('gemini');
-  const [selectedModel, setSelectedModel] = useState<string>('gemini-2.5-flash');
+  const [selectedModel, setSelectedModel] = useState<string>('gemini-3.6-flash');
   const [showNewKeyPassword, setShowNewKeyPassword] = useState(false);
   
   // Search & custom dropdowns
