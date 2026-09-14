@@ -73,7 +73,9 @@ export async function generateAcademicNotesFromDocument(
   subjectName: string,
   teacherTopics: string[] = []
 ): Promise<GeneratedAcademicNotes | null> {
-  const apiKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
+  // Never embed a provider key in the client bundle. This legacy direct-call
+  // path intentionally stays disabled until it is routed through the vault.
+  const apiKey = '';
   if (!apiKey || !attachments || attachments.length === 0) {
     return null;
   }

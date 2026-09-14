@@ -41,7 +41,7 @@ export async function explainInBhaiLang(text: string, subjectName?: string): Pro
   // Client-side direct fallback
   try {
     const { fetchGeminiApi } = await import('../providers/GeminiProvider');
-    const apiKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
+    const apiKey = '';
     if (apiKey) {
       const prompt = `Explain the following text in natural, intuitive Indian student Hinglish (Bhai Lang style). Start with "Bhai simple bolu toh:". Keep technical terms accurate and give a quick relatable analogy:\n\n"${trimmed.slice(0, 1200)}"`;
       const body = {

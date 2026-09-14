@@ -506,7 +506,7 @@ export function ExamRushWorkspace({ config, lectures = [], notes = [], onExit }:
     try {
       const { fetchGeminiApi } = await import('../../providers/GeminiProvider');
       const { getAIConfig } = await import('../../services/gemini');
-      const apiKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
+      const apiKey = '';
       if (apiKey) {
         const body = {
           contents: [{ parts: [{ text: `You are an expert exam preparation AI assistant for ${config.subject.canonicalName}. Answer the following student question strictly based on the subject topics:\n\n${query}` }] }]

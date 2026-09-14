@@ -357,7 +357,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
 
     setIsGeneratingNotes(true);
     try {
-      const apiKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
+      const apiKey = '';
       const notesData = await generateStructuredNotes(
         textContent,
         format as any,
@@ -388,7 +388,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
 
     setIsGeneratingSummary(true);
     try {
-      const apiKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
+      const apiKey = '';
       let serviceMode: 'quick_revision' | 'detailed_notes' | 'executive_summary' | 'beginner_friendly' | 'academic_format' | 'bhailang' = 'academic_format';
       if (format === 'academic') serviceMode = 'academic_format';
       else if (format === 'revision') serviceMode = 'quick_revision';
@@ -426,7 +426,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
 
     setIsGeneratingFlashcards(true);
     try {
-      const apiKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
+      const apiKey = '';
       const textLen = textContent.length;
       const count = textLen < 3000 ? 15 : textLen < 10000 ? 30 : 50;
 
@@ -456,7 +456,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
 
     setIsGeneratingQuiz(true);
     try {
-      const apiKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
+      const apiKey = '';
       const generated = await generateQuiz(textContent, apiKey);
       const docRef = doc(db, 'users', userId, 'sources', activeSourceId, 'assets', `quiz`);
       await setDoc(docRef, { data: generated, updatedAt: serverTimestamp() });
@@ -483,7 +483,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
 
     setIsGeneratingQuiz(true);
     try {
-      const apiKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
+      const apiKey = '';
       const existing = activeSource.quiz || [];
       const questionTexts = existing.map((q: any) => q.question);
 
@@ -514,7 +514,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
 
     setIsGeneratingMindmap(true);
     try {
-      const apiKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
+      const apiKey = '';
       const sections = activeSource.sections || [];
 
       const generated = await generateMindmap(textContent, sections, apiKey);
@@ -571,7 +571,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
   useEffect(() => {
     if (!activeSourceId || !activeSource) return;
 
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
+    const apiKey = '';
     if (!apiKey) return;
 
     const hasContent = !!(activeSource.content?.trim() || activeSource.transcript?.trim());
@@ -1488,7 +1488,7 @@ ${context}
 Question:
 ${queryText}`;
 
-      const apiKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
+      const apiKey = '';
       const bodyObj = { contents: [{ parts: [{ text: prompt }] }] };
       const res = await fetchGeminiApi(apiKey, getAIConfig().model || 'gemini-2.5-flash', bodyObj);
 
@@ -1661,7 +1661,7 @@ ${queryText}`;
       })}
       `;
 
-      const apiKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
+      const apiKey = '';
       const bodyObj = {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
@@ -2371,7 +2371,7 @@ ${queryText}`;
     setProcessingStatus("Generating slide content...");
 
     try {
-      const apiKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
+      const apiKey = '';
 
       const prompt = `
         Create a structured PowerPoint presentation deck based on the following material.

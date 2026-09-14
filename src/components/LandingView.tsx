@@ -520,7 +520,7 @@ export default function LandingView({
       </section>
 
 
-      {/* 7. FAQ ACCORDION SECTION */}
+
       <section id="faq" className="border-t-2 border-[var(--border-main)] bg-[var(--card-bg)] py-16 px-6">
         <div className="max-w-4xl mx-auto space-y-8">
           <div className="text-center space-y-3">

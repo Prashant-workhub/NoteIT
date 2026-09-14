@@ -38,7 +38,6 @@ import { auth, db } from '../firebaseConfig';
 import { collection, getDocs, doc, setDoc, updateDoc, deleteField } from 'firebase/firestore';
 import { API_BASE_URL } from '../config';
 import { MascotAvatarPicker } from './bauhaus/MascotAvatarPicker';
-import { validateApiKeyDirect } from '../providers/ValidationAdapters';
 import NotificationSettingsSection from './NotificationSettingsSection';
 
 const PROVIDER_METADATA: Record<string, {
@@ -225,6 +224,8 @@ export default function SettingsView({
   // Configuration Status state
   const [configStatus, setConfigStatus] = useState<{
     configured: boolean;
+    keySource?: 'user-byok' | 'platform-quota' | 'none';
+    platformQuotaAvailable?: boolean;
     provider?: string;
     maskedKey?: string;
     lastValidated?: string | null;
@@ -539,18 +540,29 @@ export default function SettingsView({
     }
   }, [activeTab]);
 
+  // Remove credentials left by versions that persisted API keys in browser
+  // storage. Provider/model preferences remain intact.
+  useEffect(() => {
+    Object.keys(localStorage)
+      .filter((key) => /^noteit_.+_api_key$/i.test(key))
+      .forEach((key) => localStorage.removeItem(key));
+  }, []);
+
   const handleRevalidateKey = async () => {
     setRevalidating(true);
     setValidationError(null);
     try {
-      const activeProvider = localStorage.getItem('noteit_active_ai_provider') || aiProvider || 'gemini';
-      const activeKey = localStorage.getItem(`noteit_${activeProvider}_api_key`) || import.meta.env.VITE_GEMINI_API_KEY || '';
-
-      if (!activeKey) {
-        throw new Error('No API key found to validate. Please enter an API key first.');
+      const currentUser = auth.currentUser;
+      if (!currentUser) throw new Error('Please sign in before validating your API key.');
+      const idToken = await currentUser.getIdToken();
+      const response = await fetch(`${API_BASE_URL}/api/ai/revalidate`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${idToken}` }
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || 'Failed to validate the encrypted API key.');
       }
-
-      await validateApiKeyDirect(activeKey, activeProvider, selectedModel);
       triggerSaveNotification();
       await fetchConfigStatus();
     } catch (err: any) {
@@ -617,7 +629,6 @@ export default function SettingsView({
       });
       if (res.ok) {
         localStorage.setItem('noteit_active_ai_provider', aiProvider);
-        localStorage.setItem(`noteit_${aiProvider}_api_key`, newKey.trim());
         const activeModel = selectedModel.trim() || PROVIDER_METADATA[aiProvider]?.defaultModel || 'gemini-2.5-flash';
         localStorage.setItem('noteit_active_ai_model', activeModel);
         localStorage.setItem('noteit_selected_model', activeModel);
@@ -1152,7 +1163,19 @@ export default function SettingsView({
                         <span>AES-256-GCM</span>
                       </div>
                     </div>
+                    <div>
+                      <div className="text-[9px] uppercase text-[#666666]">Key Source</div>
+                      <div className="mt-1 font-extrabold text-[#19B56B]">
+                        {configStatus?.keySource === 'user-byok' ? 'Your API key (BYOK)' : 'No key configured'}
+                      </div>
+                    </div>
                   </div>
+
+                  {configStatus?.platformQuotaAvailable && (
+                    <p className="text-[10px] font-mono font-bold text-[#666666] border-t-2 border-[#111111] pt-3">
+                      Platform quota is available only when explicitly enabled for a request; normal generation uses your configured BYOK key.
+                    </p>
+                  )}
 
                   <div className="flex flex-wrap gap-2.5 pt-3 border-t-2 border-[#111111]">
                     <button

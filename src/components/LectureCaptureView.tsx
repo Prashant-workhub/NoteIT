@@ -2573,7 +2573,7 @@ export default function LectureCaptureView({
                 {activeOutputTab === 'slides' && (
                   <PresentationWorkspace
                     theme={theme}
-                    apiKey={import.meta.env.VITE_GEMINI_API_KEY || ''}
+                    apiKey=""
                     contentSourceText={activeLecture.transcript || activeLecture.summary || ''}
                     initialBlueprint={activeLecture.presentationBlueprint}
                     title={activeLecture.title}

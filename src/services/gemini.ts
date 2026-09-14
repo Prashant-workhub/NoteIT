@@ -39,21 +39,19 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 export const getAIConfig = () => {
   const isBrowser = typeof window !== 'undefined';
   const provider = isBrowser ? (localStorage.getItem('noteit_active_ai_provider') || localStorage.getItem('noteit_ai_provider') || 'gemini') : 'gemini';
-  const customGeminiKey = isBrowser ? (localStorage.getItem('noteit_gemini_api_key') || '') : '';
-  const customOpenAiKey = isBrowser ? (localStorage.getItem('noteit_openai_api_key') || '') : '';
-  const customNotionKey = isBrowser ? (localStorage.getItem('noteit_notion_api_key') || '') : '';
+  // API keys are deliberately never read from browser storage. Requests that
+  // need a provider key go through the authenticated server-side vault.
+  const customGeminiKey = '';
+  const customOpenAiKey = '';
+  const customNotionKey = '';
   const model = 'gemini-3.6-flash';
-  
-  const envGeminiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
-  const envOpenAiKey = import.meta.env.VITE_OPENAI_API_KEY || '';
-  const envNotionKey = import.meta.env.VITE_NOTION_API_KEY || '';
   
   return {
     provider,
     model,
-    geminiKey: customGeminiKey || envGeminiKey,
-    openaiKey: customOpenAiKey || envOpenAiKey,
-    notionKey: customNotionKey || envNotionKey
+    geminiKey: customGeminiKey,
+    openaiKey: customOpenAiKey,
+    notionKey: customNotionKey
   };
 };
 
@@ -435,7 +433,6 @@ export const transcribeAudioWithFallback = async (
       body: JSON.stringify({
         base64Audio,
         mimeType,
-        geminiApiKey: getAIConfig().geminiKey,
         preferredProvider
       })
     });

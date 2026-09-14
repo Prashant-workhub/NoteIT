@@ -114,6 +114,15 @@ export default function App() {
     localStorage.setItem('noteit_theme', theme);
   }, [theme]);
 
+  // Security migration: older releases kept BYOK credentials in localStorage.
+  // They are now stored only in the authenticated backend vault, so purge any
+  // old browser copies as soon as the application loads.
+  useEffect(() => {
+    Object.keys(localStorage)
+      .filter((key) => /^noteit_.+_api_key$/i.test(key))
+      .forEach((key) => localStorage.removeItem(key));
+  }, []);
+
   // Authenticated user session state & Role state (Student vs Faculty)
   const [sessionUser, setSessionUser] = useState<{ uid: string; fullName: string; emailAddress: string } | null>(null);
   const [userRole, setUserRole] = useState<'student' | 'faculty'>('student');

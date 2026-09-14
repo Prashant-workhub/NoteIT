@@ -1,6 +1,11 @@
 import { BaseProvider } from './AIProvider';
 import { GeminiAdapter } from './ValidationAdapters';
 
+// A provider-side cap prevents an unexpectedly verbose response from spending
+// an unbounded amount of a server-funded Gemini quota. It is configurable for
+// longer academic resource generation when needed.
+const MAX_OUTPUT_TOKENS = Number(process.env.AI_MAX_OUTPUT_TOKENS || 8192);
+
 function sanitizeGeminiModel(_model?: string): string {
   return 'gemini-3.6-flash';
 }
@@ -91,7 +96,7 @@ export class GeminiProvider extends BaseProvider {
 
   async generateText(prompt: string, model?: string): Promise<string> {
     const activeModel = sanitizeGeminiModel(model || this.defaultModel);
-    const body = { contents: [{ parts: [{ text: prompt }] }] };
+    const body = { contents: [{ parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: MAX_OUTPUT_TOKENS } };
     const response = await fetchGeminiApi(this.apiKey, activeModel, body);
     const data = await response.json();
     return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
@@ -103,7 +108,8 @@ export class GeminiProvider extends BaseProvider {
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
         responseMimeType: 'application/json',
-        responseSchema: schema
+        responseSchema: schema,
+        maxOutputTokens: MAX_OUTPUT_TOKENS
       }
     };
     const response = await fetchGeminiApi(this.apiKey, activeModel, body);
@@ -120,7 +126,8 @@ export class GeminiProvider extends BaseProvider {
           { inlineData: { mimeType, data: base64Audio } },
           { text: 'You are an expert transcriber. Transcribe the provided audio lecture word-for-word. Format the transcript text by prepending bracketed timestamps (e.g. [00:00], [01:15]) at the beginning of each major statement or logical paragraph based on the audio timeline.' }
         ]
-      }]
+      }],
+      generationConfig: { maxOutputTokens: MAX_OUTPUT_TOKENS }
     };
     const response = await fetchGeminiApi(this.apiKey, activeModel, body);
     const data = await response.json();

@@ -24,6 +24,7 @@ import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import { runNotificationSchedulerCycle } from './src/server/notificationScheduler';
+import { canUseServerFallback, enforceAiUsage } from './src/server/aiUsageGuard';
 import path from 'path';
 import fs from 'fs';
 import { createRequire } from 'module';
@@ -454,8 +455,8 @@ const getErrorText = async (response: Response): Promise<string> => {
   return body ? `${response.status} - ${body}` : String(response.status);
 };
 
-app.post('/api/ai/transcribe-with-fallback', authenticateFirebaseUser, async (req, res) => {
-  const { base64Audio, mimeType = 'audio/webm', geminiApiKey } = req.body;
+app.post('/api/ai/transcribe-with-fallback', authenticateFirebaseUser, enforceAiUsage, async (req, res) => {
+  const { base64Audio, mimeType = 'audio/webm', usePlatformQuota = false } = req.body;
   if (!base64Audio || typeof base64Audio !== 'string') {
     res.status(400).json({ error: 'Audio data is required for transcription.' });
     return;
@@ -473,14 +474,14 @@ app.post('/api/ai/transcribe-with-fallback', authenticateFirebaseUser, async (re
     try {
       const userData = await getFirestore().collection('users').doc(uid).get();
       const data = userData.exists ? userData.data() : null;
-      const rawStoredKey = data?.encryptedGeminiTranscriptionKey || data?.geminiApiKey ||
+      const rawStoredKey = data?.encryptedGeminiTranscriptionKey ||
         (data?.aiProvider === 'gemini' ? data?.encryptedApiKey : '');
       if (rawStoredKey) storedGeminiKey = decryptKey(rawStoredKey);
     } catch (dbError) {
       console.warn('[transcribe-with-fallback] Could not load stored Gemini key:', dbError);
     }
 
-    const effectiveGeminiKey = (geminiApiKey || storedGeminiKey || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || '').trim();
+    const effectiveGeminiKey = (storedGeminiKey || (canUseServerFallback(usePlatformQuota) ? process.env.GEMINI_API_KEY : '') || '').trim();
 
     if (!effectiveGeminiKey) {
       throw new Error('Gemini API key is not configured. Please configure an API key in Settings.');
@@ -499,8 +500,8 @@ app.post('/api/ai/transcribe-with-fallback', authenticateFirebaseUser, async (re
   }
 });
 
-app.post('/api/ai/provider-proxy', authenticateFirebaseUser, async (req, res) => {
-  const { prompt, model, inlineData, responseSchema, action } = req.body;
+app.post('/api/ai/provider-proxy', authenticateFirebaseUser, enforceAiUsage, async (req, res) => {
+  const { prompt, model, inlineData, responseSchema, action, usePlatformQuota = false } = req.body;
   const user = req.body.user;
   const uid = user.uid;
   
@@ -539,14 +540,16 @@ app.post('/api/ai/provider-proxy', authenticateFirebaseUser, async (req, res) =>
       console.warn('[provider-proxy] Firestore read skipped (no GCP ADC credentials):', fsErr);
     }
 
-    const rawKey = data?.encryptedApiKey || data?.geminiApiKey || data?.openaiApiKey || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+    const usingPlatformQuota = !data?.encryptedApiKey && canUseServerFallback(usePlatformQuota);
+    const rawKey = data?.encryptedApiKey || (usingPlatformQuota ? process.env.GEMINI_API_KEY : '');
 
     if (!rawKey) {
-      res.status(400).json({ error: 'AI provider is not configured. Please enter an API key in Settings.' });
+      res.status(400).json({ error: 'AI provider is not configured. Add your own key in Settings, or explicitly enable the available platform quota.' });
       return;
     }
 
     const providerName = data?.aiProvider || 'gemini';
+    res.setHeader('X-NoteIT-AI-Key-Source', usingPlatformQuota ? 'platform-quota' : 'user-byok');
     const selectedModel = sanitizeModelName(model || data?.selectedModel || ProviderFactory.getAvailableModels(providerName)[0], providerName);
 
     let decryptedKey: string;
@@ -621,8 +624,8 @@ app.post('/api/ai/provider-proxy', authenticateFirebaseUser, async (req, res) =>
       }
 
       // Tier 2: Server platform key fallback
-      if (!retrySuccess && isRateLimitOrQuota) {
-        const fallbackKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+      if (!retrySuccess && isRateLimitOrQuota && canUseServerFallback(usePlatformQuota)) {
+        const fallbackKey = process.env.GEMINI_API_KEY;
         if (fallbackKey && decryptedKey !== fallbackKey) {
           try {
             console.warn(`[provider-proxy] Primary provider (${providerName}) rate limited. Executing automatic server platform key fallback...`);
@@ -752,7 +755,10 @@ app.get('/api/ai/config-status', authenticateFirebaseUser, async (req, res) => {
         const migrationFields = {
           aiProvider: provToMigrate,
           providerConfigured: true,
-          encryptedApiKey: keyToMigrate,
+          encryptedApiKey: encryptKey(keyToMigrate),
+          // Clear legacy plaintext fields as part of the one-time migration.
+          geminiApiKey: '',
+          openaiApiKey: '',
           selectedModel: modelToMigrate,
           providerLastValidated: data.geminiLastValidated || new Date(),
           estimatedMonthlyTokens: 0,
@@ -768,7 +774,11 @@ app.get('/api/ai/config-status', authenticateFirebaseUser, async (req, res) => {
     }
 
     if (!data || !data.providerConfigured) {
-      res.json({ configured: false });
+      res.json({
+        configured: false,
+        keySource: 'none',
+        platformQuotaAvailable: process.env.ALLOW_SERVER_AI_FALLBACK === 'true' && Boolean(process.env.GEMINI_API_KEY)
+      });
       return;
     }
 
@@ -791,6 +801,8 @@ app.get('/api/ai/config-status', authenticateFirebaseUser, async (req, res) => {
 
     res.json({
       configured: true,
+      keySource: 'user-byok',
+      platformQuotaAvailable: process.env.ALLOW_SERVER_AI_FALLBACK === 'true' && Boolean(process.env.GEMINI_API_KEY),
       provider,
       maskedKey,
       lastValidated: data.providerLastValidated || data.geminiLastValidated || null,
@@ -907,11 +919,11 @@ function chunkTranscriptText(text: string, chunkSize = 9000, overlap = 500): str
 }
 
 // Dedicated endpoint to generate / retry AI academic resources from existing transcript
-app.post(['/api/lectures/:lectureId/generate-resources', '/api/lectures/generate-resources'], authenticateFirebaseUser, async (req, res) => {
+app.post(['/api/lectures/:lectureId/generate-resources', '/api/lectures/generate-resources'], authenticateFirebaseUser, enforceAiUsage, async (req, res) => {
   const user = req.body.user;
   const uid = user.uid;
   const lectureId = req.params.lectureId || req.body.lectureId;
-  const { options } = req.body;
+  const { options, usePlatformQuota = false } = req.body;
   const mode = options?.mode || 'academic';
   const modeType = options?.modeType || 'missing'; // 'missing' or 'all'
 
@@ -968,10 +980,11 @@ app.post(['/api/lectures/:lectureId/generate-resources', '/api/lectures/generate
       console.warn('[GENERATE-RESOURCES] Firestore status update skipped/failed:', fsErr);
     }
 
-    const rawKey = userData?.encryptedApiKey || userData?.geminiApiKey || userData?.openaiApiKey || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+    const usingPlatformQuota = !userData?.encryptedApiKey && canUseServerFallback(usePlatformQuota);
+    const rawKey = userData?.encryptedApiKey || (usingPlatformQuota ? process.env.GEMINI_API_KEY : '');
 
     if (!rawKey) {
-      const errMsg = 'AI provider API key is not configured. Please configure an API key in Settings.';
+      const errMsg = 'AI provider API key is not configured. Please add your own key in Settings, or explicitly enable the available platform quota.';
       try {
         if (lectureRef) {
           await lectureRef.set({
@@ -994,6 +1007,7 @@ app.post(['/api/lectures/:lectureId/generate-resources', '/api/lectures/generate
     }
 
     const providerName = userData?.aiProvider || 'gemini';
+    res.setHeader('X-NoteIT-AI-Key-Source', usingPlatformQuota ? 'platform-quota' : 'user-byok');
     const selectedModel = sanitizeModelName(options?.model || userData?.selectedModel || ProviderFactory.getAvailableModels(providerName)[0], providerName);
 
     let decryptedKey: string;
@@ -1188,8 +1202,8 @@ app.post(['/api/lectures/:lectureId/generate-resources', '/api/lectures/generate
       const isRateLimitOrQuota = primaryErr?.status === 429 || primaryErr?.status === 402 || primaryErr?.status === 503 ||
         /429|quota|rate limit|resource_exhausted|too many requests|credit limit/i.test(primaryErr?.message || '');
 
-      const fallbackKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
-      if (isRateLimitOrQuota && fallbackKey && decryptedKey !== fallbackKey) {
+      const fallbackKey = process.env.GEMINI_API_KEY;
+      if (isRateLimitOrQuota && canUseServerFallback(usePlatformQuota) && fallbackKey && decryptedKey !== fallbackKey) {
         console.warn('[GENERATE-RESOURCES] Primary AI Provider rate limited/quota error. Executing automatic server platform key fallback...');
         const fallbackProvider = ProviderFactory.getProvider('gemini', fallbackKey);
         generated = await fallbackProvider.generateStructuredOutput(prompt, schema, 'gemini-3.6-flash');
@@ -1270,9 +1284,9 @@ app.post(['/api/lectures/:lectureId/generate-resources', '/api/lectures/generate
 });
 
 // Dedicated endpoint for Bhai Lang contextual text explanations
-app.post('/api/ai/explain-bhailang', authenticateFirebaseUser, async (req, res) => {
+app.post('/api/ai/explain-bhailang', authenticateFirebaseUser, enforceAiUsage, async (req, res) => {
   try {
-    const { text, subjectName } = req.body;
+    const { text, subjectName, usePlatformQuota = false } = req.body;
     if (!text || !text.trim()) {
       return res.status(400).json({ error: 'Text selection is required.' });
     }
@@ -1288,13 +1302,15 @@ app.post('/api/ai/explain-bhailang', authenticateFirebaseUser, async (req, res) 
       } catch (fsErr) {}
     }
 
-    const rawKey = data?.encryptedApiKey || data?.geminiApiKey || data?.openaiApiKey || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || '';
+    const usingPlatformQuota = !data?.encryptedApiKey && canUseServerFallback(usePlatformQuota);
+    const rawKey = data?.encryptedApiKey || (usingPlatformQuota ? process.env.GEMINI_API_KEY : '') || '';
 
     if (!rawKey) {
-      return res.status(400).json({ error: 'AI provider key is not configured. Please enter an API key in Settings.' });
+      return res.status(400).json({ error: 'AI provider key is not configured. Please add your own key in Settings.' });
     }
 
     const providerName = data?.aiProvider || 'gemini';
+    res.setHeader('X-NoteIT-AI-Key-Source', usingPlatformQuota ? 'platform-quota' : 'user-byok');
     let decryptedKey = rawKey;
     try {
       decryptedKey = decryptKey(rawKey);
@@ -1327,7 +1343,7 @@ Text snippet to explain:
 });
 
 // Dedicated endpoint to manually trigger or re-run OpenRouter preprocessing
-app.post('/api/lectures/:lectureId/preprocess', authenticateFirebaseUser, async (req, res) => {
+app.post('/api/lectures/:lectureId/preprocess', authenticateFirebaseUser, enforceAiUsage, async (req, res) => {
   const user = req.body.user;
   const uid = user.uid;
   const lectureId = req.params.lectureId;
@@ -1496,6 +1512,15 @@ app.put('/api/storage/local-upload', authenticateFirebaseUser, express.raw({ typ
       return;
     }
     const fileName = sanitizeUploadFileName(rawFileName);
+    // `/api/storage/sas` issues names in this exact form. Enforce the same
+    // ownership convention here as well, because this endpoint can also be
+    // called directly. Without this check an authenticated user could choose
+    // another user's prefix and overwrite a publicly-served local upload.
+    const requiredPrefix = `${user.uid}-`;
+    if (!fileName.startsWith(requiredPrefix) || fileName.length === requiredPrefix.length) {
+      res.status(403).json({ error: 'Upload file name does not belong to the authenticated user.' });
+      return;
+    }
     const resolvedFilePath = path.resolve(uploadsDir, fileName);
     if (path.resolve(uploadsDir) !== path.dirname(resolvedFilePath)) {
       res.status(400).json({ error: 'Invalid file name.' });

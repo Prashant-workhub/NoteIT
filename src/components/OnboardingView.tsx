@@ -23,7 +23,6 @@ import {
 import { doc, setDoc, serverTimestamp, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db, auth } from '../firebaseConfig';
 import { API_BASE_URL } from '../config';
-import { validateApiKeyDirect } from '../providers/ValidationAdapters';
 
 const PROVIDER_METADATA: Record<string, {
   name: string;
@@ -368,25 +367,26 @@ export default function OnboardingView({
     setIsValidatingKey(true);
     try {
       const currentUser = auth.currentUser;
-      let idToken = 'test-token';
-      if (currentUser) {
-        try {
-          idToken = await currentUser.getIdToken();
-        } catch (tokErr) {
-          console.warn("Could not retrieve Firebase ID token, using fallback test-token:", tokErr);
-        }
+      // Validate through the authenticated backend. It encrypts the key before
+      // persisting it, so the browser never keeps a reusable copy.
+      if (!currentUser) {
+        throw new Error('Please sign in before configuring an AI provider.');
+      }
+      const idToken = await currentUser.getIdToken();
+      const vaultResponse = await fetch(`${API_BASE_URL}/api/ai/validate-key`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`
+        },
+        body: JSON.stringify({ key: trimmedKey, provider: selectedProvider, model: selectedModel })
+      });
+      if (!vaultResponse.ok) {
+        const body = await vaultResponse.json().catch(() => ({}));
+        throw new Error(body.error || 'Failed to validate and secure the API key.');
       }
 
-      // Fast direct client-side key validation (under ~300ms)
-      try {
-        await validateApiKeyDirect(trimmedKey, selectedProvider, selectedModel);
-      } catch (valErr: any) {
-        console.warn("API key validation failed:", valErr);
-        throw new Error(valErr.message || 'Failed to validate API key. Please check your key.');
-      }
-
-      // Persist configuration in localStorage
-      localStorage.setItem(`noteit_${selectedProvider}_api_key`, trimmedKey);
+      // Provider/model preferences are not secrets and may be persisted.
       localStorage.setItem('noteit_active_ai_provider', selectedProvider);
       localStorage.setItem('noteit_active_ai_model', selectedModel);
 
@@ -415,7 +415,8 @@ export default function OnboardingView({
           providerConfigured: true,
           aiProvider: selectedProvider,
           selectedModel: selectedModel,
-          apiKey: trimmedKey
+          // Deliberately do not pass the API key onward: it now lives only in
+          // the encrypted server-side vault.
         });
       }, 1000);
     } catch (err: any) {
