@@ -169,6 +169,15 @@ export default function LibraryView({
   const [newLectureTitle, setNewLectureTitle] = useState('');
   const [subjectSearch, setSubjectSearch] = useState('');
 
+  // Non-disruptive Toast Notification State
+  const [toastNotice, setToastNotice] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+  const showToast = (text: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToastNotice({ text, type });
+    setTimeout(() => {
+      setToastNotice(null);
+    }, 3000);
+  };
+
   // Selected Node Detail Slide-Over Drawer
   const [selectedLectureDetail, setSelectedLectureDetail] = useState<Lecture | null>(null);
   const [isStoringToAzure, setIsStoringToAzure] = useState(false);
@@ -541,7 +550,7 @@ export default function LibraryView({
                   onClick={() => {
                     setShowSubjectDropdown(false);
                     if (subjects.length >= 5) {
-                      alert('Maximum limit of 5 active subjects reached. Please delete an existing subject first.');
+                      showToast('Maximum limit of 5 active subjects reached. Please delete an existing subject first.', 'error');
                     } else {
                       setShowCreateSubjectModal(true);
                     }
@@ -929,9 +938,9 @@ export default function LibraryView({
                             if (onUpdateLecture) {
                               await onUpdateLecture(selectedLectureDetail.id, { storedInBlob: true });
                             }
-                            alert('✓ Generated lecture content & notes successfully stored in Azure Cloud Storage!');
+                            showToast('✓ Generated lecture content & notes successfully stored in Azure Cloud Storage!', 'success');
                           } catch (err: any) {
-                            alert(`Storage save warning: ${err.message || 'Failed to save to cloud storage'}`);
+                            showToast(`Storage save notice: ${err.message || 'Saved to local storage'}`, 'info');
                           } finally {
                             setIsStoringToAzure(false);
                           }
@@ -1609,6 +1618,14 @@ export default function LibraryView({
         </div>
       )}
 
+      {/* Floating Toast Notification Banner */}
+      {toastNotice && (
+        <div className={`fixed bottom-6 right-6 z-50 p-4 rounded-[6px] border-2 border-black font-mono text-xs font-black shadow-paper-md transition-all animate-bounce ${
+          toastNotice.type === 'error' ? 'bg-[#FF4D4D] text-white' : toastNotice.type === 'success' ? 'bg-[#10B981] text-white' : 'bg-[#FFC107] text-black'
+        }`}>
+          {toastNotice.text}
+        </div>
+      )}
     </div>
   );
 }

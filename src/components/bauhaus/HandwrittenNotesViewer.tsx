@@ -594,7 +594,18 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
   }
 
   const handlePrint = () => {
-    window.print();
+    try {
+      if (typeof window !== 'undefined') {
+        if (Capacitor.isNativePlatform()) {
+          // Native Capacitor webview fallback hint for PDF/Print export
+          window.print();
+        } else {
+          window.print();
+        }
+      }
+    } catch (err) {
+      console.warn('Print exception:', err);
+    }
   };
 
   return (

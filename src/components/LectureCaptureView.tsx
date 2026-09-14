@@ -652,7 +652,8 @@ export default function LectureCaptureView({
   const startSpeechRecognition = () => {
     const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognitionClass) {
-      console.warn('SpeechRecognition API not supported in this browser.');
+      console.warn('SpeechRecognition API not supported in this environment.');
+      setLiveTranscript((prev) => prev || 'Recording audio stream... Notes and transcript will be generated automatically when capture completes.');
       return;
     }
 
