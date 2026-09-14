@@ -17,7 +17,9 @@ import { db, auth } from '../firebaseConfig';
 import { API_BASE_URL } from '../config';
 import { awardXP, processActivityEvent } from '../services/activityTracker';
 import { formatUserFriendlyErrorMessage } from '../utils/errorSanitizer';
+import { saveTranscriptMultiTier, getTranscriptMultiTier } from '../services/azure';
 import BruteLoader from './BruteLoader';
+
 
 
 
@@ -128,10 +130,17 @@ export default function LectureProcessingView({
         const lectureSnap = await getDoc(lectureRef);
         const existingData = lectureSnap.exists() ? lectureSnap.data() : null;
 
-        const existingTranscript = existingData?.cleanTranscript || existingData?.transcript || '';
+        let existingTranscript = existingData?.cleanTranscript || existingData?.transcript || '';
+        if (!existingTranscript && userId && lectureId) {
+          const remoteRes = await getTranscriptMultiTier(userId, lectureId).catch(() => null);
+          if (remoteRes?.cleanTranscript) {
+            existingTranscript = remoteRes.cleanTranscript;
+          }
+        }
         if (existingTranscript) {
           setSavedTranscript(existingTranscript);
         }
+
 
         let audioUrl = existingData?.audioUrl || '';
         let blobPath = existingData?.blobPath || '';
@@ -296,13 +305,22 @@ export default function LectureProcessingView({
             await updateLecture(lectureId, { status: 'saving' });
           }
 
-          // Save Stage 1 and Stage 2 results immediately to Firestore
+          // Save Stage 1 and Stage 2 results to Azure Blob Storage (with Local & Firebase fallbacks)
           const transcriptText = aiData.cleanTranscript || aiData.transcript || '';
           setSavedTranscript(transcriptText);
 
           const transcriptWordCount = transcriptText.trim().split(/\s+/).length;
-
           const resolvedDocTitle = determineLectureTitle(existingData?.title, aiData);
+
+          const storageRes = await saveTranscriptMultiTier(userId, lectureId, {
+            cleanTranscript: aiData.cleanTranscript || '',
+            transcript: aiData.transcript || '',
+            sections: aiData.sections || []
+          }).catch(err => {
+            console.warn('[LectureProcessingView] Multi-tier transcript save warning:', err);
+            return { success: false, storageProvider: 'client' as const, blobPath: undefined, blobUrl: undefined };
+          });
+
 
           await updateLecture(lectureId, {
             title: resolvedDocTitle,
@@ -311,6 +329,8 @@ export default function LectureProcessingView({
             resourceGenerationStatus: 'processing',
             transcript: aiData.transcript || '',
             cleanTranscript: aiData.cleanTranscript || '',
+            transcriptStorageProvider: storageRes.storageProvider,
+            transcriptBlobPath: storageRes.blobPath || null,
             sections: aiData.sections || [],
             timeline: aiData.timeline || [],
             sourceIntelligence: aiData.sourceIntelligence || null,
@@ -319,6 +339,7 @@ export default function LectureProcessingView({
             processingTimeMs,
             transcriptionFinishedAt: serverTimestamp()
           });
+
 
           // Automatically award +40 XP for Task 02 if transcript >= 500 words and saved successfully (Section 4)
           if (userId && transcriptWordCount >= 500) {
@@ -493,6 +514,16 @@ export default function LectureProcessingView({
           console.log(`- Transcribed Audio Content:\n${transcriptText}`);
           console.log('==================================================');
 
+          const audioStorageRes = await saveTranscriptMultiTier(userId, lectureId, {
+            cleanTranscript: aiData.cleanTranscript || '',
+            transcript: aiData.transcript || '',
+            sections: aiData.sections || []
+          }).catch(err => {
+            console.warn('[LectureProcessingView] Multi-tier audio transcript save warning:', err);
+            return { success: false, storageProvider: 'client' as const, blobPath: undefined, blobUrl: undefined };
+          });
+
+
           await updateLecture(lectureId, {
             title: resolvedTitle,
             recordingStatus: 'uploaded',
@@ -500,6 +531,8 @@ export default function LectureProcessingView({
             resourceGenerationStatus: 'processing',
             transcript: aiData.transcript || '',
             cleanTranscript: aiData.cleanTranscript || '',
+            transcriptStorageProvider: audioStorageRes.storageProvider,
+            transcriptBlobPath: audioStorageRes.blobPath || null,
             sections: aiData.sections || [],
             timeline: aiData.timeline || [],
             sourceIntelligence: aiData.sourceIntelligence || null,
@@ -509,6 +542,7 @@ export default function LectureProcessingView({
             processingTimeMs,
             transcriptionFinishedAt: serverTimestamp()
           });
+
 
           // Call RAG grounding engine
           try {

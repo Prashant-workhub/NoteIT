@@ -6,6 +6,14 @@ import { ProviderValidationError } from './src/providers/AIProvider';
 import { InternalAIService, buildOptimizedContextForResource } from './src/server/internalAIService';
 import { formatUserFriendlyErrorMessage } from './src/utils/errorSanitizer';
 import { authenticateFirebaseUser } from './src/middleware/authFirebase';
+import { 
+  isAzureBlobConfigured, 
+  generateAzureUploadSasUrl, 
+  uploadTranscriptToAzure, 
+  downloadTranscriptFromAzure,
+  uploadBinaryBlobToAzure 
+} from './src/server/azureBlobService';
+
 
 
 
@@ -1393,7 +1401,7 @@ function sanitizeUploadFileName(fileName: string): string {
   return base.replace(/[^\w.\-()+\s]/g, '_');
 }
 
-// Endpoint to generate Upload Target URL for local backend storage
+// Endpoint to generate Upload Target URL with Azure Blob Storage priority and Local fallback
 app.get('/api/storage/sas', authenticateFirebaseUser, async (req, res) => {
   const fileName = req.query.fileName as string;
   if (!fileName) {
@@ -1405,8 +1413,25 @@ app.get('/api/storage/sas', authenticateFirebaseUser, async (req, res) => {
     const user = req.body.user;
     const uid = user.uid;
     const safeName = sanitizeUploadFileName(fileName);
-    const localFileName = `${uid}-${safeName}`;
     const backendUrl = getBackendUrl(req);
+
+    // Primary: Attempt Azure Blob SAS URL generation if Azure is configured
+    if (isAzureBlobConfigured()) {
+      try {
+        const azureResult = await generateAzureUploadSasUrl(uid, safeName);
+        if (azureResult) {
+          return res.json({
+            ...azureResult,
+            isAzure: true
+          });
+        }
+      } catch (azureErr) {
+        console.warn('[Storage Endpoint] Azure SAS URL generation failed; falling back to local disk:', azureErr);
+      }
+    }
+
+    // Fallback: Local Backend Disk Storage Target
+    const localFileName = `${uid}-${safeName}`;
     res.json({
       uploadUrl: `${backendUrl}/api/storage/local-upload?fileName=${encodeURIComponent(localFileName)}`,
       audioUrl: `${backendUrl}/uploads/${localFileName}`,
@@ -1414,8 +1439,124 @@ app.get('/api/storage/sas', authenticateFirebaseUser, async (req, res) => {
       isLocal: true
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message || 'Local upload setup failed.' });
+    res.status(500).json({ error: err.message || 'Upload setup failed.' });
   }
+});
+
+// Endpoint to receive binary uploads for local disk fallback
+app.put('/api/storage/local-upload', express.raw({ type: '*/*', limit: '100mb' }), async (req, res) => {
+  const fileName = req.query.fileName as string;
+  if (!fileName) {
+    res.status(400).json({ error: 'Missing fileName query parameter' });
+    return;
+  }
+
+  try {
+    const safeName = sanitizeUploadFileName(fileName);
+    const targetPath = path.join(uploadsDir, safeName);
+    await fs.promises.writeFile(targetPath, req.body);
+    console.log(`[Local Upload] Saved upload payload to: ${targetPath}`);
+    res.json({ success: true, path: targetPath });
+  } catch (err: any) {
+    console.error('[Local Upload] Failed to write file to disk:', err);
+    res.status(500).json({ error: 'Failed to write upload payload to disk.' });
+  }
+});
+
+// Endpoint to save transcripts (Azure Blob primary -> Local backend disk fallback)
+app.post('/api/storage/transcripts/upload', authenticateFirebaseUser, async (req, res) => {
+  const { lectureId, transcriptData } = req.body;
+  if (!lectureId || !transcriptData) {
+    res.status(400).json({ error: 'Missing lectureId or transcriptData' });
+    return;
+  }
+
+  const user = req.body.user;
+  const uid = user.uid;
+
+  // 1. Try Azure Blob Storage first
+  if (isAzureBlobConfigured()) {
+    try {
+      const azureRes = await uploadTranscriptToAzure(uid, lectureId, transcriptData);
+      console.log(`[Transcript Storage] Stored transcript to Azure Blob for user ${uid}, lecture ${lectureId}`);
+      return res.json({
+        success: true,
+        storageProvider: 'azure',
+        blobPath: azureRes.blobPath,
+        blobUrl: azureRes.blobUrl
+      });
+    } catch (azureErr: any) {
+      console.warn(`[Transcript Storage] Azure upload failed (${azureErr.message}). Falling back to local backend disk...`);
+    }
+  }
+
+  // 2. Fallback to Local Storage on backend disk
+  try {
+    const safeLectureId = sanitizeUploadFileName(lectureId);
+    const localFileName = `${uid}-transcript-${safeLectureId}.json`;
+    const targetPath = path.join(uploadsDir, localFileName);
+    
+    const content = JSON.stringify({
+      userId: uid,
+      lectureId,
+      timestamp: new Date().toISOString(),
+      ...transcriptData
+    });
+
+    await fs.promises.writeFile(targetPath, content, 'utf8');
+    const backendUrl = getBackendUrl(req);
+    const readUrl = `${backendUrl}/uploads/${localFileName}`;
+
+    console.log(`[Transcript Storage] Stored transcript to Local Storage fallback for user ${uid}, lecture ${lectureId}`);
+    res.json({
+      success: true,
+      storageProvider: 'local',
+      blobPath: `uploads/${localFileName}`,
+      blobUrl: readUrl
+    });
+  } catch (localErr: any) {
+    console.error(`[Transcript Storage] Local disk fallback upload failed:`, localErr);
+    res.status(500).json({ error: 'Failed to save transcript to both Azure Blob Storage and Local Storage fallback.' });
+  }
+});
+
+// Endpoint to read transcripts (Azure Blob primary -> Local backend disk fallback)
+app.get('/api/storage/transcripts/read', authenticateFirebaseUser, async (req, res) => {
+  const lectureId = req.query.lectureId as string;
+  if (!lectureId) {
+    res.status(400).json({ error: 'Missing lectureId query parameter' });
+    return;
+  }
+
+  const user = req.body.user;
+  const uid = user.uid;
+
+  // 1. Try Azure Blob Storage first
+  if (isAzureBlobConfigured()) {
+    try {
+      const data = await downloadTranscriptFromAzure(uid, lectureId);
+      return res.json({ success: true, storageProvider: 'azure', transcriptData: data });
+    } catch (azureErr: any) {
+      console.warn(`[Transcript Read] Azure Blob read skipped/failed (${azureErr.message}). Checking Local Storage fallback...`);
+    }
+  }
+
+  // 2. Fallback to Local Storage on backend disk
+  try {
+    const safeLectureId = sanitizeUploadFileName(lectureId);
+    const localFileName = `${uid}-transcript-${safeLectureId}.json`;
+    const targetPath = path.join(uploadsDir, localFileName);
+
+    if (fs.existsSync(targetPath)) {
+      const content = await fs.promises.readFile(targetPath, 'utf8');
+      const data = JSON.parse(content);
+      return res.json({ success: true, storageProvider: 'local', transcriptData: data });
+    }
+  } catch (localErr: any) {
+    console.warn(`[Transcript Read] Local storage read error:`, localErr);
+  }
+
+  res.status(404).json({ error: 'Transcript content not found in Azure Blob Storage or Local Storage.' });
 });
 
 // Endpoint to generate Read URL
@@ -1432,13 +1573,19 @@ app.get('/api/storage/read-sas', authenticateFirebaseUser, async (req, res) => {
     const safeName = sanitizeUploadFileName(rawFileName);
     const user = req.body.user;
     const uid = user.uid;
+
+    if (blobPath.startsWith('users/') && !blobPath.startsWith(`users/${uid}`)) {
+      return res.status(403).json({ error: 'Access denied to target storage path.' });
+    }
+
     res.json({
-      readUrl: `${backendUrl}/uploads/${uid}-${safeName}`
+      readUrl: blobPath.startsWith('http') ? blobPath : `${backendUrl}/uploads/${uid}-${safeName}`
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message || 'Local read URL resolution failed.' });
+    res.status(500).json({ error: err.message || 'Read URL resolution failed.' });
   }
 });
+
 
 // Endpoint to clean up temporary upload files to optimize storage usage
 app.post('/api/storage/cleanup', authenticateFirebaseUser, async (req, res) => {

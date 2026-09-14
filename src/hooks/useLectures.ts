@@ -152,18 +152,20 @@ export function useLectures(userId: string | undefined) {
     const timestamp = Math.floor(Date.now() / 1000);
     const fileName = `${timestamp}.webm`;
 
-    // 1. Get Upload Target URL from Backend
+    // 1. Get Upload Target URL from Backend (Azure priority, Local fallback)
     const sasData = await getAzureUploadSasUrl(fileName);
 
     // 2. Upload binary file
     await uploadBlobToAzure(sasData.uploadUrl, audioBlob, onProgress, { fileName });
+
+    const providerName = (sasData as any).isAzure ? 'azure' : 'local';
 
     // 3. Update the Firestore lecture document
     await updateLecture(lectureId, {
       status: 'uploaded',
       audioUrl: sasData.audioUrl,
       blobPath: sasData.blobPath,
-      storageProvider: 'local',
+      storageProvider: providerName,
       storageVersion: 1,
       uploadedAt: serverTimestamp()
     });
@@ -182,18 +184,20 @@ export function useLectures(userId: string | undefined) {
     const fileExtension = file.name.split('.').pop() || 'pdf';
     const fileName = `${timestamp}.${fileExtension}`;
 
-    // 1. Get Upload Target URL from Backend
+    // 1. Get Upload Target URL from Backend (Azure priority, Local fallback)
     const sasData = await getAzureUploadSasUrl(fileName);
 
     // 2. Upload binary file
     await uploadBlobToAzure(sasData.uploadUrl, file, onProgress, { fileName });
+
+    const providerName = (sasData as any).isAzure ? 'azure' : 'local';
 
     // 3. Update the Firestore lecture document
     await updateLecture(lectureId, {
       status: 'uploaded',
       audioUrl: sasData.audioUrl,
       blobPath: sasData.blobPath,
-      storageProvider: 'local',
+      storageProvider: providerName,
       storageVersion: 1,
       uploadedAt: serverTimestamp()
     });
@@ -212,3 +216,4 @@ export function useLectures(userId: string | undefined) {
     uploadLectureDocument
   };
 }
+

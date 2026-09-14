@@ -345,3 +345,134 @@ export const cleanupBackendTemp = async (blobPath: string, idToken?: string): Pr
     console.warn('[Storage Cleanup] Non-critical cleanup request failed:', err);
   }
 };
+
+/**
+ * Multi-tiered Transcript Storage Strategy:
+ * 1. Primary: Uploads transcript to Azure Blob Storage (or Local Backend Disk fallback) via /api/storage/transcripts/upload
+ * 2. Fallback: Saves transcript locally in localStorage/IndexedDB as immediate offline backup
+ * 3. Returns storage details so metadata can be saved in Firebase
+ */
+export const saveTranscriptMultiTier = async (
+  userId: string,
+  lectureId: string,
+  transcriptData: {
+    cleanTranscript?: string;
+    transcript?: string;
+    sections?: any[];
+    summary?: string;
+  }
+): Promise<{ success: boolean; storageProvider: 'azure' | 'local' | 'client'; blobPath?: string; blobUrl?: string }> => {
+  if (!userId || !lectureId) {
+    throw new Error('UserId and LectureId are required to save transcript.');
+  }
+
+  // Always store a client local copy as zero-data-loss backup
+  try {
+    const localKey = `noteit_transcript_${userId}_${lectureId}`;
+    localStorage.setItem(localKey, JSON.stringify({
+      timestamp: Date.now(),
+      ...transcriptData
+    }));
+  } catch (localStorageErr) {
+    console.warn('[Storage] Client LocalStorage quota reached or unavailable:', localStorageErr);
+  }
+
+  // 1. Send to Backend Azure Blob Storage (with Local backend disk fallback)
+  try {
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      const idToken = await currentUser.getIdToken(true).catch(() => null);
+      if (idToken) {
+        const response = await fetch(`${API_BASE_URL}/api/storage/transcripts/upload`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${idToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            lectureId,
+            transcriptData
+          })
+        });
+
+        if (response.ok) {
+          const resBody = await response.json();
+          console.log(`[Storage] Multi-tier transcript save succeeded via ${resBody.storageProvider.toUpperCase()}`);
+          return resBody;
+        }
+      }
+    }
+  } catch (netErr) {
+    console.warn('[Storage] Remote transcript upload error. Retaining local backup:', netErr);
+  }
+
+  return {
+    success: true,
+    storageProvider: 'client'
+  };
+};
+
+/**
+ * Multi-tiered Transcript Retrieval Strategy:
+ * 1. Primary: Attempts to fetch transcript from Azure Blob Storage / Local backend disk via /api/storage/transcripts/read
+ * 2. Fallback: Reads from client local storage backup
+ */
+export const getTranscriptMultiTier = async (
+  userId: string,
+  lectureId: string
+): Promise<{ transcriptText: string; cleanTranscript: string; storageProvider: string } | null> => {
+  if (!userId || !lectureId) return null;
+
+  // 1. Try Remote Azure / Backend Local Disk
+  try {
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      const idToken = await currentUser.getIdToken(true).catch(() => null);
+      if (idToken) {
+        const res = await fetch(`${API_BASE_URL}/api/storage/transcripts/read?lectureId=${encodeURIComponent(lectureId)}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${idToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.transcriptData) {
+            const cleanText = data.transcriptData.cleanTranscript || data.transcriptData.transcript || '';
+            const rawText = data.transcriptData.transcript || cleanText;
+            return {
+              transcriptText: rawText,
+              cleanTranscript: cleanText,
+              storageProvider: data.storageProvider || 'azure'
+            };
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[Storage] Remote transcript fetch failed. Checking client cache:', err);
+  }
+
+  // 2. Client local storage fallback
+  try {
+    const localKey = `noteit_transcript_${userId}_${lectureId}`;
+    const rawLocal = localStorage.getItem(localKey);
+    if (rawLocal) {
+      const parsed = JSON.parse(rawLocal);
+      const cleanText = parsed.cleanTranscript || parsed.transcript || '';
+      const rawText = parsed.transcript || cleanText;
+      return {
+        transcriptText: rawText,
+        cleanTranscript: cleanText,
+        storageProvider: 'client_local'
+      };
+    }
+  } catch (err) {
+    console.warn('[Storage] Client local storage lookup error:', err);
+  }
+
+  return null;
+};
+
