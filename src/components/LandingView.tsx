@@ -4,11 +4,11 @@
  */
 
 import React, { useState } from 'react';
-import { 
-  Play, 
-  Mic, 
-  Sparkles, 
-  BookOpen, 
+import {
+  Play,
+  Mic,
+  Sparkles,
+  BookOpen,
   TrendingUp,
   Brain,
   Cpu,
@@ -76,7 +76,7 @@ export default function LandingView({
 
   return (
     <div className="bg-[var(--bg-paper)] text-[var(--text-primary)] min-h-screen overflow-x-hidden select-none relative font-sans transition-colors duration-200">
-      
+
       {/* 1. Header Navigation Bar */}
       <header className="sticky top-0 z-50 bg-[var(--sidebar-bg)] border-b-2 border-[var(--border-main)] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3 cursor-pointer group" onClick={onGetStarted}>
@@ -124,7 +124,7 @@ export default function LandingView({
 
       {/* 2. Hero Presentation Area featuring Mascot Broot */}
       <section className="max-w-7xl mx-auto px-6 pt-10 md:pt-16 pb-16 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center bg-grid-paper relative">
-        
+
         {/* Left Side Copy */}
         <div className="lg:col-span-7 space-y-6 text-left relative z-10">
           <h1 className="font-heading font-extrabold text-4xl sm:text-6xl md:text-7xl text-[var(--text-primary)] tracking-tight leading-none uppercase">
@@ -148,7 +148,7 @@ export default function LandingView({
             >
               Start Free with Broot
             </Button>
-            
+
             <Button
               variant="tertiary"
               size="lg"
@@ -163,7 +163,7 @@ export default function LandingView({
 
         {/* Right Side Broot Hero Showcase */}
         <div className="lg:col-span-5 relative w-full flex flex-col items-center justify-center pt-6 lg:pt-0">
-          
+
           {/* Broot Mascot Image with Speech Bubble */}
           <div className="relative group">
             {/* Speech Bubble */}
@@ -174,9 +174,9 @@ export default function LandingView({
 
             {/* Giant Mascot Broot Thinking (No Box Container) */}
             <div className="relative z-10 flex items-center justify-center">
-              <img 
-                src="/mascots/broot-hero-thinking.png" 
-                alt="Broot Thinking Mascot" 
+              <img
+                src="/mascots/broot-hero-thinking.png"
+                alt="Broot Thinking Mascot"
                 className="w-72 h-72 sm:w-80 sm:h-80 md:w-96 md:h-96 object-contain transition-transform duration-300 group-hover:scale-105 filter drop-shadow-[0_20px_30px_rgba(0,0,0,0.4)]"
               />
             </div>
@@ -200,10 +200,10 @@ export default function LandingView({
       <section id="broot-showcase" className="border-y-2 border-[var(--border-main)] bg-[#FFC400] text-[#111111] py-12 px-6">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8">
           <div className="flex items-center gap-6">
-            <img 
-              src="/mascots/broot-listening-headphones.png" 
-              alt="Broot Listening" 
-              className="w-24 h-24 sm:w-32 sm:h-32 object-contain filter drop-shadow-md animate-pulse" 
+            <img
+              src="/mascots/broot-listening-headphones.png"
+              alt="Broot Listening"
+              className="w-24 h-24 sm:w-32 sm:h-32 object-contain filter drop-shadow-md animate-pulse"
             />
             <div className="space-y-1">
               <div className="inline-block px-2.5 py-0.5 bg-[#111111] text-[#FFC400] font-mono text-xs font-extrabold rounded-[4px] uppercase tracking-wider">
@@ -219,20 +219,20 @@ export default function LandingView({
           </div>
 
           <div className="flex gap-4">
-            <img 
-              src="/mascots/broot-thinking.png" 
-              alt="Broot Thinking" 
-              className="w-16 h-16 sm:w-20 sm:h-20 object-contain bg-white/40 p-2 rounded-[12px] border-2 border-[#111111] shadow-paper-sm" 
+            <img
+              src="/mascots/broot-thinking.png"
+              alt="Broot Thinking"
+              className="w-16 h-16 sm:w-20 sm:h-20 object-contain bg-white/40 p-2 rounded-[12px] border-2 border-[#111111] shadow-paper-sm"
             />
-            <img 
-              src="/mascots/broot-peace-wink.png" 
-              alt="Broot Wink" 
-              className="w-16 h-16 sm:w-20 sm:h-20 object-contain bg-white/40 p-2 rounded-[12px] border-2 border-[#111111] shadow-paper-sm" 
+            <img
+              src="/mascots/broot-peace-wink.png"
+              alt="Broot Wink"
+              className="w-16 h-16 sm:w-20 sm:h-20 object-contain bg-white/40 p-2 rounded-[12px] border-2 border-[#111111] shadow-paper-sm"
             />
-            <img 
-              src="/mascots/broot-celebrating-confetti.png" 
-              alt="Broot Celebrating" 
-              className="w-16 h-16 sm:w-20 sm:h-20 object-contain bg-white/40 p-2 rounded-[12px] border-2 border-[#111111] shadow-paper-sm" 
+            <img
+              src="/mascots/broot-celebrating-confetti.png"
+              alt="Broot Celebrating"
+              className="w-16 h-16 sm:w-20 sm:h-20 object-contain bg-white/40 p-2 rounded-[12px] border-2 border-[#111111] shadow-paper-sm"
             />
           </div>
         </div>
@@ -456,10 +456,10 @@ export default function LandingView({
 
             {/* Floating Broot Celebrating Image */}
             <div className="flex justify-center pt-2">
-              <img 
-                src="/mascots/broot-celebrating-confetti.png" 
-                alt="Broot Celebrating Rewards" 
-                className="w-36 h-36 sm:w-44 sm:h-44 md:w-52 md:h-52 object-contain filter drop-shadow-[0_10px_20px_rgba(0,0,0,0.3)] animate-bounce" 
+              <img
+                src="/mascots/broot-celebrating-confetti.png"
+                alt="Broot Celebrating Rewards"
+                className="w-36 h-36 sm:w-44 sm:h-44 md:w-52 md:h-52 object-contain filter drop-shadow-[0_10px_20px_rgba(0,0,0,0.3)] animate-bounce"
               />
             </div>
           </div>
@@ -486,9 +486,9 @@ export default function LandingView({
               { provider: 'CLAUDE AI', title: 'SUBSCRIPTION', xp: '20,000 XP', color: '#D97757' },
               { provider: 'CANVA PRO', title: 'SUBSCRIPTION', xp: '20,000 XP', color: '#00C4CC' }
             ].map((card, idx) => (
-              <Card 
-                key={idx} 
-                shadow="sm" 
+              <Card
+                key={idx}
+                shadow="sm"
                 className="p-4 bg-[var(--panel-bg)] border-2 border-[var(--border-main)] flex flex-col justify-between space-y-2 text-center hover:-translate-y-1 transition-transform"
               >
                 <div className="text-[10px] font-mono font-extrabold uppercase px-2 py-0.5 rounded-[3px] border border-[var(--border-main)] bg-[var(--card-bg)]" style={{ color: card.color }}>
@@ -519,84 +519,6 @@ export default function LandingView({
         </div>
       </section>
 
-      {/* 5. FOUNDER & TEAM DETAILS */}
-      <section id="team" className="border-t-2 border-[var(--border-main)] bg-[var(--card-bg)] py-16 px-6">
-        <div className="max-w-7xl mx-auto space-y-12">
-          <div className="text-center space-y-3 max-w-2xl mx-auto">
-            <Badge variant="yellow" size="md">THE VISIONARIES</Badge>
-            <h2 className="font-heading font-extrabold text-3xl md:text-5xl uppercase text-[var(--text-primary)] tracking-tight">
-              MEET THE FOUNDERS
-            </h2>
-            <p className="text-xs md:text-sm font-mono text-[var(--text-secondary)]">
-              Engineered by passionate researchers and software architects dedicated to transforming how the world learns.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {/* Founder 1 */}
-            <Card shadow="md" className="p-6 bg-[var(--panel-bg)] border-2 border-[var(--border-main)] space-y-4 text-center flex flex-col justify-between">
-              <div className="space-y-3">
-                <div className="w-20 h-20 rounded-full bg-[#FFC400] border-2 border-[var(--border-main)] mx-auto shadow-paper-sm flex items-center justify-center text-[#111111] font-heading font-extrabold text-2xl">
-                  KV
-                </div>
-                <div>
-                  <h3 className="font-heading font-extrabold text-lg uppercase text-[var(--text-primary)]">KISHAN VERMA</h3>
-                  <p className="text-[10px] font-mono font-bold text-[#38BDF8] uppercase tracking-wider">FOUNDER & LEAD ARCHITECT</p>
-                </div>
-                <p className="text-xs font-mono text-[var(--text-secondary)] leading-relaxed">
-                  Spearheaded the core cognitive architecture, speech-to-text pipeline, and multi-LLM orchestration for NoteIT Labs.
-                </p>
-              </div>
-              <div className="flex justify-center gap-3 pt-2">
-                <a href="#" className="p-2 rounded-[4px] bg-[var(--card-bg)] border border-[var(--border-main)] text-[var(--text-primary)] hover:bg-[#FFC400] hover:text-[#111111] transition-colors"><Github className="h-4 w-4" /></a>
-                <a href="#" className="p-2 rounded-[4px] bg-[var(--card-bg)] border border-[var(--border-main)] text-[var(--text-primary)] hover:bg-[#FFC400] hover:text-[#111111] transition-colors"><Linkedin className="h-4 w-4" /></a>
-                <a href="#" className="p-2 rounded-[4px] bg-[var(--card-bg)] border border-[var(--border-main)] text-[var(--text-primary)] hover:bg-[#FFC400] hover:text-[#111111] transition-colors"><Mail className="h-4 w-4" /></a>
-              </div>
-            </Card>
-
-            {/* Founder 2: Sadhna Batra */}
-            <Card shadow="md" className="p-6 bg-[var(--panel-bg)] border-2 border-[var(--border-main)] space-y-4 text-center flex flex-col justify-between">
-              <div className="space-y-3">
-                <div className="w-20 h-20 rounded-full bg-[#38BDF8] text-[#111111] border-2 border-[var(--border-main)] mx-auto shadow-paper-sm flex items-center justify-center font-heading font-extrabold text-2xl">
-                  SB
-                </div>
-                <div>
-                  <h3 className="font-heading font-extrabold text-lg uppercase text-[var(--text-primary)]">SADHNA BATRA</h3>
-                  <p className="text-[10px] font-mono font-bold text-[#FFC400] uppercase tracking-wider">CO-FOUNDER & PRODUCT STRATEGY</p>
-                </div>
-                <p className="text-xs font-mono text-[var(--text-secondary)] leading-relaxed">
-                  Driving product strategy, user experience design, and pedagogical alignment to ensure NoteIT delivers maximum academic value.
-                </p>
-              </div>
-              <div className="flex justify-center gap-3 pt-2">
-                <a href="#" className="p-2 rounded-[4px] bg-[var(--card-bg)] border border-[var(--border-main)] text-[var(--text-primary)] hover:bg-[#FFC400] hover:text-[#111111] transition-colors"><Linkedin className="h-4 w-4" /></a>
-                <a href="#" className="p-2 rounded-[4px] bg-[var(--card-bg)] border border-[var(--border-main)] text-[var(--text-primary)] hover:bg-[#FFC400] hover:text-[#111111] transition-colors"><Mail className="h-4 w-4" /></a>
-                <a href="#" className="p-2 rounded-[4px] bg-[var(--card-bg)] border border-[var(--border-main)] text-[var(--text-primary)] hover:bg-[#FFC400] hover:text-[#111111] transition-colors"><Award className="h-4 w-4" /></a>
-              </div>
-            </Card>
-
-            {/* Team Pillar 3: Broot & Brute AI Labs */}
-            <Card shadow="md" className="p-6 bg-[var(--panel-bg)] border-2 border-[var(--border-main)] space-y-4 text-center flex flex-col justify-between relative overflow-hidden">
-              <div className="space-y-3">
-                <div className="w-20 h-20 rounded-full bg-[#19B56B] text-white border-2 border-[var(--border-main)] mx-auto shadow-paper-sm flex items-center justify-center p-1">
-                  <img src="/mascots/broot-waving-chat.png" alt="Broot Avatar" className="w-full h-full object-contain filter drop-shadow" />
-                </div>
-                <div>
-                  <h3 className="font-heading font-extrabold text-lg uppercase text-[var(--text-primary)]">BROOT & BRUTE AI</h3>
-                  <p className="text-[10px] font-mono font-bold text-[#34D399] uppercase tracking-wider">RESEARCH & COGNITION MASCOT</p>
-                </div>
-                <p className="text-xs font-mono text-[var(--text-secondary)] leading-relaxed">
-                  Developing proprietary semantic indexing algorithms, Broot cognitive assistance, and automated presentation slide synthesis.
-                </p>
-              </div>
-              <div className="flex justify-center gap-3 pt-2">
-                <a href="#" className="p-2 rounded-[4px] bg-[var(--card-bg)] border border-[var(--border-main)] text-[var(--text-primary)] hover:bg-[#FFC400] hover:text-[#111111] transition-colors"><Globe className="h-4 w-4" /></a>
-                <a href="#" className="p-2 rounded-[4px] bg-[var(--card-bg)] border border-[var(--border-main)] text-[var(--text-primary)] hover:bg-[#FFC400] hover:text-[#111111] transition-colors"><ShieldCheck className="h-4 w-4" /></a>
-              </div>
-            </Card>
-          </div>
-        </div>
-      </section>
 
       {/* 7. FAQ ACCORDION SECTION */}
       <section id="faq" className="border-t-2 border-[var(--border-main)] bg-[var(--card-bg)] py-16 px-6">
@@ -610,9 +532,9 @@ export default function LandingView({
 
           <div className="space-y-4">
             {faqs.map((faq, i) => (
-              <Card 
-                key={i} 
-                shadow="sm" 
+              <Card
+                key={i}
+                shadow="sm"
                 className="p-5 bg-[var(--panel-bg)] border-2 border-[var(--border-main)] cursor-pointer transition-all hover:bg-[var(--hover-bg)]"
                 onClick={() => setActiveFaq(activeFaq === i ? null : i)}
               >

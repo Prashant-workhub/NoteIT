@@ -1,9 +1,3 @@
-/**
- * Gemini Academic Notes Generator Engine
- * Multimodal document ingestion engine powered by gemini-3.6-flash.
- * Natively parses binary PDFs, PPTs, Images, and Web links across ALL pages (Page 1 to 14+).
- * Strictly filters out administrative syllabus meta-noise (Faculty Intros, CO-PO mappings, office hours).
- */
 
 import { fetchGeminiApi } from '../providers/GeminiProvider';
 import { getAIConfig } from './gemini';
