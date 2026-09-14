@@ -42,7 +42,10 @@ export const getAIConfig = () => {
   const customGeminiKey = isBrowser ? (localStorage.getItem('noteit_user_api_key_gemini') || localStorage.getItem('noteit_user_api_key') || '') : '';
   const customOpenAiKey = isBrowser ? (localStorage.getItem('noteit_user_api_key_openai') || localStorage.getItem('noteit_user_api_key') || '') : '';
   const customNotionKey = isBrowser ? (localStorage.getItem('noteit_user_api_key_notion') || localStorage.getItem('noteit_user_api_key') || '') : '';
-  const model = isBrowser ? (localStorage.getItem('noteit_active_ai_model') || 'gemini-3.6-flash') : 'gemini-3.6-flash';
+  let model = isBrowser ? (localStorage.getItem('noteit_active_ai_model') || 'gemini-1.5-flash') : 'gemini-1.5-flash';
+  if (!model || model.includes('2.5') || model.includes('3.6') || model.includes('2.0') || model.includes('3.0')) {
+    model = 'gemini-1.5-flash';
+  }
   
   return {
     provider,
@@ -135,7 +138,7 @@ export const executeGeminiCall = async (
     const idToken = await currentUser.getIdToken(true);
     const proxyUrl = `${API_BASE_URL}/api/ai/provider-proxy`;
 
-    let targetModel = 'gemini-3.6-flash';
+    let targetModel = 'gemini-1.5-flash';
 
     const response = await fetch(proxyUrl, {
       method: 'POST',
@@ -178,7 +181,7 @@ export const executeGeminiCall = async (
   const geminiKey = apiKey || getAIConfig().geminiKey;
   if (geminiKey) {
     try {
-      const directModel = (model && !model.includes('2.5') && !model.includes('3.6')) ? model : 'gemini-2.0-flash';
+      const directModel = 'gemini-1.5-flash';
       const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/${directModel}:generateContent?key=${geminiKey}`;
       
       const contentsParts: any[] = [];

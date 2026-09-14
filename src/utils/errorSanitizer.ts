@@ -110,9 +110,11 @@ export function formatUserFriendlyErrorMessage(error: any, actionPrefix?: string
     msgLower.includes('is not a valid model') ||
     msgLower.includes('invalid model') ||
     msgLower.includes('model_not_found') ||
-    msgLower.includes('unknown model')
+    msgLower.includes('unknown model') ||
+    msgLower.includes('no longer available') ||
+    msgLower.includes('not_found')
   ) {
-    friendlyMessage = "The AI model specified is invalid. Reverting to the default model for your AI provider.";
+    friendlyMessage = "The selected AI model is unavailable or outdated. Reverting to stable Gemini 1.5 Flash model.";
   }
   else if (
     msgLower.includes('transcript is not available') ||
