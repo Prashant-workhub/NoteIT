@@ -1386,6 +1386,13 @@ try {
 // Local storage configuration and optimization cleanup
 
 
+function sanitizeUploadFileName(fileName: string): string {
+  if (!fileName) return '';
+  const decoded = decodeURIComponent(fileName);
+  const base = path.basename(decoded);
+  return base.replace(/[^\w.\-()+\s]/g, '_');
+}
+
 // Endpoint to generate Upload Target URL for local backend storage
 app.get('/api/storage/sas', authenticateFirebaseUser, async (req, res) => {
   const fileName = req.query.fileName as string;
@@ -1397,12 +1404,13 @@ app.get('/api/storage/sas', authenticateFirebaseUser, async (req, res) => {
   try {
     const user = req.body.user;
     const uid = user.uid;
-    const localFileName = `${uid}-${fileName}`;
+    const safeName = sanitizeUploadFileName(fileName);
+    const localFileName = `${uid}-${safeName}`;
     const backendUrl = getBackendUrl(req);
     res.json({
       uploadUrl: `${backendUrl}/api/storage/local-upload?fileName=${encodeURIComponent(localFileName)}`,
       audioUrl: `${backendUrl}/uploads/${localFileName}`,
-      blobPath: `users/${uid}/recordings/${fileName}`,
+      blobPath: `users/${uid}/recordings/${safeName}`,
       isLocal: true
     });
   } catch (err: any) {
@@ -1420,11 +1428,12 @@ app.get('/api/storage/read-sas', authenticateFirebaseUser, async (req, res) => {
 
   try {
     const backendUrl = getBackendUrl(req);
-    const fileName = blobPath.split('/').pop() || '';
+    const rawFileName = blobPath.split('/').pop() || '';
+    const safeName = sanitizeUploadFileName(rawFileName);
     const user = req.body.user;
     const uid = user.uid;
     res.json({
-      readUrl: `${backendUrl}/uploads/${uid}-${fileName}`
+      readUrl: `${backendUrl}/uploads/${uid}-${safeName}`
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Local read URL resolution failed.' });
@@ -1442,12 +1451,25 @@ app.post('/api/storage/cleanup', authenticateFirebaseUser, async (req, res) => {
   try {
     const user = req.body.user;
     const uid = user.uid;
-    const fileName = blobPath.split('/').pop() || '';
-    const localFilePath = path.join(uploadsDir, `${uid}-${fileName}`);
+    const rawFileName = blobPath.split('/').pop() || '';
+    const safeName = sanitizeUploadFileName(rawFileName);
+    const decodedFileName = decodeURIComponent(rawFileName);
 
-    if (fs.existsSync(localFilePath)) {
-      await fs.promises.unlink(localFilePath);
-      console.log(`[Storage Cleanup] Purged temporary upload file: ${localFilePath}`);
+    const candidates = [
+      path.join(uploadsDir, `${uid}-${safeName}`),
+      path.join(uploadsDir, safeName),
+      path.join(uploadsDir, `${uid}-${rawFileName}`),
+      path.join(uploadsDir, rawFileName),
+      path.join(uploadsDir, `${uid}-${decodedFileName}`),
+      path.join(uploadsDir, decodedFileName),
+    ];
+
+    for (const candidate of candidates) {
+      if (fs.existsSync(candidate)) {
+        await fs.promises.unlink(candidate);
+        console.log(`[Storage Cleanup] Purged temporary upload file: ${candidate}`);
+        break;
+      }
     }
     res.json({ success: true, message: 'Temporary storage cleaned up.' });
   } catch (err: any) {
@@ -1458,17 +1480,42 @@ app.post('/api/storage/cleanup', authenticateFirebaseUser, async (req, res) => {
 
 // Helper to read local storage files to buffer
 async function getFileBuffer(blobPath: string, uid: string): Promise<Buffer> {
-  const fileName = blobPath.split('/').pop() || '';
-  const localFilePath = path.join(uploadsDir, `${uid}-${fileName}`);
-  if (fs.existsSync(localFilePath)) {
-    return await fs.promises.readFile(localFilePath);
+  const rawFileName = blobPath.split('/').pop() || '';
+  const safeName = sanitizeUploadFileName(rawFileName);
+  const decodedFileName = decodeURIComponent(rawFileName);
+
+  const candidates = [
+    path.join(uploadsDir, `${uid}-${safeName}`),
+    path.join(uploadsDir, safeName),
+    path.join(uploadsDir, `${uid}-${rawFileName}`),
+    path.join(uploadsDir, rawFileName),
+    path.join(uploadsDir, `${uid}-${decodedFileName}`),
+    path.join(uploadsDir, decodedFileName),
+  ];
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return await fs.promises.readFile(candidate);
+    }
   }
-  // Check direct filename in uploads
-  const directPath = path.join(uploadsDir, fileName);
-  if (fs.existsSync(directPath)) {
-    return await fs.promises.readFile(directPath);
+
+  // Directory scan fallback for fuzzy matching (e.g. differently replaced symbols)
+  if (fs.existsSync(uploadsDir)) {
+    const files = await fs.promises.readdir(uploadsDir);
+    const targetClean = safeName.toLowerCase();
+    const targetUidClean = `${uid.toLowerCase()}-${targetClean}`;
+    
+    const matched = files.find(f => {
+      const lower = f.toLowerCase();
+      return lower === targetClean || lower === targetUidClean;
+    });
+
+    if (matched) {
+      return await fs.promises.readFile(path.join(uploadsDir, matched));
+    }
   }
-  throw new Error(`Local file not found at ${localFilePath}`);
+
+  throw new Error(`Local file not found at ${path.join(uploadsDir, `${uid}-${safeName}`)}`);
 }
 
 
@@ -1973,7 +2020,7 @@ app.put('/api/storage/local-upload', authenticateFirebaseUser, express.raw({ typ
 
   try {
     // Strip any directory components and unsafe characters from the name.
-    const fileName = path.basename(rawFileName).replace(/[^\w.\-()+\s]/g, '_');
+    const fileName = sanitizeUploadFileName(rawFileName);
     const resolvedFilePath = path.resolve(uploadsDir, fileName);
     if (path.resolve(uploadsDir) !== path.dirname(resolvedFilePath)) {
       res.status(400).json({ error: 'Invalid file name.' });

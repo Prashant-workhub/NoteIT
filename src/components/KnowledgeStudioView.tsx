@@ -744,7 +744,8 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
 
       try {
         // Create firestore document initial state
-        const docRef = await addDoc(collection(db, 'users', userId, 'sources'), {
+        const docRef = doc(collection(db, 'users', userId, 'sources'));
+        await setDoc(docRef, {
           title: name,
           type: 'document',
           sourceType: extension,
@@ -752,7 +753,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
           progress: 10,
           createdAt: serverTimestamp(),
           size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`
-        });
+        }, { merge: true });
 
         // Keep file object in memory in case of retries
         setUploadingFiles(prev => ({ ...prev, [docRef.id]: file }));
@@ -1181,7 +1182,8 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
 
     let docRef: any = null;
     try {
-      docRef = await addDoc(collection(db, 'users', userId, 'sources'), {
+      docRef = doc(collection(db, 'users', userId, 'sources'));
+      await setDoc(docRef, {
         title: urlInput,
         type: 'online',
         sourceType: urlType,
@@ -1189,7 +1191,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
         progress: 20,
         createdAt: serverTimestamp(),
         url: urlInput
-      });
+      }, { merge: true });
 
       const { text, title } = await extractTextFromUrl(urlInput, urlType);
       const textToUse = text || `YouTube Video Study Resource: ${title || urlInput}\nOverview: Attached to Knowledge Studio.`;
@@ -1364,7 +1366,8 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
 
     let docRef: any = null;
     try {
-      docRef = await addDoc(collection(db, 'users', userId, 'sources'), {
+      docRef = doc(collection(db, 'users', userId, 'sources'));
+      await setDoc(docRef, {
         title: driveFile.name,
         type: 'online',
         sourceType: driveFile.type,
@@ -1372,7 +1375,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
         progress: 30,
         createdAt: serverTimestamp(),
         size: driveFile.size
-      });
+      }, { merge: true });
 
       setUploadProgress(70);
       setProcessingStatus('Ingesting in Gemini...');
