@@ -24,6 +24,44 @@ function cleanMarkdownText(str: string): string {
 }
 
 /**
+ * Condenses long verbatim text paragraphs into crisp, high-yield academic study bullets.
+ */
+function condenseTextToAcademicBullets(text: string, maxBulletsPerBlock = 4): string[] {
+  if (!text) return [];
+
+  // Remove filler words & conversational phrases
+  let clean = text
+    .replace(/\b(so basically|you know|um+|uh+|like i said|in this lecture|welcome to|let's talk about|we are going to|today we will|as we know|in terms of|kind of|sort of|basically|actually)\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // Split into sentences
+  const sentences = clean.split(/(?<=[.!?])\s+/).filter(s => s.length > 8);
+  if (sentences.length === 0) return clean ? [clean] : [];
+
+  const bullets: string[] = [];
+  sentences.forEach(sentence => {
+    let trimmed = cleanMarkdownText(sentence);
+    if (!trimmed) return;
+
+    // Cap long sentences to concise bullet length (max 18 words)
+    const words = trimmed.split(' ');
+    if (words.length > 18) {
+      trimmed = words.slice(0, 16).join(' ') + '...';
+    }
+
+    if (trimmed.length > 6) {
+      const formatted = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+      if (!bullets.includes(formatted)) {
+        bullets.push(formatted);
+      }
+    }
+  });
+
+  return bullets.slice(0, maxBulletsPerBlock);
+}
+
+/**
  * Converts structured notes arrays or markdown strings into standardized Markdown text.
  */
 function notesToMarkdown(notes: unknown, fallbackTitle = 'Lecture Study Notes'): string {
@@ -93,7 +131,6 @@ function parseMarkdownToHandwrittenSections(rawMarkdown: string) {
       const items: HandwrittenItem[] = [];
       const linesArr = currentContentLines.map(l => cleanMarkdownText(l)).filter(Boolean);
 
-      // Separate definitions, examples, formulas, and general text
       const textLines: string[] = [];
 
       linesArr.forEach((line) => {
@@ -104,7 +141,7 @@ function parseMarkdownToHandwrittenSections(rawMarkdown: string) {
             type: 'definition',
             title: 'CORE DEFINITION & PRINCIPLE',
             content: cleaned,
-            weight: 3.5
+            weight: 3
           });
         } else if (/^(example|e\.g\.|worked example|sample problem|practical application):/i.test(line)) {
           const cleaned = line.replace(/^(example|e\.g\.|worked example|sample problem|practical application):\s*/i, '');
@@ -113,7 +150,7 @@ function parseMarkdownToHandwrittenSections(rawMarkdown: string) {
             type: 'example',
             title: 'WORKED EXAMPLE & APPLICATION',
             content: cleaned,
-            weight: 3.5
+            weight: 3
           });
         } else if (/^(formula|equation|math|expression):/i.test(line) || /^[A-Z][a-z0-9_\s]*\s*=\s*[\w\d\s\+\-\*\/\(\)\^\.]+/i.test(line)) {
           const cleaned = line.replace(/^(formula|equation|math|expression):\s*/i, '');
@@ -122,23 +159,26 @@ function parseMarkdownToHandwrittenSections(rawMarkdown: string) {
             type: 'formula',
             title: 'EQUATION & FORMULA BOX',
             content: [cleaned],
-            weight: 2.5
+            weight: 2
           });
         } else {
           textLines.push(line);
         }
       });
 
-      if (textLines.length > 0 || currentTable.length > 0) {
-        const lineUnits = Math.ceil(textLines.length * 0.9);
-        const tableUnits = currentTable.length > 0 ? (2.5 + currentTable.length * 0.8) : 0;
+      // Condense long paragraph lines into crisp, high-yield academic bullets
+      const condensedBullets = condenseTextToAcademicBullets(textLines.join(' '), 4);
+
+      if (condensedBullets.length > 0 || currentTable.length > 0) {
+        const lineUnits = Math.ceil(condensedBullets.length * 0.9);
+        const tableUnits = currentTable.length > 0 ? (2 + currentTable.length * 0.7) : 0;
         
         items.unshift({
           type: 'concept',
           title: cleanMarkdownText(currentTitle) || 'Key Concepts',
-          content: textLines,
+          content: condensedBullets,
           table: currentTable.length > 0 ? [...currentTable] : undefined,
-          weight: Math.max(3, lineUnits + tableUnits)
+          weight: Math.max(2.5, lineUnits + tableUnits)
         });
       }
 
@@ -282,23 +322,28 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
   if (parsedMarkdown.sections.length > 0) {
     sections = parsedMarkdown.sections;
   } else if (Array.isArray(lectureData?.sections) && lectureData.sections.length > 0) {
-    sections = lectureData.sections.map((s: any) => ({
-      title: cleanMarkdownText(s.title || s.heading || 'Topic Section'),
-      items: [{
-        type: 'concept' as const,
+    sections = lectureData.sections.map((s: any) => {
+      const text = cleanMarkdownText(s.content || s.explanation || s.summary || '');
+      const bullets = condenseTextToAcademicBullets(text, 4);
+      return {
         title: cleanMarkdownText(s.title || s.heading || 'Topic Section'),
-        content: cleanMarkdownText(s.content || s.explanation || s.summary || '').split('\n').filter(Boolean),
-        weight: Math.max(3, Math.ceil((s.content || '').split('\n').length * 0.9))
-      }]
-    }));
+        items: [{
+          type: 'concept' as const,
+          title: cleanMarkdownText(s.title || s.heading || 'Topic Section'),
+          content: bullets.length > 0 ? bullets : [text].filter(Boolean),
+          weight: Math.max(2.5, Math.ceil(bullets.length * 0.9))
+        }]
+      };
+    });
   } else if (overview) {
+    const overviewBullets = condenseTextToAcademicBullets(overview, 3);
     sections = [{
       title: 'Overview & Foundations',
       items: [{
         type: 'concept' as const,
         title: 'Overview & Foundations',
-        content: [overview],
-        weight: 4
+        content: overviewBullets.length > 0 ? overviewBullets : [overview],
+        weight: 3
       }]
     }];
   }
@@ -313,7 +358,7 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
 
   const hasNotesContent = sections.length > 0 || (overview && overview.trim().length > 0);
 
-  // DYNAMIC A4 HEIGHT-BUDGET BIN PACKING ALGORITHM
+  // DYNAMIC A4 PAGE ALLOCATION ALGORITHM BASED ON TOPIC LENGTH & IMPORTANCE WEIGHT
   const pages = React.useMemo(() => {
     if (!hasNotesContent) return [];
 
@@ -326,13 +371,22 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
         items: [{
           type: 'concept' as const,
           title: 'Core Concepts & Overview',
-          content: [overview || 'High-yield revision sheet compiled from source material.'],
-          weight: 4
+          content: condenseTextToAcademicBullets(overview || 'High-yield revision sheet compiled from source material.', 3),
+          weight: 3
         }]
       }
     ];
 
-    // Target height units budget per A4 page (at 28px ruled line height, ~25 units max)
+    // Total content word count calculation to determine appropriate page count
+    const totalWordCount = (overview + ' ' + rawNotesString).split(/\s+/).filter(Boolean).length;
+
+    // Target Max Page Count based strictly on Topic Length & Importance Weight:
+    // Short topics (< 400 words): 1 Page Cheat Sheet
+    // Medium topics (400 - 1200 words): 2 Pages Study Notes
+    // Long topics (> 1200 words): 3 Pages Max
+    const maxAllowedPages = totalWordCount < 400 ? 1 : totalWordCount < 1200 ? 2 : 3;
+
+    // Height budget units per A4 page (25 units per page)
     const MAX_PAGE_UNITS = 25;
 
     // Collect all discrete items to be rendered across pages
@@ -340,11 +394,12 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
 
     // Page 1 Synthesis Box if available
     if (overview && !noiseRegex.test(overview)) {
+      const ovBullets = condenseTextToAcademicBullets(overview, 3);
       flattenedItems.push({
         type: 'text',
         title: 'CORE TOPIC SYNTHESIS',
-        content: overview,
-        weight: 4
+        content: ovBullets.length > 0 ? ovBullets : overview,
+        weight: 3
       });
     }
 
@@ -353,8 +408,8 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
       flattenedItems.push({
         type: 'bullets',
         title: 'KEY REVISION POINTS',
-        content: keyPoints,
-        weight: Math.min(6, 1 + keyPoints.length * 0.9)
+        content: keyPoints.slice(0, 5),
+        weight: Math.min(5, 1 + Math.min(5, keyPoints.length) * 0.8)
       });
     }
 
@@ -365,7 +420,7 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
       });
     });
 
-    // Prepare supplementary revision callouts to distribute into available page budgets
+    // Prepare supplementary revision callouts
     const supplementaryItems: HandwrittenItem[] = [];
 
     if (parsedMarkdown.remember) {
@@ -373,7 +428,7 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
         type: 'remember',
         title: 'REMEMBER FOR EXAMS',
         content: parsedMarkdown.remember,
-        weight: 3.5
+        weight: 3
       });
     }
 
@@ -382,7 +437,7 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
         type: 'examFocus',
         title: 'EXAM FOCUS & TIP',
         content: parsedMarkdown.examFocus,
-        weight: 3.5
+        weight: 3
       });
     }
 
@@ -390,8 +445,8 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
       supplementaryItems.push({
         type: 'formula',
         title: 'KEY FORMULAS & EQUATIONS',
-        content: Array.from(new Set(formulas)).slice(0, 6),
-        weight: Math.min(6, 2 + formulas.length * 1.2)
+        content: Array.from(new Set(formulas)).slice(0, 5),
+        weight: Math.min(5, 1.5 + formulas.length * 1)
       });
     }
 
@@ -399,12 +454,12 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
       supplementaryItems.push({
         type: 'terms',
         title: 'KEY TERMINOLOGY',
-        content: Array.from(new Set(keyTerms)).slice(0, 10),
-        weight: 3
+        content: Array.from(new Set(keyTerms)).slice(0, 8),
+        weight: 2.5
       });
     }
 
-    // Bin-pack items into A4 pages to achieve ~85-95% page fill ratio
+    // Bin-pack items into A4 pages
     const pagesResult: Array<{
       pageNumber: number;
       header: string;
@@ -436,7 +491,12 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
 
     // Item placement loop
     flattenedItems.forEach(item => {
-      // First page accounts for 4 units for the Document Title Banner
+      if (pagesResult.length >= maxAllowedPages && currentPageItems.length > 0) {
+        // If max allowed page count reached, fit into existing page budget
+        currentPageItems.push(item);
+        return;
+      }
+
       const effectiveMaxUnits = (pagesResult.length === 0 && currentPageItems.length === 0)
         ? (MAX_PAGE_UNITS - 4)
         : MAX_PAGE_UNITS;
@@ -454,27 +514,34 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
         commitPage();
       }
 
-      currentPageItems.push(item);
-      currentUnits += item.weight;
-    });
-
-    supplementaryItems.forEach(suppItem => {
-      const effectiveMaxUnits = (pagesResult.length === 0 && currentPageItems.length === 0)
-        ? (MAX_PAGE_UNITS - 4)
-        : MAX_PAGE_UNITS;
-
-      if (currentUnits + suppItem.weight > effectiveMaxUnits && currentPageItems.length > 0) {
-        commitPage();
+      if (pagesResult.length < maxAllowedPages || pagesResult.length === 0) {
+        currentPageItems.push(item);
+        currentUnits += item.weight;
       }
-
-      currentPageItems.push(suppItem);
-      currentUnits += suppItem.weight;
     });
+
+    if (pagesResult.length < maxAllowedPages) {
+      supplementaryItems.forEach(suppItem => {
+        const effectiveMaxUnits = (pagesResult.length === 0 && currentPageItems.length === 0)
+          ? (MAX_PAGE_UNITS - 4)
+          : MAX_PAGE_UNITS;
+
+        if (currentUnits + suppItem.weight > effectiveMaxUnits && currentPageItems.length > 0) {
+          if (pagesResult.length < maxAllowedPages - 1) {
+            commitPage();
+          }
+        }
+
+        currentPageItems.push(suppItem);
+        currentUnits += suppItem.weight;
+      });
+    }
 
     commitPage();
 
-    return pagesResult;
-  }, [sections, overview, keyPoints, formulas, keyTerms, hasNotesContent, parsedMarkdown]);
+    // Strictly enforce max page cap corresponding to topic length weight
+    return pagesResult.slice(0, maxAllowedPages);
+  }, [sections, overview, keyPoints, formulas, keyTerms, hasNotesContent, parsedMarkdown, rawNotesString]);
 
   const showLoading = !hasNotesContent && isCompilingState;
 
@@ -494,7 +561,7 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
               AI IS COMPILING HANDWRITTEN A4 REVISION NOTES...
             </h3>
             <p className="text-xs font-mono font-bold text-[#475569] max-w-md mx-auto leading-relaxed">
-              Synthesizing A4 handwritten study sheets, red-line notebook canvas, formulas & terminology. 
+              Synthesizing concise A4 handwritten study sheets, red-line notebook canvas, formulas & terminology. 
               Preview will automatically display when note compilation is 100% complete.
             </p>
           </div>
@@ -540,10 +607,10 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-[6px] border-2 border-[#111111] bg-[#F6F2EA] shadow-paper-sm print:hidden">
         <div className="flex items-center gap-2">
           <span className="px-2.5 py-1 rounded-[4px] bg-[#1E3A8A] text-white text-[10px] font-mono font-bold uppercase tracking-wider border border-[#111111] shadow-paper-sm">
-            📝 A4 HANDWRITTEN REVISION CANVAS
+            📝 A4 REVISION SHEET ({pages.length} {pages.length === 1 ? 'PAGE' : 'PAGES'})
           </span>
           <span className="text-xs font-mono font-bold text-[#666666]">
-            ({pages.length} {pages.length === 1 ? 'Page' : 'Pages'} • 210mm × 297mm Standard A4 Notebook)
+            (210mm × 297mm Standard A4 Notebook)
           </span>
         </div>
 
@@ -710,7 +777,10 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
                                   <span>{pLine.replace(/^\d+\.\s+/, '')}</span>
                                 </span>
                               ) : (
-                                pLine
+                                <span className="flex items-start gap-2">
+                                  <span className="text-amber-600 font-bold">•</span>
+                                  <span>{pLine}</span>
+                                </span>
                               )}
                             </p>
                           ))
