@@ -10,9 +10,6 @@
     "build": "vite build",
     "start": "tsx server.ts",
     "preview": "vite preview",
-    "android:sync": "npm run build && npx cap sync android",
-    "android:build": "npm run android:sync && cd android && gradlew.bat :app:assembleDebug",
-    "android:open": "npm run android:sync && npx cap open android",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit"
   },
