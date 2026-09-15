@@ -201,8 +201,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [logActivity],
   )
 
-  const setDoubtStatus = useCallback((id: string, status: DoubtStatus) => {
+  const setDoubtStatus = useCallback(async (id: string, status: DoubtStatus) => {
+    const previousStatus = doubts.find((d) => d.id === id)?.status
+    
+    // Optimistic update
     setDoubts((list) => list.map((d) => (d.id === id ? { ...d, status } : d)))
+    
     // Sync status change to Firestore
     const firestoreStatusMap: Record<DoubtStatus, any> = {
       pending: 'NEW',
@@ -210,8 +214,31 @@ export function DataProvider({ children }: { children: ReactNode }) {
       resolved: 'RESOLVED',
       escalated: 'ESCALATED',
     }
-    updateDoubtResponse(id, '', firestoreStatusMap[status] || 'ANSWERED').catch(() => {})
-  }, [])
+    
+    try {
+      await updateDoubtResponse(id, '', firestoreStatusMap[status] || 'ANSWERED')
+    } catch (err) {
+      console.warn('Failed to update doubt status in Firestore:', err)
+      
+      // Rollback on failure
+      if (previousStatus) {
+        setDoubts((list) => list.map((d) => (d.id === id ? { ...d, status: previousStatus } : d)))
+      }
+      
+      // Notify user of failure
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('noteit_api_error', {
+            detail: {
+              context: 'update_doubt_status',
+              message: 'Failed to update status. Please try again.',
+              doubtId: id
+            }
+          })
+        )
+      }
+    }
+  }, [doubts])
 
   const toggleSyllabusItem = useCallback(
     (courseId: string, itemId: string) => {

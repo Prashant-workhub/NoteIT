@@ -335,6 +335,11 @@ export async function claimWeekendQuizXPAtomic(
     updatedAt: new Date().toISOString()
   };
 
+  // Capture original states for potential rollback
+  const originalClaim = localStorage.getItem(`noteit_claim_${userId}_weekend_${dateStr}`);
+  const originalStreak = localStorage.getItem(`noteit_streak_data_${userId}`);
+  const originalChallenge = localStorage.getItem(`noteit_weekend_quiz_${userId}_${dateStr}`);
+
   // Local storage save for immediate client response
   localStorage.setItem(`noteit_claim_${userId}_weekend_${dateStr}`, 'true');
   localStorage.setItem(`noteit_streak_data_${userId}`, JSON.stringify(updatedData));
@@ -381,7 +386,16 @@ export async function claimWeekendQuizXPAtomic(
       }, { merge: true });
     });
   } catch (err) {
-    console.warn('Firestore transaction warning (handled gracefully via local state):', err);
+    console.warn('Firestore transaction warning, rolling back local state:', err);
+    // Rollback to original state
+    if (originalClaim === null) localStorage.removeItem(`noteit_claim_${userId}_weekend_${dateStr}`);
+    else localStorage.setItem(`noteit_claim_${userId}_weekend_${dateStr}`, originalClaim);
+    
+    if (originalStreak === null) localStorage.removeItem(`noteit_streak_data_${userId}`);
+    else localStorage.setItem(`noteit_streak_data_${userId}`, originalStreak);
+    
+    if (originalChallenge === null) localStorage.removeItem(`noteit_weekend_quiz_${userId}_${dateStr}`);
+    else localStorage.setItem(`noteit_weekend_quiz_${userId}_${dateStr}`, originalChallenge);
   }
 
   // Dispatch global XP award event for toast notifications
