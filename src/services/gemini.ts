@@ -189,8 +189,7 @@ export const executeGeminiCall = async (
   if (geminiKey) {
     try {
       const requestedModel = model || getAIConfig().model || 'gemini-3.6-flash';
-      const apiEndpointModel = (requestedModel === 'gemini-3.6-flash' || requestedModel === 'gemini-2.5-flash') ? 'gemini-1.5-flash' : requestedModel;
-      const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/${apiEndpointModel}:generateContent?key=${geminiKey}`;
+      const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/${requestedModel}:generateContent?key=${geminiKey}`;
       
       const contentsParts: any[] = [];
       if (inlineData) {
