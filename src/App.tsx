@@ -11,6 +11,7 @@ import { auth, db } from './firebaseConfig';
 import { doc, getDoc, setDoc, serverTimestamp, collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { App as CapApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
+import { isNetworkAvailable } from './config';
 import {
   GraduationCap, 
   Sparkles, 
@@ -86,6 +87,34 @@ import TeacherPortalApp from './teacher-portal/TeacherPortalApp';
 
 
 export default function App() {
+  // Network connectivity state (critical for mobile users)
+  const [isOnline, setIsOnline] = useState<boolean>(() => {
+    if (typeof navigator === 'undefined') return true;
+    return navigator.onLine;
+  });
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Periodic connectivity probe for mobile WebViews (navigator.onLine can be unreliable)
+  useEffect(() => {
+    const probe = async () => {
+      const available = await isNetworkAvailable();
+      setIsOnline(prev => prev !== available ? available : prev);
+    };
+    const interval = setInterval(probe, 30000);
+    probe(); // Run once on mount
+    return () => clearInterval(interval);
+  }, []);
+
   // Live global recording state across tabs
   const [globalRecordingState, setGlobalRecordingState] = useState<{
     isRecording: boolean;
@@ -1052,6 +1081,11 @@ export default function App() {
   if (checkingOnboarding) {
     return (
       <ErrorBoundary theme={theme}>
+        {!isOnline && (
+          <div className="fixed top-0 left-0 right-0 z-[99999] bg-red-600 text-white text-center py-2 px-4 text-sm font-mono font-bold">
+            ⚠️ No network connection. Some features may be unavailable.
+          </div>
+        )}
         <div className={`min-h-screen flex items-center justify-center ${
           theme === 'dark' ? 'bg-[#0a0a0c]' : 'bg-[#FAF9F5]'
         }`}>
@@ -1322,6 +1356,7 @@ export default function App() {
               onLogOut={handleLogOut}
               totalXp={streakData.totalXp}
               currentStreak={streakData.currentStreak}
+              isOnline={isOnline}
             />
           )}
 

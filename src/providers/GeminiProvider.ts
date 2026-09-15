@@ -67,9 +67,11 @@ export async function fetchGeminiApi(apiKey: string, requestedModel: string, bod
       if (err.status && err.status !== 404) {
         throw err;
       }
+      // 404 means model not found on this version - fall through to try next version
     }
   }
 
+  // If all versions failed with 404, try final v1beta URL as last resort
   const finalUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
   return await executeFetchWithRetry(finalUrl);
 }

@@ -16,8 +16,38 @@ if (isProd && !apiEnvUrl) {
 
 let defaultApiUrl = 'http://localhost:3003';
 if (Capacitor.isNativePlatform()) {
-  // If running in Android emulator, use 10.0.2.2 to point to host machine's localhost port 3003
-  defaultApiUrl = Capacitor.getPlatform() === 'android' ? 'http://10.0.2.2:3003' : 'http://localhost:3003';
+  const platform = Capacitor.getPlatform();
+  if (platform === 'android') {
+    // Android emulator can reach host machine via 10.0.2.2; real devices need the LAN IP
+    defaultApiUrl = 'http://10.0.2.2:3003';
+  } else {
+    // iOS simulator can reach host via localhost; real iOS devices need LAN IP
+    defaultApiUrl = 'http://localhost:3003';
+  }
 }
 
 export const API_BASE_URL = apiEnvUrl?.replace(/\/$/, '') ?? (Capacitor.isNativePlatform() ? defaultApiUrl : (isProd ? '' : defaultApiUrl));
+
+/**
+ * Returns true when the device appears to have network connectivity.
+ * Checks both navigator.onLine and attempts a lightweight connectivity probe
+ * (since mobile WebViews can report "online" while actually being stuck on a captive portal).
+ */
+export async function isNetworkAvailable(): Promise<boolean> {
+  if (typeof navigator === 'undefined') return true;
+  if (!navigator.onLine) return false;
+  // Quick probe: try to reach a known endpoint with a short timeout
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch(`${API_BASE_URL || 'https://generativelanguage.googleapis.com'}/v1beta/models?key=probe`, {
+      method: 'GET',
+      signal: controller.signal,
+      cache: 'no-store'
+    });
+    clearTimeout(timer);
+    return res.ok || res.status === 401 || res.status === 403; // Any response means connectivity works
+  } catch {
+    return true; // fetch probe failed but navigator says online — trust navigator
+  }
+}

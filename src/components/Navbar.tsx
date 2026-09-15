@@ -36,6 +36,7 @@ interface NavbarProps {
   onLogOut: () => void;
   totalXp?: number;
   currentStreak?: number;
+  isOnline?: boolean;
 }
 
 export default function Navbar({
@@ -50,7 +51,8 @@ export default function Navbar({
   setTheme,
   onLogOut,
   totalXp = 0,
-  currentStreak = 0
+  currentStreak = 0,
+  isOnline
 }: NavbarProps) {
   
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -174,6 +176,21 @@ export default function Navbar({
         </button>
 
         <div className="h-6 w-[2px] bg-[var(--border-main)] mx-1 hidden sm:block" />
+
+        {/* Network status indicator */}
+        {isOnline !== undefined && (
+          <div
+            className={`flex items-center gap-1.5 px-2 py-1 rounded-[4px] border text-[10px] font-mono font-bold ${
+              isOnline
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                : 'bg-red-500/10 border-red-500/30 text-red-400'
+            }`}
+            title={isOnline ? 'Connected' : 'No network connection'}
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${isOnline ? 'bg-emerald-400' : 'bg-red-400 animate-pulse'}`} />
+            {isOnline ? 'ONLINE' : 'OFFLINE'}
+          </div>
+        )}
 
         {/* User avatar - Dropdown */}
         <div className="relative" ref={dropdownRef}>
