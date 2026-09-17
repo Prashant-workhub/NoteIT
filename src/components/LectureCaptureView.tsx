@@ -265,19 +265,19 @@ export default function LectureCaptureView({
       if (userActivityTimerRef.current) {
         clearTimeout(userActivityTimerRef.current);
       }
-      // Fade down after 3.5 seconds of untouched screen
+      // Fade down after 6.0 seconds of untouched screen (delayed by 2.5s)
       userActivityTimerRef.current = setTimeout(() => {
         setIsScreenDimmed(true);
-      }, 3500);
+      }, 6000);
     };
 
     handleUserActivity();
 
-    window.addEventListener('mousemove', handleUserActivity);
-    window.addEventListener('mousedown', handleUserActivity);
-    window.addEventListener('keydown', handleUserActivity);
-    window.addEventListener('touchstart', handleUserActivity);
-    window.addEventListener('scroll', handleUserActivity);
+    window.addEventListener('mousemove', handleUserActivity, { passive: true });
+    window.addEventListener('mousedown', handleUserActivity, { passive: true });
+    window.addEventListener('keydown', handleUserActivity, { passive: true });
+    window.addEventListener('touchstart', handleUserActivity, { passive: true });
+    window.addEventListener('scroll', handleUserActivity, { passive: true });
 
     return () => {
       if (userActivityTimerRef.current) {
@@ -296,6 +296,8 @@ export default function LectureCaptureView({
   const recognitionRef = useRef<any>(null);
   const accumulatedTranscriptRef = useRef<string>('');
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
+  const transcriptContainerRef = useRef<HTMLDivElement | null>(null);
+  const isUserScrolledUpRef = useRef<boolean>(false);
 
   const isRecordingRef = useRef(false);
   const isPausedRef = useRef(false);
@@ -642,12 +644,20 @@ export default function LectureCaptureView({
     }
   };
 
-  // Auto-scroll the transcript to bottom
+  // Localized auto-scroll for transcript (only scrolls inner transcript container, without hijacking root window)
   useEffect(() => {
-    if (transcriptEndRef.current) {
-      transcriptEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    const container = transcriptContainerRef.current;
+    if (container && !isUserScrolledUpRef.current) {
+      container.scrollTop = container.scrollHeight;
     }
   }, [liveTranscript]);
+
+  const handleTranscriptScroll = () => {
+    const container = transcriptContainerRef.current;
+    if (!container) return;
+    const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 40;
+    isUserScrolledUpRef.current = !isAtBottom;
+  };
 
   const startSpeechRecognition = () => {
     const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -3336,7 +3346,11 @@ export default function LectureCaptureView({
                               </div>
                             </div>
 
-                            <div className="flex-1 overflow-y-auto pr-1 text-xs leading-relaxed font-mono text-[var(--text-primary)] select-text">
+                            <div
+                              ref={transcriptContainerRef}
+                              onScroll={handleTranscriptScroll}
+                              className="flex-1 overflow-y-auto pr-1 text-xs leading-relaxed font-mono text-[var(--text-primary)] select-text scroll-smooth"
+                            >
                               <p className="whitespace-pre-wrap">{liveTranscript}</p>
                               <div ref={transcriptEndRef} />
                             </div>

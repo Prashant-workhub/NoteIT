@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { BookOpen, Sparkles, Check, AlertTriangle, HelpCircle, Layers, Lightbulb, Target } from 'lucide-react';
+import { BookOpen, Sparkles, Check, AlertTriangle, HelpCircle, Layers, Lightbulb, Target, Flame, ExternalLink } from 'lucide-react';
 
 interface AcademicNotesViewerProps {
   content: string | Record<string, string> | any[];
@@ -97,22 +97,85 @@ export const AcademicNotesViewer: React.FC<AcademicNotesViewerProps> = ({
   let keyCounter = 0;
 
   const renderFormattedInlineText = (text: string) => {
-    // Process inline bold, code/math, and callout labels
+    // Process markdown links [Text](url), inline bold **Text**, code/math `code` or $math$
     let formatted: React.ReactNode[] = [];
-    const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`|\$[^\$]+\$)/g);
+    const parts = text.split(/(\[[^\]]+\]\([^\)]+\)|\*\*[^*]+\*\*|`[^`]+`|\$[^\$]+\$)/g);
 
     parts.forEach((part, idx) => {
+      if (part.startsWith('[') && part.includes('](') && part.endsWith(')')) {
+        const linkMatch = part.match(/^\[([^\]]+)\]\(([^\)]+)\)$/);
+        if (linkMatch) {
+          const linkText = linkMatch[1];
+          const linkHref = linkMatch[2].trim();
+
+          if (linkHref.toLowerCase() === 'gfg' || linkHref.toLowerCase().startsWith('gfg:') || linkHref.toLowerCase().includes('geeksforgeeks')) {
+            const queryTerm = linkHref.includes(':') ? linkHref.split(':')[1] : linkText;
+            const gfgUrl = `https://www.geeksforgeeks.org/search/?q=${encodeURIComponent(queryTerm)}`;
+            formatted.push(
+              <a
+                key={idx}
+                href={gfgUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[4px] bg-[#2F8D46]/15 text-[#2F8D46] dark:bg-[#2F8D46]/25 dark:text-[#4ADE80] font-mono text-xs font-extrabold border border-[#2F8D46]/40 hover:bg-[#2F8D46] hover:text-white transition-all shadow-paper-sm mx-1 my-0.5 select-none no-underline cursor-pointer group"
+                title={`Look up "${queryTerm}" explanation on GeeksforGeeks`}
+              >
+                <span>{linkText}</span>
+                <span className="text-[9px] font-mono bg-[#2F8D46] text-white px-1 rounded group-hover:bg-white group-hover:text-[#2F8D46] transition-colors flex items-center gap-0.5">
+                  GFG <ExternalLink className="h-2.5 w-2.5 inline" />
+                </span>
+              </a>
+            );
+          } else {
+            formatted.push(
+              <a
+                key={idx}
+                href={linkHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 underline hover:text-blue-800"
+              >
+                {linkText}
+              </a>
+            );
+          }
+          return;
+        }
+      }
+
       if (part.startsWith('**') && part.endsWith('**')) {
         const inner = part.slice(2, -2);
-        // Highlight specific labels like Definition:, Given:, Result:, Formula:
-        if (/^(Definition|Key Idea|Important|Formula|Given|Process|Result|Example|Where|Common Confusion):/i.test(inner)) {
+        // Highlight specific labels like Definition:, Given:, Result:, Formula: or [HIGH WEIGHTAGE]
+        if (/^(\[?🔥\s*HIGH WEIGHTAGE\]?|\[?⭐\s*EXAM PRIORITY\]?|HIGH WEIGHTAGE|EXAM PRIORITY)/i.test(inner)) {
+          formatted.push(
+            <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[4px] bg-[#FF4D4D] text-white font-mono font-extrabold text-[10px] uppercase border border-[#111111] shadow-paper-sm mr-1 my-0.5">
+              🔥 HIGH WEIGHTAGE
+            </span>
+          );
+        } else if (/^(Definition|Key Idea|Important|Formula|Given|Process|Result|Example|Where|Common Confusion):/i.test(inner)) {
           formatted.push(
             <span key={idx} className="inline-block px-1.5 py-0.5 rounded-[3px] bg-[#FFC400] text-[#111111] font-mono font-extrabold text-[11px] uppercase tracking-wide mr-1 border border-[#111111] shadow-paper-sm">
               {inner}
             </span>
           );
         } else {
-          formatted.push(<strong key={idx} className="font-extrabold text-[var(--text-primary)]">{inner}</strong>);
+          const gfgUrl = `https://www.geeksforgeeks.org/search/?q=${encodeURIComponent(inner)}`;
+          formatted.push(
+            <span key={idx} className="inline-wrap group/term">
+              <strong className="font-extrabold text-[var(--text-primary)]">{inner}</strong>
+              {inner.length > 2 && !inner.includes(':') && (
+                <a
+                  href={gfgUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center text-[9px] font-mono font-bold text-[#2F8D46] hover:bg-[#2F8D46] hover:text-white px-1 py-0.2 rounded border border-[#2F8D46]/30 ml-1 opacity-75 hover:opacity-100 transition-all no-underline"
+                  title={`Search "${inner}" on GeeksforGeeks`}
+                >
+                  GFG ↗
+                </a>
+              )}
+            </span>
+          );
         }
       } else if ((part.startsWith('`') && part.endsWith('`')) || (part.startsWith('$') && part.endsWith('$'))) {
         const inner = part.slice(1, -1);
@@ -232,6 +295,17 @@ export const AcademicNotesViewer: React.FC<AcademicNotesViewerProps> = ({
               <AlertTriangle className="h-5 w-5 text-[#FF4D4D]" />
               <h2 className="font-heading text-base font-extrabold uppercase tracking-wider text-[#111111]">
                 ⚠️ COMMON CONFUSION & DISTINCTIONS
+              </h2>
+            </div>
+          </div>
+        );
+      } else if (h2Text.includes('🔥') || h2Text.toLowerCase().includes('teacher') || h2Text.toLowerCase().includes('high-weightage')) {
+        elements.push(
+          <div key={`teacher-callouts-${keyCounter++}`} className="mt-8 mb-4 p-5 rounded-[6px] border-2 border-[#111111] bg-[#FFC400]/25 text-[var(--text-primary)] shadow-paper-md">
+            <div className="flex items-center gap-2 border-b-2 border-[#111111] pb-2 mb-3">
+              <Flame className="h-5 w-5 text-[#FF4D4D] fill-[#FF4D4D]" />
+              <h2 className="font-heading text-base font-extrabold uppercase tracking-wider text-[#111111]">
+                🔥 TEACHER'S SPOKEN CALLOUTS & HIGH-WEIGHTAGE TOPICS
               </h2>
             </div>
           </div>

@@ -352,6 +352,7 @@ export const generateNotesFromTranscript = async (
 ): Promise<{
   title: string;
   overview: string;
+  teacherCallouts?: string[];
   keyConcepts: { heading: string; explanation: string; details: string[] }[];
   importantPoints: string[];
   examples: string[];
@@ -367,6 +368,10 @@ export const generateNotesFromTranscript = async (
   const prompt = `You are an AI study assistant for students.
 
 Generate structured study notes ONLY from the transcript provided below.
+
+SPOKEN TEACHER EMPHASIS & HIGH WEIGHTAGE DETECTION (MANDATORY):
+Scan the transcript for any phrases where the teacher explicitly emphasizes a concept, topic, definition, formula, diagram, or question (e.g. "this is very important", "mark a star on this", "will definitely come in exams", "high weightage topic", "pay close attention", "remember this formula", "last year paper question", "crucial concept").
+Extract all such teacher emphasis items into the 'teacherCallouts' array.
 
 Use the transcript as the sole source of truth.
 
@@ -387,6 +392,7 @@ ${transcript}`;
     properties: {
       title: { type: 'STRING' },
       overview: { type: 'STRING' },
+      teacherCallouts: { type: 'ARRAY', items: { type: 'STRING' } },
       keyConcepts: {
         type: 'ARRAY',
         items: {
@@ -415,13 +421,14 @@ ${transcript}`;
       },
       takeaways: { type: 'ARRAY', items: { type: 'STRING' } }
     },
-    required: ['title', 'overview', 'keyConcepts', 'importantPoints', 'examples', 'formulas', 'definitions', 'takeaways']
+    required: ['title', 'overview', 'teacherCallouts', 'keyConcepts', 'importantPoints', 'examples', 'formulas', 'definitions', 'takeaways']
   };
 
   const rawResult = await executeGeminiCall(prompt, customGeminiApiKey || '', undefined, schema, onBusy, 'gemini-3.6-flash', 'generate-notes');
 
   const title = rawResult.title || 'Lecture Study Notes';
   const overview = rawResult.overview || '';
+  const teacherCallouts = Array.isArray(rawResult.teacherCallouts) ? rawResult.teacherCallouts : [];
   const keyConcepts = Array.isArray(rawResult.keyConcepts) ? rawResult.keyConcepts : [];
   const importantPoints = Array.isArray(rawResult.importantPoints) ? rawResult.importantPoints : [];
   const examples = Array.isArray(rawResult.examples) ? rawResult.examples : [];
@@ -430,6 +437,14 @@ ${transcript}`;
   const takeaways = Array.isArray(rawResult.takeaways) ? rawResult.takeaways : [];
 
   let markdown = `# ${title}\n\n## Overview\n${overview}\n\n`;
+
+  if (teacherCallouts.length > 0) {
+    markdown += `## 🔥 Teacher's Spoken Callouts & High-Weightage Topics\n`;
+    teacherCallouts.forEach((tc: string) => {
+      markdown += `- 🔥 **[HIGH WEIGHTAGE]**: ${tc}\n`;
+    });
+    markdown += `\n`;
+  }
 
   if (keyConcepts.length > 0) {
     markdown += `## Key Concepts\n`;
@@ -1661,10 +1676,13 @@ export const generateSummary = async (
     
     CRITICAL FORMATTING RULE: For any mathematical equations, numbers, variables, or exponents, NEVER use caret notation (like '3^2', 'x^y', 'x^2', '2^n'). Instead, write them with actual superscript Unicode characters representing the power/exponent directly above the base (e.g., '3²', 'xʸ', 'x²', '2ⁿ'). Apply this rule strictly to all mathematical powers and exponents throughout the output.
     
-    You MUST structure the summary exactly with the following 10 Markdown headers:
+    You MUST structure the summary with the following Markdown headers:
     
     ### Overview
     [Strategic overview of this summary mode and main themes]
+
+    ### 🔥 Teacher's High-Weightage Callouts
+    [Specific topics, formulas, definitions, or exam questions explicitly emphasized by the teacher as important, useful, or high weightage in the lecture transcript]
     
     ### Key Concepts
     [Core concepts, models, and baseline conceptual framework]
@@ -1753,6 +1771,17 @@ export const generateNotes = async (
     - NEVER include sections for "Faculty Name", "Instructor Profile", "Office Hours", "Grading Criteria", "Prerequisites"
     - START GENERATING NOTES ONLY FROM REAL ACADEMIC CONCEPT CONTENT!
 
+    SPOKEN TEACHER EMPHASIS & HIGH WEIGHTAGE DETECTION (MANDATORY):
+    Scan the transcript for any instances where the teacher explicitly emphasizes a concept, topic, definition, formula, diagram, or question (e.g. phrases like "this is very important", "mark a star on this", "will definitely come in exams", "high weightage topic", "pay close attention", "remember this formula", "last year paper question", "crucial concept").
+    1. Create a dedicated high-priority section right after Brief Overview:
+       ## 🔥 Teacher's High-Weightage Callouts & Spoken Emphasis
+       - [List every topic, formula, or question the teacher specifically flagged as important/useful/high weightage in the lecture, along with why the teacher emphasized it]
+    2. Next to any concept/heading/topic in the notes that received teacher emphasis, prefix it with '[🔥 HIGH WEIGHTAGE]' or '[⭐ EXAM PRIORITY]' and include a brief note explaining why the teacher highlighted it.
+
+    DIFFICULT TECHNICAL TERMS & GFG HIGHLIGHTING (MANDATORY):
+    Identify any complex, technical, or difficult academic terms, algorithms, formulas, or specialized jargon mentioned in the transcript (e.g. Recursion, Polymorphism, Eigenvalue, Dijkstra, Mutex, Backpropagation, etc.).
+    Tag these difficult terms in markdown as '[Term](gfg)' (e.g. '[Recursion](gfg)') so students can click them for GeeksforGeeks explanations.
+
     PIPELINE RULES:
     1. Do NOT treat the lecture transcript as text to be summarized or rewritten as spoken.
     2. Understand the lecture -> Identify concepts -> Group related concepts -> Extract definitions, formulas, procedures, comparisons & worked examples -> Eliminate speech noise (fillers like "uh", "okay", stutters, repetitions, lecturer tangents) -> Construct a logical, textbook-quality learning document.
@@ -1774,10 +1803,14 @@ export const generateNotes = async (
     ## Brief Overview
     [Concise 2–4 sentence explanation of what the topic is, why it is important, and what the lecture covers]
 
+    ## 🔥 Teacher's High-Weightage Callouts & Spoken Emphasis
+    - [Extract every single topic, formula, process, or question that the teacher explicitly flagged as important/useful/high weightage in the lecture transcript (e.g. phrases like "this is very important", "mark a star", "will come in exams", "pay close attention to this concept", "remember this formula"). Include why the teacher highlighted it.]
+
     ## Key Points
     - [4–8 highly relevant, concise academic bullet points representing core takeaways]
 
     ## 01 — [FIRST MAJOR CONCEPT NAME]
+    (If the teacher explicitly flagged this concept as high weightage, prefix the heading or description with '[🔥 HIGH WEIGHTAGE]')
     ### Definition
     [Clear student-friendly definition]
 
