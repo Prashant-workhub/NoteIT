@@ -243,6 +243,7 @@ export interface UserSettings {
     lastName?: string;
     countryCode?: string;
     phoneNumber?: string;
+    uid?: string;
     onboardingCompleted?: boolean;
     teacherCode?: string;
   };

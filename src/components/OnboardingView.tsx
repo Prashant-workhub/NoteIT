@@ -155,6 +155,7 @@ export default function OnboardingView({
   const [firstName, setFirstName] = useState(initialFirstName);
   const [lastName, setLastName] = useState(initialLastName);
   const [school, setSchool] = useState('');
+  const [studentUid, setStudentUid] = useState('');
   const [email, setEmail] = useState(initialEmail || '');
   const [countryCode, setCountryCode] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -225,9 +226,13 @@ export default function OnboardingView({
           if (data.first_name) setFirstName(data.first_name);
           if (data.last_name) setLastName(data.last_name);
           if (data.school_or_university) setSchool(data.school_or_university);
+          if (data.uid || data.student_uid) setStudentUid(data.uid || data.student_uid);
           if (data.email) setEmail(data.email);
           if (data.country_code) setCountryCode(data.country_code);
           if (data.phone_number) setPhoneNumber(data.phone_number);
+          if (data.ai_provider) setSelectedProvider(data.ai_provider);
+          if (data.selected_model) setSelectedModel(data.selected_model);
+          if (data.api_key) setApiKey(data.api_key);
         }
       } catch (err) {
         console.error("Error loading user profile in OnboardingView:", err);
@@ -249,6 +254,10 @@ export default function OnboardingView({
     } else if (step === 2) {
       if (!school.trim()) {
         setError('Please enter your school or university name.');
+        return;
+      }
+      if (!studentUid.trim()) {
+        setError('Please enter your Student UID / College Roll Number.');
         return;
       }
       setStep(3);
@@ -313,6 +322,8 @@ export default function OnboardingView({
         first_name: firstName.trim(),
         last_name: lastName.trim(),
         school_or_university: school.trim(),
+        uid: studentUid.trim(),
+        student_uid: studentUid.trim(),
         email: email.trim(),
         country_code: countryCode,
         phone_number: cleanPhone,
@@ -411,11 +422,19 @@ export default function OnboardingView({
         localStorage.setItem(`noteit_user_api_key_${selectedProvider}`, trimmedKey);
         localStorage.setItem('noteit_user_api_key', trimmedKey);
 
-        // Save onboarding_completed: true in Firestore
+        // Save onboarding_completed: true and credentials in Firestore database
         if (userId) {
           try {
             const userDocRef = doc(db, 'users', userId);
-            await setDoc(userDocRef, { onboarding_completed: true, updated_at: serverTimestamp() }, { merge: true });
+            await setDoc(userDocRef, {
+              onboarding_completed: true,
+              ai_provider: selectedProvider,
+              selected_model: selectedModel,
+              api_key: trimmedKey,
+              uid: studentUid.trim(),
+              student_uid: studentUid.trim(),
+              updated_at: serverTimestamp()
+            }, { merge: true });
           } catch (fErr) {
             console.warn("Failed to mark onboarding_completed in Firestore:", fErr);
           }
@@ -430,6 +449,7 @@ export default function OnboardingView({
             last_name: lastName,
             email: email,
             school_or_university: school,
+            uid: studentUid,
             country_code: countryCode,
             phone_number: phoneNumber,
             onboarding_completed: true,
@@ -547,7 +567,7 @@ export default function OnboardingView({
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-mono font-extrabold uppercase tracking-wider text-[#222222] block">
-                    University / Institution Name
+                    University / Institution Name *
                   </label>
                   <div className="relative">
                     <GraduationCap className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#444444]" />
@@ -560,6 +580,26 @@ export default function OnboardingView({
                       className="w-full rounded-xl border-2 border-[#111111] bg-[#F9F9F9] pl-10 pr-4 py-3 text-xs font-bold text-[#111111] placeholder-[#777777] outline-none focus:bg-white focus:border-[#2F6BFF] transition-all"
                     />
                   </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-mono font-extrabold uppercase tracking-wider text-[#222222] block">
+                    Student UID / College Roll No. *
+                  </label>
+                  <div className="relative">
+                    <BookOpen className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#444444]" />
+                    <input
+                      type="text"
+                      required
+                      value={studentUid}
+                      onChange={(e) => setStudentUid(e.target.value)}
+                      placeholder="e.g. 21BCS1042 / UID-98765"
+                      className="w-full rounded-xl border-2 border-[#111111] bg-[#F9F9F9] pl-10 pr-4 py-3 text-xs font-bold text-[#111111] placeholder-[#777777] outline-none focus:bg-white focus:border-[#2F6BFF] transition-all"
+                    />
+                  </div>
+                  <span className="text-[10px] font-mono text-[#666666] block">
+                    Official Student UID or Roll Number required for academic verification.
+                  </span>
                 </div>
               </div>
             )}

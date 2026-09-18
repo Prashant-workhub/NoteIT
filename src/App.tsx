@@ -144,14 +144,7 @@ export default function App() {
     localStorage.setItem('noteit_theme', theme);
   }, [theme]);
 
-  // Security migration: older releases kept BYOK credentials in localStorage.
-  // They are now stored only in the authenticated backend vault, so purge any
-  // old browser copies as soon as the application loads.
-  useEffect(() => {
-    Object.keys(localStorage)
-      .filter((key) => /^noteit_.+_api_key$/i.test(key))
-      .forEach((key) => localStorage.removeItem(key));
-  }, []);
+  // Persist theme preference in localStorage
 
   // Authenticated user session state & Role state (Student vs Faculty)
   const [sessionUser, setSessionUser] = useState<{ uid: string; fullName: string; emailAddress: string } | null>(null);
@@ -353,7 +346,7 @@ export default function App() {
           
           if (userDocSnap.exists()) {
             const data = userDocSnap.data();
-            console.log("User data loaded from Firestore:", data);
+            console.log("User data loaded from Firestore database:", data);
             
             const isCompleted = !!data.onboarding_completed;
             const detectedRole = data.role === 'faculty' ? 'faculty' : 'student';
@@ -363,15 +356,32 @@ export default function App() {
               ? (data.teacherCode || generateTeacherCode(`${data.first_name || ''} ${data.last_name || ''}`.trim() || loggedUser.fullName))
               : undefined;
 
+            // Load AI credentials from database into localStorage for instant API usage
+            if (data.ai_provider) {
+              localStorage.setItem('noteit_active_ai_provider', data.ai_provider);
+            }
+            if (data.selected_model) {
+              localStorage.setItem('noteit_active_ai_model', data.selected_model);
+            }
+            if (data.api_key) {
+              localStorage.setItem('noteit_user_api_key', data.api_key);
+              if (data.ai_provider) {
+                localStorage.setItem(`noteit_user_api_key_${data.ai_provider}`, data.api_key);
+              }
+            }
+
+            const fullNameFromDb = `${data.first_name || ''} ${data.last_name || ''}`.trim() || data.fullName || loggedUser.fullName;
+
             setSettings(prev => ({
               ...prev,
               profile: {
                 ...prev.profile,
-                fullName: `${data.first_name || ''} ${data.last_name || ''}`.trim() || loggedUser.fullName,
+                fullName: fullNameFromDb,
                 firstName: data.first_name || '',
                 lastName: data.last_name || '',
                 emailAddress: data.email || loggedUser.emailAddress,
                 institution: data.school_or_university || '',
+                uid: data.uid || data.student_uid || '',
                 countryCode: data.country_code || '',
                 phoneNumber: data.phone_number || '',
                 avatarUrl: data.profile_image_url || '',
@@ -380,19 +390,25 @@ export default function App() {
                 teacherCode: calculatedCode
               }
             }));
-            setSessionUser(loggedUser);
+            setSessionUser({
+              ...loggedUser,
+              fullName: fullNameFromDb
+            });
 
             if (detectedRole === 'faculty') {
               if (!isCompleted || !data.teacherCode) {
                 setIsOnboarding(true);
               } else {
                 setIsOnboarding(false);
+                setActivePage('faculty-dashboard');
               }
             } else if (!isCompleted) {
               console.log("User onboarding incomplete. Directing to OnboardingView.");
               setIsOnboarding(true);
             } else {
+              // Existing completed user: bypass onboarding and direct straight to dashboard!
               setIsOnboarding(false);
+              setActivePage('dashboard');
             }
           } else {
             console.log("User document missing in Firestore for UID:", user.uid, "- New registration detected!");
@@ -403,6 +419,7 @@ export default function App() {
           console.error("Error checking user status:", err);
           setSessionUser(loggedUser);
           setIsOnboarding(false);
+          setActivePage('dashboard');
         } finally {
           setCheckingOnboarding(false);
         }
@@ -865,8 +882,39 @@ export default function App() {
     }
   };
 
-  const handleLoginSuccess = (user: { fullName: string; emailAddress: string; role?: string }) => {
+  const handleLoginSuccess = async (user: { fullName: string; emailAddress: string; role?: string }) => {
     console.log("Login success callback triggered for:", user);
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      try {
+        const userDocRef = doc(db, 'users', currentUser.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+          const data = userDocSnap.data();
+          if (data.onboarding_completed) {
+            setIsOnboarding(false);
+            if (data.ai_provider) localStorage.setItem('noteit_active_ai_provider', data.ai_provider);
+            if (data.selected_model) localStorage.setItem('noteit_active_ai_model', data.selected_model);
+            if (data.api_key) {
+              localStorage.setItem('noteit_user_api_key', data.api_key);
+              if (data.ai_provider) localStorage.setItem(`noteit_user_api_key_${data.ai_provider}`, data.api_key);
+            }
+            const detectedRole = data.role === 'faculty' || user.role === 'faculty' ? 'faculty' : 'student';
+            setUserRole(detectedRole);
+            setActivePage(detectedRole === 'faculty' ? 'faculty-dashboard' : 'dashboard');
+            setSessionUser({
+              uid: currentUser.uid,
+              fullName: `${data.first_name || ''} ${data.last_name || ''}`.trim() || data.fullName || user.fullName || currentUser.displayName || 'Academic Scholar',
+              emailAddress: data.email || user.emailAddress || currentUser.email || ''
+            });
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn("Error loading user profile in handleLoginSuccess:", err);
+      }
+    }
+
     if (user.role === 'faculty') {
       setUserRole('faculty');
       setActivePage('faculty-dashboard');

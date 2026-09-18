@@ -49,6 +49,7 @@ export default function ProfileView({
   const [firstName, setFirstName] = useState(settings.profile.firstName || '');
   const [lastName, setLastName] = useState(settings.profile.lastName || '');
   const [school, setSchool] = useState(settings.profile.institution || '');
+  const [studentUid, setStudentUid] = useState(settings.profile.uid || '');
   const [email, setEmail] = useState(settings.profile.emailAddress || '');
   const [countryCode, setCountryCode] = useState(settings.profile.countryCode || '+91');
   const [phoneNumber, setPhoneNumber] = useState(settings.profile.phoneNumber || '');
@@ -84,8 +85,8 @@ export default function ProfileView({
     e.preventDefault();
     setError(null);
     
-    if (!firstName.trim() || !lastName.trim() || !school.trim() || !email.trim() || !countryCode || !phoneNumber.trim()) {
-      setError('All fields are required.');
+    if (!firstName.trim() || !lastName.trim() || !school.trim() || !studentUid.trim() || !email.trim() || !countryCode || !phoneNumber.trim()) {
+      setError('All fields including Student UID are required.');
       return;
     }
 
@@ -112,6 +113,7 @@ export default function ProfileView({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         institution: school.trim(),
+        uid: studentUid.trim(),
         countryCode,
         phoneNumber: cleanPhone,
         onboardingCompleted: true
@@ -254,6 +256,15 @@ export default function ProfileView({
               value={school}
               onChange={(e) => setSchool(e.target.value)}
               placeholder="e.g. Chandigarh University"
+            />
+
+            <Input
+              label="STUDENT UID / COLLEGE ROLL NO."
+              type="text"
+              required
+              value={studentUid}
+              onChange={(e) => setStudentUid(e.target.value)}
+              placeholder="e.g. 21BCS1042"
             />
 
             <Input
