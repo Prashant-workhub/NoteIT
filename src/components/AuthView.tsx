@@ -95,8 +95,16 @@ export default function AuthView({
   // Helper function to turn Firebase error codes into friendly, clear, user-facing error messages
   const getFriendlyAuthErrorMessage = (err: any): string => {
     if (!err) return 'An unexpected authentication error occurred.';
-    const code = err.code || '';
-    const msg = err.message || '';
+
+    if (typeof err === 'string') {
+      const trimmed = err.trim();
+      return trimmed && trimmed !== 'Error' && trimmed !== 'Error.'
+        ? trimmed
+        : 'Authentication failed. Please verify your details and try again.';
+    }
+
+    const code = err.code || err.errorCode || '';
+    const msg = err.message || err.toString() || '';
 
     switch (code) {
       case 'auth/invalid-credential':
@@ -105,11 +113,12 @@ export default function AuthView({
       case 'auth/user-not-found':
         return 'No account found with this email address. Please verify your email or sign up.';
       case 'auth/email-already-in-use':
-        return 'This email address is already in use by another account. Only a single email per account is permitted.';
+      case 'auth/email-already-exists':
+        return 'This email address is already in use by another account. Only a single account is permitted per email address.';
       case 'auth/weak-password':
         return 'Password is too weak. Please enter a password with at least 6 characters.';
       case 'auth/invalid-email':
-        return 'Invalid email address format. Please enter a valid email address.';
+        return 'Invalid email address format. Please enter a valid email address (e.g. scholar@university.edu).';
       case 'auth/unauthorized-domain':
         return 'Domain authorization error: Please add this domain to Authorized Domains in Firebase Console -> Authentication -> Settings.';
       case 'auth/popup-closed-by-user':
@@ -117,7 +126,7 @@ export default function AuthView({
       case 'auth/popup-blocked':
         return 'Sign-in popup was blocked by your browser. Please allow popups for this site.';
       case 'auth/operation-not-allowed':
-        return 'This sign-in provider is disabled in Firebase Console. Please enable it under Authentication -> Sign-in method.';
+        return 'This sign-in provider is disabled in Firebase Console. Please enable Email/Password under Authentication -> Sign-in method.';
       case 'auth/account-exists-with-different-credential':
         return 'An account already exists with the same email address using a different sign-in method.';
       case 'auth/too-many-requests':
@@ -126,11 +135,27 @@ export default function AuthView({
         return 'Network connection failed. Please check your internet connection and try again.';
       case 'auth/user-disabled':
         return 'This user account has been disabled by an administrator.';
-      default:
-        if (msg.startsWith('Firebase:')) {
-          return msg.replace(/^Firebase:\s*/, '').replace(/\s*\(auth\/.*\)\.?$/, '');
+      case 'auth/api-key-not-valid':
+      case 'auth/invalid-api-key':
+        return 'Firebase API key is invalid or restricted. Please check your project configuration.';
+      case 'auth/app-not-authorized':
+        return 'App is not authorized to use Firebase Authentication with the provided API key.';
+      case 'auth/internal-error':
+        return 'Firebase internal error occurred during authentication. Please check your connection and try again.';
+      default: {
+        let cleaned = msg;
+        if (cleaned.startsWith('Firebase:')) {
+          cleaned = cleaned.replace(/^Firebase:\s*/, '').replace(/\s*\(auth\/.*\)\.?$/, '').trim();
         }
-        return msg || 'Authentication error. Please verify your details.';
+        if (!cleaned || cleaned.toLowerCase() === 'error' || cleaned === 'Error.') {
+          if (code) {
+            const readableCode = code.replace(/^auth\//, '').replace(/-/g, ' ');
+            return `Authentication error (${readableCode}). Please check your input and try again.`;
+          }
+          return 'Authentication failed. Please verify your details and try again.';
+        }
+        return cleaned;
+      }
     }
   };
 
@@ -509,7 +534,7 @@ export default function AuthView({
               </p>
             </header>
 
-            {error && (
+            {error && error.trim() && (
               <div className="p-3 rounded-[4px] bg-[#FF4D4D]/10 border-2 border-[#FF4D4D] text-[#FF4D4D] text-xs font-mono font-bold flex items-center gap-2">
                 <AlertCircle className="h-4 w-4 shrink-0" />
                 <span>{error}</span>
