@@ -59,15 +59,6 @@ const PROVIDER_METADATA: Record<string, {
     models: ['gemini-3.6-flash'],
     endpoint: 'generativelanguage.googleapis.com'
   },
-  notion: {
-    name: 'Notion AI / Notion API',
-    description: 'Integrate Notion AI & Workspace API key for note synthesis and smart study tools.',
-    defaultModel: 'notion-ai-v1',
-    docLink: 'https://developers.notion.com/docs',
-    getKeyLink: 'https://www.notion.so/my-integrations',
-    models: ['notion-ai-v1', 'notion-workspace-v1'],
-    endpoint: 'api.notion.com/v1'
-  },
   groq: {
     name: 'Groq',
     description: 'Ultra-low latency open models. Excellent for speedy revision synthesis.',

@@ -57,13 +57,11 @@ export const getAIConfig = () => {
   const envGeminiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_API_KEY || import.meta.env.VITE_GOOGLE_API_KEY || '';
   const envOpenAiKey = import.meta.env.VITE_OPENAI_API_KEY || '';
   const envOpenRouterKey = import.meta.env.VITE_OPENROUTER_API_KEY || '';
-  const envNotionKey = import.meta.env.VITE_NOTION_API_KEY || '';
 
   const provider = isBrowser ? (localStorage.getItem('noteit_active_ai_provider') || localStorage.getItem('noteit_ai_provider') || (envOpenRouterKey ? 'openrouter' : 'gemini')) : 'gemini';
   
   const customGeminiKey = isBrowser ? (localStorage.getItem('noteit_user_api_key_gemini') || localStorage.getItem('noteit_user_api_key') || envGeminiKey) : envGeminiKey;
   const customOpenAiKey = isBrowser ? (localStorage.getItem('noteit_user_api_key_openai') || localStorage.getItem('noteit_user_api_key') || envOpenAiKey) : envOpenAiKey;
-  const customNotionKey = isBrowser ? (localStorage.getItem('noteit_user_api_key_notion') || localStorage.getItem('noteit_user_api_key') || envNotionKey) : envNotionKey;
   const customOpenRouterKey = isBrowser ? (localStorage.getItem('noteit_user_api_key_openrouter') || envOpenRouterKey) : envOpenRouterKey;
 
   const model = isBrowser ? (localStorage.getItem('noteit_active_ai_model') || import.meta.env.VITE_OPENROUTER_MODEL || 'gemini-3.6-flash') : 'gemini-3.6-flash';
@@ -73,7 +71,6 @@ export const getAIConfig = () => {
     model,
     geminiKey: customGeminiKey || envGeminiKey,
     openaiKey: customOpenAiKey || envOpenAiKey,
-    notionKey: customNotionKey || envNotionKey,
     openrouterKey: customOpenRouterKey || envOpenRouterKey
   };
 };

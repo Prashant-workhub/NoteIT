@@ -196,7 +196,6 @@ const PROVIDER_ALIASES: Record<string, string[]> = {
   openrouter: ['openrouter'],
   mistral: ['mistral'],
   nvidia: ['nvidia', 'glm', 'nvidia nim'],
-  notion: ['notion', 'notion ai', 'notion api', 'notion-ai'],
 };
 
 async function runPureLogicTests() {
