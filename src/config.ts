@@ -36,17 +36,19 @@ export const API_BASE_URL = apiEnvUrl?.replace(/\/$/, '') ?? (Capacitor.isNative
 export async function isNetworkAvailable(): Promise<boolean> {
   if (typeof navigator === 'undefined') return true;
   if (!navigator.onLine) return false;
-  // Quick probe: try to reach a known endpoint with a short timeout
+  // Quick probe: try to reach a known public endpoint with a short timeout
+  // Using generic successful HTTP response check instead of specific API endpoint
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 5000);
-    const res = await fetch(`${API_BASE_URL || 'https://generativelanguage.googleapis.com'}/v1beta/models?key=probe`, {
+    // Use a simple reliable endpoint (dns.google supports HTTPS and is very stable)
+    const res = await fetch('https://dns.google/resolve?name=example.com&type=A', {
       method: 'GET',
       signal: controller.signal,
       cache: 'no-store'
     });
     clearTimeout(timer);
-    return res.ok || res.status === 401 || res.status === 403; // Any response means connectivity works
+    return res.ok; // Any successful response means internet is reachable
   } catch {
     return true; // fetch probe failed but navigator says online — trust navigator
   }
