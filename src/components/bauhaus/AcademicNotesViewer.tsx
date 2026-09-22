@@ -64,55 +64,87 @@ export const cleanNotesTimestamps = cleanAcademicNotesNoise;
 
 /**
  * Automatically structures raw un-synthesized document text or transcripts
- * into clean, textbook-grade academic sections with headers and bullet points.
+ * into clean, textbook-grade academic sections with headers, bold labels, and bullet points.
  */
 export function autoStructureRawText(text: string): string {
   if (!text || typeof text !== 'string') return '';
-
-  // If text already contains Markdown headers, return as-is
-  if (/^#{1,3}\s+/m.test(text)) {
-    return text;
-  }
 
   let cleaned = text.replace(/\r\n/g, '\n').trim();
 
   // Strip leading file name noise e.g. "Class Content Unit 2.docx Unit 2 "
   cleaned = cleaned.replace(/^(Class Content |Document |File |Unit \d+[\.a-z0-9_\-\s]*)+/i, '');
 
-  const sentences = cleaned.split(/(?<=[.!?])\s+|\n+/);
+  // 1. Separate concatenated topic headers into distinct lines
+  cleaned = cleaned
+    .replace(/([.!?\)]|\b)\s*([A-Z][A-Za-z0-9\s\&\-\(\)\/]{3,50})(:\s*|[-—–]\s*)/g, (match, prefix, title, sep) => {
+      const t = title.trim();
+      if (
+        /^(Main Parts|Core Components|Key Concepts|Register Transfer|Conditional Register|Micro Operations|Types of Micro|Arithmetic Micro|Logic Micro|Shift Micro|Register Transfer Language|RTL|Basic Symbols|Naming Operator|Simple Transfer|Conditional Transfer|Simultaneous Operations|Bus and [A-Za-z]+|Common Bus|Multiplexers|Tri-state|Memory Unit|Control Unit|Central Processing|ALU|CPU|CU|RAM|ROM|Overview|Introduction|Definition|Key Concept|Formula|Equation|Example)/i.test(t)
+      ) {
+        return `${prefix}\n\n### ${t}\n`;
+      }
+      return match;
+    });
+
+  // 2. If text already has full Markdown headers and multiple bullet points, return cleaned version
+  const headerCount = (cleaned.match(/^#{1,3}\s+/gm) || []).length;
+  const bulletCount = (cleaned.match(/^\s*[\*\-\•▪]\s+/gm) || []).length;
+  if (headerCount >= 2 && bulletCount >= 3) {
+    return cleaned;
+  }
+
+  // 3. Process lines to format key-value pairs, bullet points, and subheadings
+  const rawLines = cleaned.split('\n');
   const structuredLines: string[] = [];
 
-  structuredLines.push(`# Structured Academic Study Notes`);
-  structuredLines.push(`## Overview & Core Concepts`);
+  // Add H1 if not already present
+  if (!/^#\s+/m.test(cleaned)) {
+    structuredLines.push(`# Structured Academic Study Notes`);
+  }
 
-  sentences.forEach((sentence) => {
-    const s = sentence.trim();
-    if (!s) return;
+  for (let line of rawLines) {
+    let trimmed = line.trim();
+    if (!trimmed) continue;
 
-    if (s.includes(':') && !s.toLowerCase().startsWith('http')) {
-      const parts = s.split(/:\s*/);
-      const label = parts[0].trim();
-      const body = parts.slice(1).join(': ').trim();
-      if (label.length > 2 && label.length < 50) {
-        structuredLines.push(`* **${label}**: ${body}`);
-        return;
+    // Existing Markdown headers
+    if (/^#{1,3}\s+/.test(trimmed)) {
+      structuredLines.push(`\n${trimmed}\n`);
+      continue;
+    }
+
+    // Existing bullet points
+    if (/^[\*\-\•▪]\s+/.test(trimmed)) {
+      structuredLines.push(trimmed.replace(/^[\*\-\•▪]\s+/, '* '));
+      continue;
+    }
+
+    // Process inline sentences or definition pairs inside the line
+    const segments = trimmed.split(/(?<=[.!?])\s+(?=[A-Z])/);
+    for (let segment of segments) {
+      const segTrimmed = segment.trim();
+      if (!segTrimmed) continue;
+
+      if (segTrimmed.includes(':') && !segTrimmed.toLowerCase().startsWith('http')) {
+        const colonIdx = segTrimmed.indexOf(':');
+        const label = segTrimmed.substring(0, colonIdx).trim().replace(/\[gfg\]/gi, '');
+        const body = segTrimmed.substring(colonIdx + 1).trim();
+
+        if (label.length >= 2 && label.length <= 60 && !label.includes('.')) {
+          structuredLines.push(`* **${label}**: ${body}`);
+          continue;
+        }
       }
+
+      if (segTrimmed.length < 65 && /^[A-Z0-9\s\-\(\)\/\.,]+$/.test(segTrimmed) && !segTrimmed.endsWith('.')) {
+        structuredLines.push(`\n### ${segTrimmed}\n`);
+        continue;
+      }
+
+      structuredLines.push(segTrimmed);
     }
+  }
 
-    if (/^(•|-|\*|▪)\s*/.test(s)) {
-      structuredLines.push(`* ${s.replace(/^(•|-|\*|▪)\s*/, '')}`);
-      return;
-    }
-
-    if (s.length < 70 && /^[A-Z0-9\s\-\(\)\.,]+$/.test(s)) {
-      structuredLines.push(`### ${s}`);
-      return;
-    }
-
-    structuredLines.push(s);
-  });
-
-  return structuredLines.join('\n\n');
+  return structuredLines.join('\n\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 /**
