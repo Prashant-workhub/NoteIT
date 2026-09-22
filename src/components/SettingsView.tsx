@@ -1596,8 +1596,19 @@ export default function SettingsView({
                             {PROVIDER_METADATA[aiProvider]?.models.map(m => (
                               <option key={m} value={m}>{m}</option>
                             ))}
-                            <option value="custom">Custom Model</option>
+                            <option value="custom">Custom Model (Type below)</option>
                           </select>
+
+                          {(!PROVIDER_METADATA[aiProvider]?.models.includes(selectedModel) || selectedModel === '') && (
+                            <input
+                              type="text"
+                              required
+                              placeholder={`Enter custom model ID (e.g. llama-3.3-70b-versatile)`}
+                              value={selectedModel}
+                              onChange={(e) => setSelectedModel(e.target.value)}
+                              className="w-full mt-2 rounded-[6px] border-2 border-[#111111] bg-white p-2.5 text-xs font-mono font-bold text-[#111111] outline-none shadow-paper-sm"
+                            />
+                          )}
                         </div>
 
                         {/* Secret API Key Input */}
