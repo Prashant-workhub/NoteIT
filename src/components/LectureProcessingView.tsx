@@ -372,7 +372,10 @@ export default function LectureProcessingView({
 
 
           await updateLecture(lectureId, {
-            title: resolvedDocTitle,
+            title: aiData.lectureTopic || resolvedDocTitle,
+            lectureTopic: aiData.lectureTopic || resolvedDocTitle,
+            highlightedTopics: aiData.highlightedTopics || [],
+            importantConcepts: aiData.importantConcepts || [],
             recordingStatus: 'uploaded',
             transcriptionStatus: 'completed',
             resourceGenerationStatus: 'processing',
@@ -604,7 +607,10 @@ export default function LectureProcessingView({
 
 
           await updateLecture(lectureId, {
-            title: resolvedTitle,
+            title: aiData.lectureTopic || resolvedTitle,
+            lectureTopic: aiData.lectureTopic || resolvedTitle,
+            highlightedTopics: aiData.highlightedTopics || [],
+            importantConcepts: aiData.importantConcepts || [],
             recordingStatus: 'uploaded',
             transcriptionStatus: 'completed',
             resourceGenerationStatus: 'processing',

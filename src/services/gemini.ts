@@ -1253,6 +1253,56 @@ export const generateInitialLectureAssets = async (
   return executeGeminiCall(prompt, apiKey, undefined, schema, onBusy);
 };
 
+export const formatTranscriptWithOpenRouter = async (
+  rawTranscript: string,
+  onProgress?: (step: number, message: string) => void
+): Promise<{
+  formattedTranscript: string;
+  lectureTopic: string;
+  highlightedTopics: Array<{ topic: string; level: 'HIGH' | 'MEDIUM'; description: string; keyPoints: string[] }>;
+  importantConcepts: Array<{ term: string; definitionOrFormula: string }>;
+}> => {
+  if (onProgress) onProgress(2, 'Pre-formatting transcript & extracting key highlights using OpenRouter (Nemotron)…');
+  try {
+    const currentUser = auth.currentUser;
+    const idToken = currentUser ? await currentUser.getIdToken() : '';
+    const res = await fetch(`${API_BASE_URL}/api/ai/format-transcript-openrouter`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {})
+      },
+      body: JSON.stringify({ rawTranscript })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      return {
+        formattedTranscript: data.formattedTranscript || rawTranscript,
+        lectureTopic: data.lectureTopic || 'LECTURE TOPIC ANALYSIS',
+        highlightedTopics: Array.isArray(data.highlightedTopics) ? data.highlightedTopics : [],
+        importantConcepts: Array.isArray(data.importantConcepts) ? data.importantConcepts : []
+      };
+    }
+  } catch (err) {
+    console.warn('[formatTranscriptWithOpenRouter] Failed calling OpenRouter endpoint, using direct transcript:', err);
+  }
+
+  return {
+    formattedTranscript: rawTranscript,
+    lectureTopic: 'LECTURE TOPIC ANALYSIS',
+    highlightedTopics: [
+      {
+        topic: 'Core Lecture Overview',
+        level: 'HIGH',
+        description: 'Main lecture concepts extracted from transcript.',
+        keyPoints: ['Live audio capture lecture analysis']
+      }
+    ],
+    importantConcepts: []
+  };
+};
+
 export const generateLectureContent = async (
   base64Audio: string, 
   mimeType: string = 'audio/webm',
@@ -1300,10 +1350,21 @@ export const generateLectureContent = async (
     console.log('==================================================');
   }
 
-  // Phase 2: Ingest Assets (Lightweight)
-  if (onProgress) onProgress(2, `Transcript ready via ${providerName.toUpperCase()}. Sending text to your selected AI provider…`);
-  const data = await generateInitialLectureAssets(rawTranscript, apiKey, onBusy);
-  return data;
+  // Phase 1.5: Pre-format transcript using OpenRouter (Nemotron-3) and extract highlights
+  const openRouterRes = await formatTranscriptWithOpenRouter(rawTranscript, onProgress);
+
+  // Phase 2: Send formatted transcript to Gemini for deep academic note synthesis
+  if (onProgress) onProgress(3, `OpenRouter pre-formatting complete. Passing formatted transcript to Gemini AI for final note synthesis…`);
+  const data = await generateInitialLectureAssets(openRouterRes.formattedTranscript, apiKey, onBusy);
+  
+  return {
+    ...data,
+    transcript: rawTranscript,
+    cleanTranscript: openRouterRes.formattedTranscript || data.cleanTranscript || rawTranscript,
+    lectureTopic: openRouterRes.lectureTopic,
+    highlightedTopics: openRouterRes.highlightedTopics,
+    importantConcepts: openRouterRes.importantConcepts
+  };
 };
 
 export const parseFallbackRawTranscriptToAssets = (
@@ -1444,12 +1505,18 @@ export const generateLectureContentFromText = async (
   }
 
   try {
-    if (onProgress) onProgress(1, "Analyzing text and generating initial workspace chapters...");
-    const data = await generateInitialLectureAssets(extractedText, apiKey, onBusy);
+    if (onProgress) onProgress(1, "Pre-formatting document & analyzing topics using OpenRouter (Nemotron)…");
+    const openRouterRes = await formatTranscriptWithOpenRouter(extractedText, onProgress);
+
+    if (onProgress) onProgress(2, "OpenRouter formatting complete. Generating initial workspace chapters via Gemini AI...");
+    const data = await generateInitialLectureAssets(openRouterRes.formattedTranscript, apiKey, onBusy);
 
     return {
       transcript: extractedText,
-      cleanTranscript: data.cleanTranscript || extractedText,
+      cleanTranscript: openRouterRes.formattedTranscript || data.cleanTranscript || extractedText,
+      lectureTopic: openRouterRes.lectureTopic,
+      highlightedTopics: openRouterRes.highlightedTopics,
+      importantConcepts: openRouterRes.importantConcepts,
       sections: data.sections || [],
       timeline: data.timeline || [],
       sourceIntelligence: data.sourceIntelligence || null,

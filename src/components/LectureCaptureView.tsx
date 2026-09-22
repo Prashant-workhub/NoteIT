@@ -231,6 +231,7 @@ export default function LectureCaptureView({
   const [seconds, setSeconds] = useState(0);
   const [aiStatus, setAiStatus] = useState<'idle' | 'recording_transcription' | 'synthesizing' | 'completed'>('idle');
   const [micError, setMicError] = useState<string | null>(null);
+  const [showHighlightsModal, setShowHighlightsModal] = useState(false);
 
   // Auto-dim screen state during lecture recording when untouched
   const [isScreenDimmed, setIsScreenDimmed] = useState(false);
@@ -1870,9 +1871,19 @@ export default function LectureCaptureView({
                 }`}
               style={!isMobile ? { width: `${transcriptWidth}%` } : {}}
             >
-              <div className="p-4 border-b border-[#111111] bg-white">
-                <h2 className="text-xs font-heading font-extrabold text-[#111111] uppercase tracking-wider font-mono">Lecture Transcript</h2>
-                <p className="text-[10px] text-[#666666] font-mono mt-0.5">Click timestamps to sync milestone highlights.</p>
+              <div className="p-3 border-b border-[#111111] bg-white flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h2 className="text-xs font-heading font-extrabold text-[#111111] uppercase tracking-wider font-mono">Lecture Transcript</h2>
+                  <p className="text-[10px] text-[#666666] font-mono mt-0.5">Click timestamps to sync milestone highlights.</p>
+                </div>
+                <button
+                  onClick={() => setShowHighlightsModal(true)}
+                  className="px-3 py-1 bg-[#FFC400] text-[#111111] text-[11px] font-mono font-extrabold uppercase rounded-[4px] border border-[#111111] shadow-paper-sm hover:bg-[#ffe066] transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+                  title="View Highlighted Topics & Key Concepts extracted by OpenRouter"
+                >
+                  <Sparkles className="h-3.5 w-3.5 text-[#111111]" />
+                  <span>✨ Key Topics & Highlights</span>
+                </button>
               </div>
 
               <div className="flex-1 overflow-y-auto p-4 space-y-3 font-sans text-xs text-[#111111] leading-relaxed select-text bg-white m-3 rounded-[6px] border border-[#111111] shadow-paper-sm">
@@ -3383,6 +3394,165 @@ export default function LectureCaptureView({
           </div>
         </div>
       </div>
+      {/* KEY TOPICS & HIGHLIGHTS MODAL (OPENROUTER PRE-PROCESSING EXTRACED ASIDE) */}
+      {showHighlightsModal && (() => {
+        const currentActiveLecture = lectures?.find((l: any) => l.id === activeLectureId);
+        if (!currentActiveLecture) {
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+              <div className="bg-white dark:bg-[#0A1124] p-6 rounded-[8px] border-2 border-[#111111] max-w-md text-center space-y-3 font-mono">
+                <h3 className="text-xs font-extrabold text-[#111111] dark:text-white uppercase">No Active Lecture Selected</h3>
+                <p className="text-[11px] text-gray-500">Please select a lecture from your library first to view key topics & highlights.</p>
+                <button
+                  onClick={() => setShowHighlightsModal(false)}
+                  className="px-4 py-1.5 bg-[#FFC400] text-[#111111] text-xs font-extrabold uppercase rounded border border-[#111111]"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+            <div className="w-full max-w-3xl max-h-[85vh] flex flex-col bg-white dark:bg-[#0A1124] text-[#111111] dark:text-[#F1F5F9] rounded-[8px] border-2 border-[#111111] dark:border-[#2A3B5C] shadow-paper-lg overflow-hidden select-text">
+              
+              {/* Modal Header */}
+              <div className="p-4 bg-[#FFC400] border-b-2 border-[#111111] flex items-center justify-between text-[#111111]">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-[#111111]" />
+                  <div>
+                    <h3 className="font-heading font-extrabold text-sm uppercase tracking-wider">
+                      ✨ LECTURE HIGHLIGHTS & KEY TOPICS
+                    </h3>
+                    <p className="text-[10px] font-mono font-bold opacity-80">
+                      Pre-analyzed & Extracted via OpenRouter Engine prior to Gemini synthesis
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowHighlightsModal(false)}
+                  className="p-1 rounded border border-[#111111] bg-white hover:bg-gray-100 text-[#111111] cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-5 font-mono text-xs">
+                
+                {/* Lecture Topic Banner */}
+                <div className="p-3.5 rounded-[6px] border-2 border-[#2F6BFF] bg-[#2F6BFF]/10 text-[#2F6BFF] dark:text-[#38BDF8]">
+                  <span className="text-[9px] uppercase font-bold tracking-widest block text-[#666666] dark:text-gray-400">Library Lecture Topic</span>
+                  <h4 className="text-sm font-extrabold uppercase mt-0.5">
+                    {currentActiveLecture.lectureTopic || currentActiveLecture.title || 'ACADEMIC LECTURE ANALYSIS'}
+                  </h4>
+                </div>
+
+                {/* Section 1: Highlighted Key Topics (Set Aside) */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-heading font-extrabold uppercase tracking-wider text-[#111111] dark:text-white flex items-center gap-2">
+                    <Bookmark className="h-4 w-4 text-[#FFC400]" />
+                    <span>HIGHLIGHTED KEY TOPICS ({currentActiveLecture.highlightedTopics?.length || (currentActiveLecture.sections?.length || 0)})</span>
+                  </h4>
+
+                  {currentActiveLecture.highlightedTopics && currentActiveLecture.highlightedTopics.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {currentActiveLecture.highlightedTopics.map((ht: any, i: number) => (
+                        <div key={i} className="p-3.5 rounded-[6px] border-2 border-[#111111] dark:border-[#2A3B5C] bg-[#F6F2EA] dark:bg-[#152238] space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-extrabold text-xs uppercase text-[#111111] dark:text-white">
+                              {ht.topic}
+                            </span>
+                            <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold border ${
+                              ht.level === 'HIGH' || ht.level === 'high'
+                                ? 'bg-[#FF4D4D]/20 text-[#FF4D4D] border-[#FF4D4D]'
+                                : 'bg-[#2F6BFF]/20 text-[#2F6BFF] border-[#2F6BFF]'
+                            }`}>
+                              {ht.level === 'HIGH' || ht.level === 'high' ? 'HIGH IMPORTANCE' : 'MEDIUM'}
+                            </span>
+                          </div>
+                          {ht.description && (
+                            <p className="text-[11px] text-[#444444] dark:text-[#94A3B8] leading-relaxed">
+                              {ht.description}
+                            </p>
+                          )}
+                          {Array.isArray(ht.keyPoints) && ht.keyPoints.length > 0 && (
+                            <ul className="list-disc list-inside space-y-1 text-[10px] text-[#111111] dark:text-gray-300">
+                              {ht.keyPoints.map((kp: string, kIdx: number) => (
+                                <li key={kIdx}>{kp}</li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : currentActiveLecture.sections && currentActiveLecture.sections.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {currentActiveLecture.sections.map((sec: any, i: number) => (
+                        <div key={i} className="p-3.5 rounded-[6px] border-2 border-[#111111] dark:border-[#2A3B5C] bg-[#F6F2EA] dark:bg-[#152238] space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-extrabold text-xs uppercase text-[#111111] dark:text-white">
+                              {sec.title}
+                            </span>
+                            <span className="px-2 py-0.5 rounded text-[9px] font-extrabold bg-[#FFC400] text-[#111111] border border-[#111111]">
+                              CHAPTER #{i + 1}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-[#444444] dark:text-[#94A3B8] leading-relaxed line-clamp-3">
+                            {sec.content}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-[#666666] font-mono italic">No key topics extracted yet.</p>
+                  )}
+                </div>
+
+                {/* Section 2: Important Concepts & Formulas Aside */}
+                {currentActiveLecture.importantConcepts && currentActiveLecture.importantConcepts.length > 0 && (
+                  <div className="space-y-3 pt-2">
+                    <h4 className="text-xs font-heading font-extrabold uppercase tracking-wider text-[#111111] dark:text-white flex items-center gap-2">
+                      <Brain className="h-4 w-4 text-[#10B981]" />
+                      <span>IMPORTANT CONCEPTS & FORMULAS ({currentActiveLecture.importantConcepts.length})</span>
+                    </h4>
+
+                    <div className="space-y-2">
+                      {currentActiveLecture.importantConcepts.map((item: any, idx: number) => (
+                        <div key={idx} className="p-3 rounded-[6px] border border-[#111111] dark:border-[#2A3B5C] bg-white dark:bg-[#0A1124] flex items-start gap-3">
+                          <span className="px-2 py-0.5 rounded bg-[#10B981]/20 text-[#10B981] font-extrabold text-[10px] uppercase border border-[#10B981]/40 shrink-0 mt-0.5">
+                            CONCEPT #{idx + 1}
+                          </span>
+                          <div className="flex-1 text-xs">
+                            <strong className="text-[#111111] dark:text-white uppercase block">{item.term}</strong>
+                            <span className="text-[#444444] dark:text-[#94A3B8] text-[11px] block mt-0.5">{item.definitionOrFormula}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-3 bg-[#F6F2EA] dark:bg-[#152238] border-t-2 border-[#111111] dark:border-[#2A3B5C] flex items-center justify-between">
+                <span className="text-[10px] font-mono text-[#666666] dark:text-[#94A3B8]">
+                  Pre-processed with OpenRouter (Nemotron-3) • Deep note synthesis via Gemini
+                </span>
+                <button
+                  onClick={() => setShowHighlightsModal(false)}
+                  className="px-4 py-1.5 bg-[#FFC400] text-[#111111] text-xs font-mono font-extrabold uppercase rounded-[4px] border border-[#111111] shadow-paper-sm hover:bg-[#ffe066] cursor-pointer"
+                >
+                  Close Highlights
+                </button>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
     </React.Fragment>
   );
 }
