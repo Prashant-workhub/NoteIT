@@ -145,7 +145,7 @@ import { API_BASE_URL } from '../config';
 
 export const getFallbackOpenRouterKey = (): string => {
   const isBrowser = typeof window !== 'undefined';
-  const customKey = isBrowser ? localStorage.getItem('noteit_user_api_key_openrouter') : '';
+  const customKey = isBrowser ? (localStorage.getItem('noteit_user_api_key_openrouter') || localStorage.getItem('noteit_user_api_key')) : '';
   if (customKey && customKey.trim()) return customKey.trim();
 
   let envKey = '';
@@ -157,16 +157,6 @@ export const getFallbackOpenRouterKey = (): string => {
   }
   if (envKey && envKey.trim()) return envKey.trim();
 
-  try {
-    const encoded = 'c2stb3ItdjEtMjQ2MGVhOTZiMjQxMDAwMWYwYmQ3MTQ3MmE2OGJkM2NiNGFhNTZmYzk0M2Y3MDZjMTZhYWVhN2U2MDMzN2EwOQ==';
-    if (typeof atob === 'function') {
-      return atob(encoded);
-    } else if (typeof Buffer !== 'undefined') {
-      return Buffer.from(encoded, 'base64').toString('utf-8');
-    }
-  } catch (e) {
-    // ignore
-  }
   return '';
 };
 
@@ -249,62 +239,62 @@ export const executeOpenRouterFallbackCall = async (
   onBusy?: (isBusy: boolean) => void
 ): Promise<any> => {
   const openrouterKey = getFallbackOpenRouterKey();
-  const freeModels = [
-    'nvidia/nemotron-3-ultra-550b-a55b:free',
-    'google/gemini-2.0-flash-exp:free',
-    'meta-llama/llama-3.3-70b-instruct:free',
-    'qwen/qwen-2.5-72b-instruct:free',
-    'mistralai/mistral-7b-instruct:free'
-  ];
-
-  let lastErr: any = null;
-  for (const model of freeModels) {
-    try {
-      console.warn(`[OpenRouter Fallback] Attempting model: ${model}...`);
-      const payload: any = {
-        model,
-        messages: [
-          { role: 'user', content: prompt }
-        ]
-      };
-
-      if (responseSchema) {
-        payload.response_format = { type: 'json_object' };
-      }
-
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${openrouterKey}`,
-          'HTTP-Referer': 'https://noteit.ai',
-          'X-Title': 'NoteIT'
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const text = data.choices?.[0]?.message?.content || '';
-
-        if (responseSchema) {
-          const cleanedText = extractJsonObject(text);
-          return JSON.parse(cleanedText);
-        }
-
-        return text;
-      }
-
-      const errText = await response.text().catch(() => '');
-      console.warn(`[OpenRouter Fallback] Model ${model} returned ${response.status}: ${errText}`);
-      lastErr = new Error(`OpenRouter fallback error (${response.status}): ${errText}`);
-    } catch (err) {
-      console.warn(`[OpenRouter Fallback] Model ${model} failed:`, err);
-      lastErr = err;
-    }
+  if (!openrouterKey || !openrouterKey.trim()) {
+    throw new Error('OpenRouter API key is not configured. Please configure your custom API key in Settings.');
   }
 
-  throw lastErr || new Error('All OpenRouter fallback models failed.');
+  const model = 'nvidia/nemotron-3-ultra-550b-a55b:free';
+  try {
+    console.warn(`[OpenRouter Fallback] Attempting built-in fallback model: ${model}...`);
+    const payload: any = {
+      model,
+      messages: [
+        { role: 'user', content: prompt }
+      ]
+    };
+
+    if (responseSchema) {
+      payload.response_format = { type: 'json_object' };
+    }
+
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openrouterKey}`,
+        'HTTP-Referer': 'https://noteit.ai',
+        'X-Title': 'NoteIT'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const text = data.choices?.[0]?.message?.content || '';
+
+      if (responseSchema) {
+        const cleanedText = extractJsonObject(text);
+        return JSON.parse(cleanedText);
+      }
+
+      return text;
+    }
+
+    const errText = await response.text().catch(() => '');
+    console.warn(`[OpenRouter Fallback] Model ${model} returned ${response.status}: ${errText}`);
+
+    if (response.status === 401) {
+      throw new Error('OpenRouter API key authentication failed (401 User not found). Please configure a valid API key in Settings.');
+    }
+    if (response.status === 429 || response.status === 402) {
+      throw new Error('Daily AI limit reached or rate limited. Please try again later or configure your custom AI API key in Settings.');
+    }
+
+    throw new Error(`OpenRouter fallback error (${response.status}): ${errText}`);
+  } catch (err: any) {
+    console.warn(`[OpenRouter Fallback] Model ${model} failed:`, err?.message || err);
+    throw err;
+  }
 };
 
 export const executeGeminiCall = async (

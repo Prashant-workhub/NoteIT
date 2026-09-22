@@ -314,7 +314,7 @@ export class InternalAIService {
       return null;
     }
 
-    const modelName = process.env.OPENROUTER_MODEL || 'google/gemini-2.0-flash-exp:free';
+    const modelName = process.env.OPENROUTER_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b:free';
 
     // 4. Create in-flight processing promise
     const processingPromise = (async (): Promise<StructuredLectureAnalysis | null> => {

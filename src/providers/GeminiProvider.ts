@@ -86,6 +86,9 @@ export async function fetchGeminiApi(apiKey: string, requestedModel: string, bod
 
     try {
       const openRouterKey = getFallbackOpenRouterKey();
+      if (!openRouterKey || !openRouterKey.trim()) {
+        throw geminiErr;
+      }
       const openRouterModel = 'nvidia/nemotron-3-ultra-550b-a55b:free';
 
       let promptText = '';

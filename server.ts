@@ -600,11 +600,7 @@ app.post('/api/ai/format-transcript-openrouter', authenticateFirebaseUser, async
   try {
     let openRouterKey = process.env.OPENROUTER_API_KEY || process.env.VITE_OPENROUTER_API_KEY || '';
     if (!openRouterKey) {
-      try {
-        openRouterKey = Buffer.from('c2stb3ItdjEtMjQ2MGVhOTZiMjQxMDAwMWYwYmQ3MTQ3MmE2OGJkM2NiNGFhNTZmYzk0M2Y3MDZjMTZhYWVhN2U2MDMzN2EwOQ==', 'base64').toString('utf-8');
-      } catch (e) {
-        // ignore
-      }
+      console.warn('[format-transcript-openrouter] OPENROUTER_API_KEY is not configured.');
     }
 
     const openRouterProvider = ProviderFactory.getProvider('openrouter', openRouterKey);
@@ -908,11 +904,7 @@ app.post('/api/ai/provider-proxy', authenticateFirebaseUser, enforceAiUsage, asy
         try {
           let openRouterKey = process.env.OPENROUTER_API_KEY || process.env.VITE_OPENROUTER_API_KEY || '';
           if (!openRouterKey) {
-            try {
-              openRouterKey = Buffer.from('c2stb3ItdjEtMjQ2MGVhOTZiMjQxMDAwMWYwYmQ3MTQ3MmE2OGJkM2NiNGFhNTZmYzk0M2Y3MDZjMTZhYWVhN2U2MDMzN2EwOQ==', 'base64').toString('utf-8');
-            } catch (e) {
-              // ignore
-            }
+            throw primaryErr;
           }
           console.warn('[provider-proxy] Reverting to emergency platform quota fallback (nvidia/nemotron-3-ultra-550b-a55b:free)...');
           const openRouterProvider = ProviderFactory.getProvider('openrouter', openRouterKey);
