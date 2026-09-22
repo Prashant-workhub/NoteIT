@@ -123,7 +123,7 @@ const executeLlmCall = async (
   apiKey: string,
   responseSchema?: any
 ): Promise<any> => {
-  return executeGeminiCall(prompt, apiKey, undefined, responseSchema, undefined, model || getAIConfig().model || 'gemini-2.0-flash');
+  return executeGeminiCall(prompt, apiKey, undefined, responseSchema, undefined, model || getAIConfig().model || 'gemini-3.6-flash');
 };
 
 export async function processAiStreamResponse(
@@ -151,7 +151,7 @@ export const generatePresentationBlueprint = async (
   level: 'quick' | 'balanced' | 'premium',
   apiKey: string
 ): Promise<SlideBlueprint[]> => {
-  const model = getAIConfig().model || 'gemini-2.0-flash';
+  const model = getAIConfig().model || 'gemini-3.6-flash';
 
   const schema = {
     type: 'OBJECT',

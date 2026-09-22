@@ -125,6 +125,55 @@ import { auth, db } from '../firebaseConfig';
 import { doc, getDoc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { API_BASE_URL } from '../config';
 
+export const executeOpenRouterFallbackCall = async (
+  prompt: string,
+  responseSchema?: any,
+  onBusy?: (isBusy: boolean) => void
+): Promise<any> => {
+  const isBrowser = typeof window !== 'undefined';
+  const openrouterKey = (isBrowser ? (localStorage.getItem('noteit_user_api_key_openrouter') || import.meta.env.VITE_OPENROUTER_API_KEY) : '') || import.meta.env.VITE_OPENROUTER_API_KEY || (typeof process !== 'undefined' ? (process.env.VITE_OPENROUTER_API_KEY || process.env.OPENROUTER_API_KEY) : '') || '';
+  const model = 'nvidia/nemotron-3-ultra-550b-a55b:free';
+
+  console.warn(`[OpenRouter Error Fallback] Reverting to OpenRouter model (${model})...`);
+
+  const payload: any = {
+    model,
+    messages: [
+      { role: 'user', content: prompt }
+    ]
+  };
+
+  if (responseSchema) {
+    payload.response_format = { type: 'json_object' };
+  }
+
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${openrouterKey}`,
+      'HTTP-Referer': 'https://noteit.ai',
+      'X-Title': 'NoteIT'
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => '');
+    throw new Error(`OpenRouter fallback error (${response.status}): ${errText}`);
+  }
+
+  const data = await response.json();
+  const text = data.choices?.[0]?.message?.content || '';
+
+  if (responseSchema) {
+    const cleanedText = extractJsonObject(text);
+    return JSON.parse(cleanedText);
+  }
+
+  return text;
+};
+
 export const executeGeminiCall = async (
   prompt: string,
   apiKey: string,
@@ -135,140 +184,124 @@ export const executeGeminiCall = async (
   action?: string
 ): Promise<any> => {
   const currentUser = auth.currentUser;
-  if (!currentUser) {
-    throw new Error('User not authenticated with Firebase Auth.');
-  }
-
   if (onBusy) onBusy(true);
 
-  try {
-    const idToken = await currentUser.getIdToken(true);
-    const proxyUrl = `${API_BASE_URL}/api/ai/provider-proxy`;
+  const targetModel = 'gemini-3.6-flash';
+  let primaryError: any = null;
 
-    let targetModel = model || getAIConfig().model || 'gemini-3.6-flash';
+  // 1. Try server proxy call if authenticated
+  if (currentUser) {
+    try {
+      const idToken = await currentUser.getIdToken(true);
+      const proxyUrl = `${API_BASE_URL}/api/ai/provider-proxy`;
 
-    const response = await fetch(proxyUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${idToken}`
-      },
-      body: JSON.stringify({
-        prompt,
-        model: targetModel,
-        inlineData,
-        responseSchema,
-        action
-      })
-    });
+      const response = await fetch(proxyUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`
+        },
+        body: JSON.stringify({
+          prompt,
+          model: targetModel,
+          inlineData,
+          responseSchema,
+          action
+        })
+      });
 
-    if (response.ok) {
-      if (onBusy) onBusy(false);
-      const data = await response.json();
+      if (response.ok) {
+        if (onBusy) onBusy(false);
+        const data = await response.json();
 
-      if (responseSchema) {
-        if (typeof data === 'string') {
-          try {
-            const cleanedText = extractJsonObject(data);
-            return JSON.parse(cleanedText);
-          } catch (err) {
-            console.error('Failed to parse response text as JSON:', data, err);
-            throw new Error('Invalid JSON format returned from AI API.');
+        if (responseSchema) {
+          if (typeof data === 'string') {
+            try {
+              const cleanedText = extractJsonObject(data);
+              return JSON.parse(cleanedText);
+            } catch (err) {
+              console.error('Failed to parse response text as JSON:', data, err);
+              throw new Error('Invalid JSON format returned from AI API.');
+            }
           }
+          return data;
         }
         return data;
+      } else {
+        const errText = await response.text().catch(() => '');
+        primaryError = new Error(`Proxy call status ${response.status}: ${errText}`);
       }
-      return data;
+    } catch (proxyErr) {
+      console.warn('[executeGeminiCall] Server proxy fetch failed or unreachable:', proxyErr);
+      primaryError = proxyErr;
     }
-  } catch (proxyErr) {
-    console.warn('[executeGeminiCall] Server proxy fetch failed or unreachable. Trying direct Gemini client API call:', proxyErr);
   }
 
-  // DIRECT CLIENT-SIDE GEMINI REST FALLBACK (for mobile or server unreachable, with candidate model fallback)
+  // 2. Direct client-side Gemini REST call if key available
   const geminiKey = apiKey || getAIConfig().geminiKey;
   if (geminiKey) {
-    const requestedModel = model || getAIConfig().model || 'gemini-3.6-flash';
-    const candidateModels = Array.from(new Set([requestedModel, 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro']));
-    let lastDirectError: any = null;
-
+    const candidateModels = ['gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-2.0-flash'];
     for (const currentModel of candidateModels) {
-      let attempts = 0;
-      const maxAttempts = 2;
+      try {
+        const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${geminiKey}`;
 
-      while (attempts < maxAttempts) {
-        attempts++;
-        try {
-          const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${geminiKey}`;
+        const contentsParts: any[] = [];
+        if (inlineData) {
+          contentsParts.push({ inline_data: { mime_type: inlineData.mimeType, data: inlineData.data } });
+        }
+        contentsParts.push({ text: prompt });
 
-          const contentsParts: any[] = [];
-          if (inlineData) {
-            contentsParts.push({ inline_data: { mime_type: inlineData.mimeType, data: inlineData.data } });
-          }
-          contentsParts.push({ text: prompt });
+        const requestBody: any = {
+          contents: [{ parts: contentsParts }]
+        };
 
-          const requestBody: any = {
-            contents: [{ parts: contentsParts }]
+        if (responseSchema) {
+          requestBody.generationConfig = {
+            response_mime_type: 'application/json'
           };
+        }
+
+        const directRes = await fetch(directUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody)
+        });
+
+        if (directRes.ok) {
+          if (onBusy) onBusy(false);
+          const directData = await directRes.json();
+          const rawText = directData.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
           if (responseSchema) {
-            requestBody.generationConfig = {
-              response_mime_type: 'application/json'
-            };
+            const cleanedText = extractJsonObject(rawText);
+            return JSON.parse(cleanedText);
           }
-
-          const directRes = await fetch(directUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody)
-          });
-
-          if (directRes.ok) {
-            if (onBusy) onBusy(false);
-            const directData = await directRes.json();
-            const rawText = directData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-            if (responseSchema) {
-              const cleanedText = extractJsonObject(rawText);
-              return JSON.parse(cleanedText);
-            }
-            return rawText;
-          }
-
-          const status = directRes.status;
-          const errText = await directRes.text().catch(() => '');
-
-          if ((status === 503 || status === 429) && attempts < maxAttempts) {
-            console.warn(`[executeGeminiCall] Direct call (${currentModel}) status ${status}. Retrying attempt ${attempts + 1}...`);
-            await new Promise(r => setTimeout(r, 1000 * attempts));
-            continue;
-          }
-
-          if ((status === 503 || status === 429 || status === 404) && currentModel !== candidateModels[candidateModels.length - 1]) {
-            console.warn(`[executeGeminiCall] Direct call with ${currentModel} returned ${status}. Trying next fallback model...`);
-            lastDirectError = new Error(`Direct Gemini API call failed (${status}): ${errText}`);
-            break; // Break inner attempt loop to try next candidate model
-          }
-
-          throw new Error(`Direct Gemini API call failed (${status}): ${errText}`);
-        } catch (directErr: any) {
-          lastDirectError = directErr;
-          if (currentModel === candidateModels[candidateModels.length - 1] && attempts >= maxAttempts) {
-            if (onBusy) onBusy(false);
-            console.error('[executeGeminiCall] Direct Gemini API call failed on all fallback models:', directErr);
-            throw directErr;
-          }
+          return rawText;
         }
-      }
-    }
 
-    if (lastDirectError) {
-      if (onBusy) onBusy(false);
-      throw lastDirectError;
+        const status = directRes.status;
+        const errText = await directRes.text().catch(() => '');
+        primaryError = new Error(`Direct Gemini API call failed (${status}): ${errText}`);
+        if (status !== 404) {
+          break;
+        }
+      } catch (directErr: any) {
+        primaryError = directErr;
+      }
     }
   }
 
-  if (onBusy) onBusy(false);
-  throw new Error('Unable to reach server and no direct Gemini API key configured in Settings.');
+  // 3. Fallback to OpenRouter with predefined key and nvidia/nemotron-3-ultra-550b-a55b:free for errors
+  try {
+    console.warn('[executeGeminiCall] Gemini execution failed. Reverting to OpenRouter fallback with nvidia/nemotron-3-ultra-550b-a55b:free...');
+    const fallbackResult = await executeOpenRouterFallbackCall(prompt, responseSchema, onBusy);
+    if (onBusy) onBusy(false);
+    return fallbackResult;
+  } catch (fallbackErr) {
+    if (onBusy) onBusy(false);
+    console.error('[executeGeminiCall] Gemini call and OpenRouter fallback failed:', primaryError || fallbackErr);
+    throw primaryError || fallbackErr;
+  }
 };
 
 export const generateResourcesFromTranscript = async (
@@ -1541,7 +1574,6 @@ export const generateAdditionalQuizQuestions = async (
 };
 
 import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
 
 export const retrieveGroundingChunks = async (
   uid: string,

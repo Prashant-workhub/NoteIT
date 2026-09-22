@@ -114,7 +114,7 @@ export function formatUserFriendlyErrorMessage(error: any, actionPrefix?: string
     msgLower.includes('no longer available') ||
     msgLower.includes('not_found')
   ) {
-    friendlyMessage = "The selected AI model is unavailable or outdated. Reverting to stable Gemini 1.5 Flash model.";
+    friendlyMessage = "The selected AI model encountered an issue. Using predefined OpenRouter fallback model (nvidia/nemotron-3-ultra-550b-a55b:free).";
   }
   else if (
     msgLower.includes('transcript is not available') ||

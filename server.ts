@@ -74,7 +74,7 @@ console.error = (...args: any[]) => {
 };
 
 const app = express();
-const PORT = process.env.PORT || 3002;
+const PORT = Number(process.env.PORT) || 3002;
 
 // Restrict CORS to same-origin requests, explicitly configured origins
 // (CORS_ORIGINS, comma-separated), and local dev hosts. Requests without an
@@ -403,14 +403,14 @@ app.delete('/api/ai/saved-keys/:keyId', authenticateFirebaseUser, async (req, re
 
 function getDefaultModelForProvider(provider?: string): string {
   const p = (provider || 'gemini').toLowerCase();
-  if (p === 'openrouter') return 'google/gemini-2.0-flash-001';
+  if (p === 'openrouter') return 'nvidia/nemotron-3-ultra-550b-a55b:free';
   if (p === 'openai') return 'gpt-4o-mini';
   if (p === 'groq') return 'llama-3.3-70b-versatile';
   if (p === 'claude' || p === 'anthropic') return 'claude-3-5-sonnet-latest';
   if (p === 'deepseek') return 'deepseek-chat';
   if (p === 'grok' || p === 'xai') return 'grok-2';
   if (p === 'mistral') return 'mistral-large-latest';
-  if (p === 'nvidia') return 'z-ai/glm-5.2';
+  if (p === 'nvidia') return 'nvidia/nemotron-3-ultra-550b-a55b:free';
   return 'gemini-3.6-flash';
 }
 
@@ -595,18 +595,16 @@ app.post('/api/ai/provider-proxy', authenticateFirebaseUser, enforceAiUsage, asy
     try {
       result = await executeProxyCall(providerInstance, selectedModel);
     } catch (primaryErr: any) {
-      const isRateLimitOrQuota = primaryErr?.status === 429 || primaryErr?.status === 402 || primaryErr?.status === 503 ||
-        /429|quota|rate limit|resource_exhausted|too many requests|credit limit/i.test(primaryErr?.message || '');
-
+      console.warn(`[provider-proxy] Primary provider (${providerName}) execution failed:`, primaryErr?.message || primaryErr);
       let retrySuccess = false;
 
-      // Tier 1: Check user's encrypted saved backup keys first
-      if (isRateLimitOrQuota && data?.savedKeys && Array.isArray(data.savedKeys)) {
+      // Tier 1: Saved backup keys if available
+      if (data?.savedKeys && Array.isArray(data.savedKeys)) {
         const backupPresets = data.savedKeys.filter((k: any) => k.encryptedKey !== rawKey && k.encryptedKey !== data?.encryptedApiKey);
         for (const backupKeyPreset of backupPresets) {
           try {
             const backupDecrypted = decryptKey(backupKeyPreset.encryptedKey);
-            console.warn(`[provider-proxy] Active key rate limited (${primaryErr?.status || 'quota'}). Retrying with user saved backup key (${backupKeyPreset.provider.toUpperCase()} - ${backupKeyPreset.model})...`);
+            console.warn(`[provider-proxy] Retrying with user saved backup key (${backupKeyPreset.provider.toUpperCase()} - ${backupKeyPreset.model})...`);
             const backupProviderInstance = ProviderFactory.getProvider(backupKeyPreset.provider, backupDecrypted);
             result = await executeProxyCall(backupProviderInstance, backupKeyPreset.model);
             retrySuccess = true;
@@ -617,23 +615,18 @@ app.post('/api/ai/provider-proxy', authenticateFirebaseUser, enforceAiUsage, asy
         }
       }
 
-      // Tier 2: Server platform key fallback
-      if (!retrySuccess && isRateLimitOrQuota && canUseServerFallback(usePlatformQuota)) {
-        const fallbackKey = process.env.GEMINI_API_KEY;
-        if (fallbackKey && decryptedKey !== fallbackKey) {
-          try {
-            console.warn(`[provider-proxy] Primary provider (${providerName}) rate limited. Executing automatic server platform key fallback...`);
-            const fallbackProvider = ProviderFactory.getProvider('gemini', fallbackKey);
-            result = await executeProxyCall(fallbackProvider, 'gemini-3.6-flash');
-            retrySuccess = true;
-          } catch (fbErr) {
-            throw primaryErr;
-          }
-        } else {
+      // Tier 2: Predefined OpenRouter fallback with nvidia/nemotron-3-ultra-550b-a55b:free for errors
+      if (!retrySuccess) {
+        try {
+          const openRouterKey = process.env.OPENROUTER_API_KEY || process.env.VITE_OPENROUTER_API_KEY || '';
+          console.warn('[provider-proxy] Reverting to predefined OpenRouter fallback key with model nvidia/nemotron-3-ultra-550b-a55b:free...');
+          const openRouterProvider = ProviderFactory.getProvider('openrouter', openRouterKey);
+          result = await executeProxyCall(openRouterProvider, 'nvidia/nemotron-3-ultra-550b-a55b:free');
+          retrySuccess = true;
+        } catch (openRouterErr: any) {
+          console.error('[provider-proxy] OpenRouter error fallback also failed:', openRouterErr?.message || openRouterErr);
           throw primaryErr;
         }
-      } else if (!retrySuccess) {
-        throw primaryErr;
       }
     }
 

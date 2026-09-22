@@ -12,6 +12,7 @@ export async function postOpenRouterWithCreditFallback(
   requestedMaxTokens?: number
 ): Promise<any> {
   const FREE_MODELS_POOL = [
+    'nvidia/nemotron-3-ultra-550b-a55b:free',
     'google/gemini-2.0-flash-exp:free',
     'meta-llama/llama-3.3-70b-instruct:free',
     'qwen/qwen-2.5-72b-instruct:free',
@@ -52,7 +53,7 @@ export async function postOpenRouterWithCreditFallback(
     });
   };
 
-  let initialModel = payload.model || 'google/gemini-2.0-flash-exp:free';
+  let initialModel = payload.model || 'nvidia/nemotron-3-ultra-550b-a55b:free';
   if (
     !initialModel ||
     initialModel.startsWith('sk-') ||
@@ -66,7 +67,7 @@ export async function postOpenRouterWithCreditFallback(
     /^[a-zA-Z0-9_\-]{40,}$/.test(initialModel)
   ) {
     console.warn(`[OpenRouter] Invalid model string detected ("${initialModel?.slice(0, 12)}..."). Fallback to free models pool.`);
-    initialModel = 'google/gemini-2.0-flash-exp:free';
+    initialModel = 'nvidia/nemotron-3-ultra-550b-a55b:free';
   }
 
   // 1. Initial Attempt using specified model or free pool

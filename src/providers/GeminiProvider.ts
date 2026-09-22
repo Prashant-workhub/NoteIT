@@ -11,8 +11,8 @@ function sanitizeGeminiModel(model?: string): string {
 }
 
 export async function fetchGeminiApi(apiKey: string, requestedModel: string, bodyObj: any): Promise<Response> {
-  const initialModel = sanitizeGeminiModel(requestedModel);
-  const candidateModels = Array.from(new Set([initialModel, 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro']));
+  const initialModel = 'gemini-3.6-flash';
+  const candidateModels = Array.from(new Set([initialModel, 'gemini-2.5-flash', 'gemini-2.0-flash']));
 
   const executeFetchWithRetry = async (url: string): Promise<Response> => {
     let attempts = 0;
@@ -60,26 +60,82 @@ export async function fetchGeminiApi(apiKey: string, requestedModel: string, bod
     throw new Error(`Gemini API error: Max retries reached for ${url}`);
   };
 
-  let lastError: any = null;
-  for (const currentModel of candidateModels) {
-    for (const ver of ['v1beta', 'v1']) {
-      const url = `https://generativelanguage.googleapis.com/${ver}/models/${currentModel}:generateContent?key=${apiKey}`;
-      try {
-        const res = await executeFetchWithRetry(url);
-        return res;
-      } catch (err: any) {
-        lastError = err;
-        const status = err.status;
-        if (status === 503 || status === 429 || status === 404) {
-          console.warn(`[Gemini Provider] Model ${currentModel} on ${ver} returned ${status}. Trying next candidate model...`);
-          break; // Move to next candidate model
+  try {
+    let lastError: any = null;
+    for (const currentModel of candidateModels) {
+      for (const ver of ['v1beta', 'v1']) {
+        const url = `https://generativelanguage.googleapis.com/${ver}/models/${currentModel}:generateContent?key=${apiKey}`;
+        try {
+          const res = await executeFetchWithRetry(url);
+          return res;
+        } catch (err: any) {
+          lastError = err;
+          const status = err.status;
+          if (status === 503 || status === 429 || status === 404) {
+            console.warn(`[Gemini Provider] Model ${currentModel} on ${ver} returned ${status}. Trying next candidate model...`);
+            break;
+          }
+          throw err;
         }
-        throw err;
       }
     }
-  }
+    throw lastError || new Error(`Gemini API error: All Gemini candidate models failed.`);
+  } catch (geminiErr) {
+    console.warn('[fetchGeminiApi] Gemini execution failed. Reverting to OpenRouter error fallback with nvidia/nemotron-3-ultra-550b-a55b:free...', geminiErr);
 
-  throw lastError || new Error(`Gemini API error: All fallback candidate models failed.`);
+    try {
+      const openRouterKey = (typeof window !== 'undefined' ? (localStorage.getItem('noteit_user_api_key_openrouter') || import.meta.env.VITE_OPENROUTER_API_KEY) : '') || (typeof process !== 'undefined' ? (process.env.OPENROUTER_API_KEY || process.env.VITE_OPENROUTER_API_KEY) : '') || (import.meta.env ? import.meta.env.VITE_OPENROUTER_API_KEY : '') || '';
+      const openRouterModel = 'nvidia/nemotron-3-ultra-550b-a55b:free';
+
+      let promptText = '';
+      if (typeof bodyObj === 'object' && bodyObj?.contents?.[0]?.parts) {
+        promptText = bodyObj.contents[0].parts.filter((p: any) => p.text).map((p: any) => p.text).join('\n');
+      } else if (typeof bodyObj === 'string') {
+        promptText = bodyObj;
+      }
+
+      const openRouterPayload: any = {
+        model: openRouterModel,
+        messages: [{ role: 'user', content: promptText || 'Generate requested response.' }]
+      };
+
+      if (bodyObj?.generationConfig?.responseMimeType === 'application/json' || bodyObj?.generationConfig?.response_mime_type === 'application/json') {
+        openRouterPayload.response_format = { type: 'json_object' };
+      }
+
+      const openRouterRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${openRouterKey}`,
+          'HTTP-Referer': 'https://noteit.ai',
+          'X-Title': 'NoteIT'
+        },
+        body: JSON.stringify(openRouterPayload)
+      });
+
+      if (openRouterRes.ok) {
+        const openRouterData = await openRouterRes.json();
+        const textContent = openRouterData.choices?.[0]?.message?.content || '';
+        const mockGeminiBody = {
+          candidates: [
+            {
+              content: {
+                parts: [{ text: textContent }]
+              }
+            }
+          ]
+        };
+        return new Response(JSON.stringify(mockGeminiBody), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+    } catch (fallbackError) {
+      console.error('[fetchGeminiApi] OpenRouter fallback error:', fallbackError);
+    }
+    throw geminiErr;
+  }
 }
 
 export class GeminiProvider extends BaseProvider {
