@@ -1302,6 +1302,7 @@ export default function LectureCaptureView({
     }
 
     setIsGeneratingNotes(true);
+    await new Promise(r => setTimeout(r, 20));
     try {
       const { generateNotes: callGenerateNotes, getAIConfig } = await import('../services/gemini');
       const generated = await callGenerateNotes(textContent, mode, getAIConfig().geminiKey);
@@ -1335,6 +1336,7 @@ export default function LectureCaptureView({
     }
 
     setIsGeneratingSummary(true);
+    await new Promise(r => setTimeout(r, 20));
     try {
       const { generateSummary: callGenerateSummary, getAIConfig } = await import('../services/gemini');
       const generated = await callGenerateSummary(textContent, mode, getAIConfig().geminiKey);
@@ -1967,7 +1969,11 @@ export default function LectureCaptureView({
                     </div>
 
                     <div className="space-y-3">
-                      {(getAsset(activeLecture.id, 'notes', selectedNotesMode) || activeLecture?.notes || activeLecture?.cleanTranscript || activeLecture?.transcript) ? (
+                      {isGeneratingNotes ? (
+                        <div className="py-16 flex flex-col items-center justify-center border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5">
+                          <BruteLoader size="md" message={`Compiling & generating ${selectedNotesMode} notes with AI...`} />
+                        </div>
+                      ) : (getAsset(activeLecture.id, 'notes', selectedNotesMode) || (typeof activeLecture?.notes === 'object' && (activeLecture.notes as any)?.[selectedNotesMode]) || (typeof activeLecture?.notes === 'string' && activeLecture.notes) || activeLecture?.cleanTranscript || activeLecture?.transcript) ? (
                         <div className="p-5 rounded-[6px] border border-[#111111] bg-white text-[#111111] shadow-paper-sm font-sans">
                           <AcademicNotesViewer
                             content={
@@ -1980,9 +1986,9 @@ export default function LectureCaptureView({
                             theme={theme}
                           />
                         </div>
-                      ) : (isGeneratingNotes || isAssetLoading) ? (
+                      ) : isAssetLoading ? (
                         <div className="py-16 flex flex-col items-center justify-center border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5">
-                          <BruteLoader size="md" message={`Loading / Generating ${selectedNotesMode} notes...`} />
+                          <BruteLoader size="md" message={`Loading ${selectedNotesMode} notes...`} />
                         </div>
                       ) : (
                         <div className="text-center py-16 border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5 p-6 space-y-4">
@@ -2040,7 +2046,11 @@ export default function LectureCaptureView({
                     </div>
 
                     <div className="space-y-4">
-                      {getAsset(activeLecture.id, 'summaries', selectedSummaryMode) ? (
+                      {isGeneratingSummary ? (
+                        <div className="py-16 flex flex-col items-center justify-center border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5">
+                          <BruteLoader size="md" message={`Compiling & generating ${selectedSummaryMode.replace('_', ' ')} summary with AI...`} />
+                        </div>
+                      ) : getAsset(activeLecture.id, 'summaries', selectedSummaryMode) ? (
                         <div className="space-y-4 animate-fade-in">
                           {(() => {
                             const sections = parseSummaryIntoSections(getAsset(activeLecture.id, 'summaries', selectedSummaryMode));
@@ -2085,9 +2095,9 @@ export default function LectureCaptureView({
                             ));
                           })()}
                         </div>
-                      ) : (isGeneratingSummary || isAssetLoading) ? (
+                      ) : isAssetLoading ? (
                         <div className="py-16 flex flex-col items-center justify-center border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5">
-                          <BruteLoader size="md" message={`Loading / Generating ${selectedSummaryMode.replace('_', ' ')} summary...`} />
+                          <BruteLoader size="md" message={`Loading ${selectedSummaryMode.replace('_', ' ')} summary...`} />
                         </div>
                       ) : (
                         <div className="text-center py-16 border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5 p-6 space-y-4">
