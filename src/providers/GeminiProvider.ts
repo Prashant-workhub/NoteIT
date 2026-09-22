@@ -1,5 +1,6 @@
 import { BaseProvider } from './AIProvider';
 import { GeminiAdapter } from './ValidationAdapters';
+import { getFallbackOpenRouterKey } from '../services/gemini';
 
 // A provider-side cap prevents an unexpectedly verbose response from spending
 // an unbounded amount of a server-funded Gemini quota. It is configurable for
@@ -84,7 +85,7 @@ export async function fetchGeminiApi(apiKey: string, requestedModel: string, bod
     console.warn('[fetchGeminiApi] Gemini execution failed. Reverting to OpenRouter error fallback with nvidia/nemotron-3-ultra-550b-a55b:free...', geminiErr);
 
     try {
-      const openRouterKey = (typeof window !== 'undefined' ? (localStorage.getItem('noteit_user_api_key_openrouter') || import.meta.env.VITE_OPENROUTER_API_KEY) : '') || (typeof process !== 'undefined' ? (process.env.OPENROUTER_API_KEY || process.env.VITE_OPENROUTER_API_KEY) : '') || (import.meta.env ? import.meta.env.VITE_OPENROUTER_API_KEY : '') || '';
+      const openRouterKey = getFallbackOpenRouterKey();
       const openRouterModel = 'nvidia/nemotron-3-ultra-550b-a55b:free';
 
       let promptText = '';
