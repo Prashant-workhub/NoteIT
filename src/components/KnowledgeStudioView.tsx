@@ -313,9 +313,17 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
     if (activeSource[key] && activeSource[key].length > 0) {
       return activeSource[key];
     }
-    // Fallback to legacy notes field if the mode matches selectedMode
-    if (notesFormat === (activeSource.selectedMode || 'academic') && activeSource.notes && activeSource.notes.length > 0) {
+    // Fallback to legacy notes field if available
+    if (activeSource.notes && activeSource.notes.length > 0) {
       return activeSource.notes;
+    }
+    // Auto-display source transcript / text if explicit mode notes not generated yet
+    const rawContent = activeSource.cleanTranscript || activeSource.transcript || activeSource.content || activeSource.text;
+    if (rawContent && rawContent.trim()) {
+      return [{
+        title: activeSource.title || 'Source Notes',
+        content: rawContent
+      }];
     }
     return [];
   };
@@ -331,15 +339,14 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
     if (activeSource[key] && activeSource[key].trim().length > 0) {
       return activeSource[key];
     }
-    // Fallback to legacy summary field if the mode matches selectedSummaryMode
-    const activeSummaryMode = activeSource.selectedSummaryMode || 'academic';
-    const isMatch = (summaryFormat === 'academic' && activeSummaryMode === 'academic') ||
-      (summaryFormat === 'revision' && activeSummaryMode === 'revision') ||
-      (summaryFormat === 'executive' && activeSummaryMode === 'executive') ||
-      (summaryFormat === 'beginner' && activeSummaryMode === 'beginner') ||
-      (summaryFormat === 'bhailang' && activeSummaryMode === 'bhailang');
-    if (isMatch && activeSource.summary && activeSource.summary.trim().length > 0) {
+    // Fallback to legacy summary field if available
+    if (activeSource.summary && typeof activeSource.summary === 'string' && activeSource.summary.trim().length > 0) {
       return activeSource.summary;
+    }
+    // Auto-display source transcript / text if explicit mode summary not generated yet
+    const rawContent = activeSource.cleanTranscript || activeSource.transcript || activeSource.content || activeSource.text;
+    if (rawContent && rawContent.trim()) {
+      return rawContent;
     }
     return '';
   };
@@ -380,24 +387,30 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
       return;
     }
 
-    const cacheKey = `noteit_asset_${activeSourceId}_notes_${format}`;
-    if (localAssets[cacheKey]) return;
+    setIsGeneratingNotes(true);
+    await new Promise(r => setTimeout(r, 20));
+
     try {
-      const stored = localStorage.getItem(cacheKey);
-      if (stored) {
-        setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: JSON.parse(stored) }));
+      const cacheKey = `noteit_asset_${activeSourceId}_notes_${format}`;
+      if (localAssets[cacheKey]) {
+        setIsGeneratingNotes(false);
         return;
       }
-    } catch (_) {}
+      try {
+        const stored = localStorage.getItem(cacheKey);
+        if (stored) {
+          setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: JSON.parse(stored) }));
+          setIsGeneratingNotes(false);
+          return;
+        }
+      } catch (_) {}
 
-    const textContent = await getSourceTextContent(activeSource);
-    if (!textContent.trim()) {
-      setImportError("A valid transcript is required to generate notes.");
-      return;
-    }
+      const textContent = await getSourceTextContent(activeSource);
+      if (!textContent.trim()) {
+        setImportError("A valid transcript is required to generate notes.");
+        return;
+      }
 
-    setIsGeneratingNotes(true);
-    try {
       const apiKey = getAIConfig().geminiKey;
       const notesData = await generateStructuredNotes(
         textContent,
@@ -420,24 +433,30 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
   const triggerGenerateSummary = async (format: 'academic' | 'revision' | 'executive' | 'beginner' | 'bhailang' | 'bhailang_normal' | 'bhailang_savage' | 'bhailang_pro') => {
     if (!activeSourceId || !userId || !activeSource || isGeneratingSummary) return;
 
-    const cacheKey = `noteit_asset_${activeSourceId}_summary_${format}`;
-    if (localAssets[cacheKey]) return;
+    setIsGeneratingSummary(true);
+    await new Promise(r => setTimeout(r, 20));
+
     try {
-      const stored = localStorage.getItem(cacheKey);
-      if (stored) {
-        setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: JSON.parse(stored) }));
+      const cacheKey = `noteit_asset_${activeSourceId}_summary_${format}`;
+      if (localAssets[cacheKey]) {
+        setIsGeneratingSummary(false);
         return;
       }
-    } catch (_) {}
+      try {
+        const stored = localStorage.getItem(cacheKey);
+        if (stored) {
+          setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: JSON.parse(stored) }));
+          setIsGeneratingSummary(false);
+          return;
+        }
+      } catch (_) {}
 
-    const textContent = await getSourceTextContent(activeSource);
-    if (!textContent.trim()) {
-      setImportError("No content available to generate summary.");
-      return;
-    }
+      const textContent = await getSourceTextContent(activeSource);
+      if (!textContent.trim()) {
+        setImportError("No content available to generate summary.");
+        return;
+      }
 
-    setIsGeneratingSummary(true);
-    try {
       const apiKey = getAIConfig().geminiKey;
       let serviceMode: 'quick_revision' | 'detailed_notes' | 'executive_summary' | 'beginner_friendly' | 'academic_format' | 'bhailang' = 'academic_format';
       if (format === 'academic') serviceMode = 'academic_format';
