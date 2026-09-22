@@ -795,6 +795,9 @@ export default function App() {
   // Callbacks: Settings & Upgrading Tiers
   const handleUpdateSettings = async (newSettings: UserSettings) => {
     setSettings(newSettings);
+    if (newSettings.profile?.theme && newSettings.profile.theme !== theme) {
+      setTheme(newSettings.profile.theme as 'light' | 'dark');
+    }
     if (sessionUser) {
       const profileData = {
         first_name: newSettings.profile.firstName || '',
@@ -804,6 +807,7 @@ export default function App() {
         country_code: newSettings.profile.countryCode || '',
         phone_number: newSettings.profile.phoneNumber || '',
         profile_image_url: newSettings.profile.avatarUrl || '',
+        theme: newSettings.profile.theme || theme,
         onboarding_completed: true,
         updated_at: serverTimestamp()
       };
@@ -1047,6 +1051,7 @@ export default function App() {
             onUpdateSettings={handleUpdateSettings}
             setActivePage={setActivePage}
             theme={theme}
+            setTheme={setTheme}
             onLogOut={handleLogOut}
           />
         );
