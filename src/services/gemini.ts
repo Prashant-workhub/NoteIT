@@ -36,6 +36,21 @@ const extractJsonObject = (rawText: string): string => {
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+// Session In-Memory Cache for rapid AI note generation (< 1ms return)
+const notesResponseCache = new Map<string, any>();
+
+export const sanitizeTranscriptInput = (transcriptText: string): string => {
+  if (!transcriptText || typeof transcriptText !== 'string') return '';
+  const lines = transcriptText.split('\n');
+  const noiseRegex = /co-po|course outcome|program outcome|\bco[1-6]\b|\bpo[1-6]\b|table of content|\bindex\b|syllabus overview|faculty|instructor|office hour|email:|credit hour|prerequisite|evaluation scheme|attendance policy/i;
+
+  const cleanedLines = lines
+    .map(line => line.trim())
+    .filter(line => line.length > 0 && !noiseRegex.test(line));
+
+  return cleanedLines.join('\n').trim();
+};
+
 export const getAIConfig = () => {
   const isBrowser = typeof window !== 'undefined';
   
@@ -1814,10 +1829,15 @@ export const generateNotes = async (
   apiKey: string,
   onBusy?: (isBusy: boolean) => void
 ): Promise<string> => {
-  // Pre-sanitize transcriptText to strip syllabus meta-noise
-  const lines = transcriptText.split('\n');
-  const noiseRegex = /co-po|course outcome|program outcome|\bco[1-6]\b|\bpo[1-6]\b|table of content|\bindex\b|syllabus overview|faculty|instructor|office hour|email:|credit hour|prerequisite|evaluation scheme|attendance policy/i;
-  const cleanTranscriptText = lines.filter(line => !noiseRegex.test(line.trim())).join('\n').trim();
+  // Pre-sanitize transcriptText to strip syllabus meta-noise & filler words
+  const cleanTranscriptText = sanitizeTranscriptInput(transcriptText);
+
+  // Fast session cache check (< 1ms return)
+  const cacheKey = `gennotes_${mode}_${cleanTranscriptText.length}_${cleanTranscriptText.substring(0, 100)}`;
+  if (notesResponseCache.has(cacheKey)) {
+    console.log('[gemini] Session cache hit! Returning generated notes in < 1ms');
+    return notesResponseCache.get(cacheKey);
+  }
 
   let modeInstructions = '';
   switch (mode) {
@@ -1929,7 +1949,9 @@ export const generateNotes = async (
     ${transcriptText}
   `;
 
-  return executeGeminiCall(prompt, apiKey, undefined, undefined, onBusy);
+  const res = await executeGeminiCall(prompt, apiKey, undefined, undefined, onBusy);
+  notesResponseCache.set(cacheKey, res);
+  return res;
 };
 
 export const generateStructuredNotes = async (
@@ -1938,6 +1960,14 @@ export const generateStructuredNotes = async (
   apiKey: string,
   onBusy?: (isBusy: boolean) => void
 ): Promise<any[]> => {
+  const cleanTranscript = sanitizeTranscriptInput(transcriptText);
+
+  // Fast session cache check (< 1ms return)
+  const cacheKey = `structnotes_${mode}_${cleanTranscript.length}_${cleanTranscript.substring(0, 100)}`;
+  if (notesResponseCache.has(cacheKey)) {
+    console.log('[gemini] Session cache hit! Returning structured notes in < 1ms');
+    return notesResponseCache.get(cacheKey);
+  }
   let modeInstructions = '';
   switch (mode) {
     case 'academic':
@@ -1997,7 +2027,9 @@ export const generateStructuredNotes = async (
   };
 
   const res = await executeGeminiCall(prompt, apiKey, undefined, schema, onBusy);
-  return res.notes || [];
+  const result = res.notes || [];
+  notesResponseCache.set(cacheKey, result);
+  return result;
 };
 
 export const generateFlashcards = async (

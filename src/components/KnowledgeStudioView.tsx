@@ -351,6 +351,16 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
       return;
     }
 
+    const cacheKey = `noteit_asset_${activeSourceId}_notes_${format}`;
+    if (localAssets[cacheKey]) return;
+    try {
+      const stored = localStorage.getItem(cacheKey);
+      if (stored) {
+        setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: JSON.parse(stored) }));
+        return;
+      }
+    } catch (_) {}
+
     const textContent = activeSource.transcript || activeSource.cleanTranscript || activeSource.content || activeSource.text || '';
     if (!textContent.trim()) {
       setImportError("A valid transcript is required to generate notes.");
@@ -368,7 +378,6 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
       const docRef = doc(db, 'users', userId, 'sources', activeSourceId, 'assets', `notes_${format}`);
       await setDoc(docRef, { data: notesData, updatedAt: serverTimestamp() });
 
-      const cacheKey = `noteit_asset_${activeSourceId}_notes_${format}`;
       localStorage.setItem(cacheKey, JSON.stringify(notesData));
       setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: notesData }));
     } catch (err: any) {
@@ -381,6 +390,16 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
 
   const triggerGenerateSummary = async (format: 'academic' | 'revision' | 'executive' | 'beginner' | 'bhailang' | 'bhailang_normal' | 'bhailang_savage' | 'bhailang_pro') => {
     if (!activeSourceId || !userId || !activeSource || isGeneratingSummary) return;
+
+    const cacheKey = `noteit_asset_${activeSourceId}_summary_${format}`;
+    if (localAssets[cacheKey]) return;
+    try {
+      const stored = localStorage.getItem(cacheKey);
+      if (stored) {
+        setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: JSON.parse(stored) }));
+        return;
+      }
+    } catch (_) {}
 
     const textContent = activeSource.content || activeSource.transcript || '';
     if (!textContent.trim()) {
@@ -406,7 +425,6 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
       const docRef = doc(db, 'users', userId, 'sources', activeSourceId, 'assets', `summary_${format}`);
       await setDoc(docRef, { data: summaryText, updatedAt: serverTimestamp() });
 
-      const cacheKey = `noteit_asset_${activeSourceId}_summary_${format}`;
       localStorage.setItem(cacheKey, JSON.stringify(summaryText));
       setLocalAssets((prev: any) => ({ ...prev, [cacheKey]: summaryText }));
     } catch (err: any) {
