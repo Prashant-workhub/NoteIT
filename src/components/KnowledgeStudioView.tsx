@@ -48,7 +48,7 @@ import { db, auth } from '../firebaseConfig';
 import { API_BASE_URL } from '../config';
 import { collection, addDoc, getDocs, deleteDoc, doc, setDoc, updateDoc, serverTimestamp, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { generateLectureContentFromText, generateFastDocumentAssets, generateStructuredNotes, generateSummary, generateFlashcards, generateQuiz, generateMoreQuestions, generateMindmap, getAIConfig } from '../services/gemini';
-import { getAzureUploadSasUrl, uploadBlobToAzure, extractTextFromDocument, extractTextFromUrl } from '../services/storageService';
+import { getAzureUploadSasUrl, uploadBlobToAzure, extractTextFromDocument, extractTextFromUrl, saveTranscriptMultiTier } from '../services/storageService';
 import pptxgen from 'pptxgenjs';
 import BruteLoader from './BruteLoader';
 import PresentationWorkspace from './PresentationWorkspace';
@@ -832,25 +832,31 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
       // Fast rule-based asset generation (< 5ms)
       const fastData = generateFastDocumentAssets(extractedText, name);
 
-      // Save everything to Firestore and mark READY immediately!
-      await updateDoc(docRef, {
-        status: 'ready',
-        progress: 100,
-        selectedMode: notesFormat,
-        selectedSummaryMode: 'academic',
-        content: extractedText,
+      // Offload full transcript and extracted content to Azure Blob Storage
+      const storageRes = await saveTranscriptMultiTier(userId, docId, {
         transcript: extractedText,
         cleanTranscript: fastData.cleanTranscript || extractedText,
         sections: fastData.sections || [],
         timeline: fastData.timeline || [],
         sourceIntelligence: fastData.sourceIntelligence || null,
+        title: name,
+        storedInBlob: true
+      }).catch(err => {
+        console.warn('[KnowledgeStudio] Azure Blob storage save fallback:', err);
+        return { storageProvider: 'client' };
+      });
+
+      // Store ONLY lightweight metadata in Firestore
+      await updateDoc(docRef, {
+        status: 'ready',
+        progress: 100,
+        selectedMode: notesFormat,
+        selectedSummaryMode: 'academic',
+        transcriptStorageProvider: storageRes.storageProvider,
+        transcriptBlobPath: (storageRes as any)?.blobPath || null,
+        storedInBlob: true,
         summary: '',
-        notes: [],
-        flashcards: [],
-        quiz: [],
-        keyConcepts: [],
-        slides: [],
-        podcastScript: ''
+        keyConcepts: []
       });
 
       if (!isBatch) {

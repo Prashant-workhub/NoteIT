@@ -420,8 +420,8 @@ export const saveTranscriptMultiTier = async (
     throw new Error('UserId and LectureId are required to save transcript.');
   }
 
-  // Explicitly omit notes, notesMarkdown, and academicNotes so notes are never stored
-  const { notes, notesMarkdown, academicNotes, ...cleanTranscriptData } = transcriptData || {};
+  // Include all generated content (transcript, notes, flashcards, quizzes, mindmap) in Azure Blob payload
+  const cleanTranscriptData = transcriptData || {};
 
   try {
     const localKey = `noteit_transcript_${userId}_${lectureId}`;

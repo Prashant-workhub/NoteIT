@@ -1564,8 +1564,8 @@ app.post('/api/storage/transcripts/upload', authenticateFirebaseUser, async (req
   const user = req.body.user;
   const uid = user.uid;
 
-  // Explicitly omit notes, notesMarkdown, and academicNotes so notes are never stored
-  const { notes, notesMarkdown, academicNotes, ...cleanTranscriptData } = transcriptData || {};
+  // Store complete transcript and generated content payload directly in Azure Blob Storage
+  const cleanTranscriptData = transcriptData || {};
 
   if (isAzureBlobConfigured()) {
     try {

@@ -92,8 +92,21 @@ export function useLectures(userId: string | undefined) {
   }) => {
     if (!userId) throw new Error('User not authenticated');
     const lecturesRef = collection(db, 'users', userId, 'lectures');
+    const {
+      transcript,
+      cleanTranscript,
+      content,
+      text,
+      notes,
+      quizzes,
+      flashcards,
+      mindMap,
+      summary,
+      summaries,
+      ...lightweightMetadata
+    } = lectureData as any;
     const docRef = await addDoc(lecturesRef, {
-      ...lectureData,
+      ...lightweightMetadata,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
@@ -103,8 +116,21 @@ export function useLectures(userId: string | undefined) {
   const updateLecture = async (id: string, data: Partial<Lecture>) => {
     if (!userId) throw new Error('User not authenticated');
     const lectureRef = doc(db, 'users', userId, 'lectures', id);
+    const {
+      transcript,
+      cleanTranscript,
+      content,
+      text,
+      notes,
+      quizzes,
+      flashcards,
+      mindMap,
+      summary,
+      summaries,
+      ...lightweightMetadata
+    } = data as any;
     await updateDoc(lectureRef, {
-      ...data,
+      ...lightweightMetadata,
       updatedAt: serverTimestamp(),
     });
   };
