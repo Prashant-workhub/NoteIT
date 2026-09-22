@@ -184,54 +184,86 @@ export const executeGeminiCall = async (
     console.warn('[executeGeminiCall] Server proxy fetch failed or unreachable. Trying direct Gemini client API call:', proxyErr);
   }
 
-  // DIRECT CLIENT-SIDE GEMINI REST FALLBACK (for mobile or server unreachable)
+  // DIRECT CLIENT-SIDE GEMINI REST FALLBACK (for mobile or server unreachable, with candidate model fallback)
   const geminiKey = apiKey || getAIConfig().geminiKey;
   if (geminiKey) {
-    try {
-      const requestedModel = model || getAIConfig().model || 'gemini-3.6-flash';
-      const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/${requestedModel}:generateContent?key=${geminiKey}`;
-      
-      const contentsParts: any[] = [];
-      if (inlineData) {
-        contentsParts.push({ inline_data: { mime_type: inlineData.mimeType, data: inlineData.data } });
+    const requestedModel = model || getAIConfig().model || 'gemini-3.6-flash';
+    const candidateModels = Array.from(new Set([requestedModel, 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro']));
+    let lastDirectError: any = null;
+
+    for (const currentModel of candidateModels) {
+      let attempts = 0;
+      const maxAttempts = 2;
+
+      while (attempts < maxAttempts) {
+        attempts++;
+        try {
+          const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${geminiKey}`;
+
+          const contentsParts: any[] = [];
+          if (inlineData) {
+            contentsParts.push({ inline_data: { mime_type: inlineData.mimeType, data: inlineData.data } });
+          }
+          contentsParts.push({ text: prompt });
+
+          const requestBody: any = {
+            contents: [{ parts: contentsParts }]
+          };
+
+          if (responseSchema) {
+            requestBody.generationConfig = {
+              response_mime_type: 'application/json'
+            };
+          }
+
+          const directRes = await fetch(directUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody)
+          });
+
+          if (directRes.ok) {
+            if (onBusy) onBusy(false);
+            const directData = await directRes.json();
+            const rawText = directData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+            if (responseSchema) {
+              const cleanedText = extractJsonObject(rawText);
+              return JSON.parse(cleanedText);
+            }
+            return rawText;
+          }
+
+          const status = directRes.status;
+          const errText = await directRes.text().catch(() => '');
+
+          if ((status === 503 || status === 429) && attempts < maxAttempts) {
+            console.warn(`[executeGeminiCall] Direct call (${currentModel}) status ${status}. Retrying attempt ${attempts + 1}...`);
+            await new Promise(r => setTimeout(r, 1000 * attempts));
+            continue;
+          }
+
+          if ((status === 503 || status === 429 || status === 404) && currentModel !== candidateModels[candidateModels.length - 1]) {
+            console.warn(`[executeGeminiCall] Direct call with ${currentModel} returned ${status}. Trying next fallback model...`);
+            lastDirectError = new Error(`Direct Gemini API call failed (${status}): ${errText}`);
+            break; // Break inner attempt loop to try next candidate model
+          }
+
+          throw new Error(`Direct Gemini API call failed (${status}): ${errText}`);
+        } catch (directErr: any) {
+          lastDirectError = directErr;
+          if (currentModel === candidateModels[candidateModels.length - 1] && attempts >= maxAttempts) {
+            if (onBusy) onBusy(false);
+            console.error('[executeGeminiCall] Direct Gemini API call failed on all fallback models:', directErr);
+            throw directErr;
+          }
+        }
       }
-      contentsParts.push({ text: prompt });
+    }
 
-      const requestBody: any = {
-        contents: [{ parts: contentsParts }]
-      };
-
-      if (responseSchema) {
-        requestBody.generationConfig = {
-          response_mime_type: 'application/json'
-        };
-      }
-
-      const directRes = await fetch(directUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
-      });
-
+    if (lastDirectError) {
       if (onBusy) onBusy(false);
-
-      if (!directRes.ok) {
-        const errText = await directRes.text().catch(() => '');
-        throw new Error(`Direct Gemini API call failed (${directRes.status}): ${errText}`);
-      }
-
-      const directData = await directRes.json();
-      const rawText = directData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      
-      if (responseSchema) {
-        const cleanedText = extractJsonObject(rawText);
-        return JSON.parse(cleanedText);
-      }
-      return rawText;
-    } catch (directErr: any) {
-      if (onBusy) onBusy(false);
-      console.error('[executeGeminiCall] Direct Gemini API call failed:', directErr);
-      throw directErr;
+      throw lastDirectError;
     }
   }
 
