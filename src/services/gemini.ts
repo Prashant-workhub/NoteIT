@@ -1960,7 +1960,7 @@ export const generateNotes = async (
 
     DIFFICULT TECHNICAL TERMS & GFG HIGHLIGHTING (MANDATORY):
     Identify any complex, technical, or difficult academic terms, algorithms, formulas, or specialized jargon mentioned in the transcript (e.g. Recursion, Polymorphism, Eigenvalue, Dijkstra, Mutex, Backpropagation, etc.).
-    Tag these difficult terms in markdown as '[Term](gfg)' (e.g. '[Recursion](gfg)') so students can click them for GeeksforGeeks explanations.
+    Tag these difficult terms in markdown as '[Term](gfg)' (e.g. '[Recursion](gfg)' or '[Indirect Addressing](gfg:https://www.geeksforgeeks.org/indirect-addressing-in-computer-organization/)') so students can click them for GeeksforGeeks explanations.
 
     PIPELINE RULES:
     1. Do NOT treat the lecture transcript as text to be summarized or rewritten as spoken.
