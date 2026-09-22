@@ -18,6 +18,7 @@ import {
   Trash2,
   Lock,
   ChevronDown,
+  ChevronUp,
   Search,
   Activity,
   TrendingUp,
@@ -252,6 +253,8 @@ export default function SettingsView({
     model: string;
     maskedKey: string;
     label: string;
+    rank?: number;
+    status?: string;
     savedAt: string;
     lastUsedAt?: string;
     isActive: boolean;
@@ -259,6 +262,7 @@ export default function SettingsView({
   const [loadingSavedKeys, setLoadingSavedKeys] = useState(false);
   const [switchingKeyId, setSwitchingKeyId] = useState<string | null>(null);
   const [deletingPresetId, setDeletingPresetId] = useState<string | null>(null);
+  const [newKeyRank, setNewKeyRank] = useState<number>(1);
 
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -632,12 +636,49 @@ export default function SettingsView({
         const data = await res.json();
         if (Array.isArray(data.savedKeys)) {
           setSavedKeys(data.savedKeys);
+          setNewKeyRank(data.savedKeys.length + 1);
+          localStorage.setItem('noteit_ranked_saved_keys', JSON.stringify(data.savedKeys));
         }
       }
     } catch (err) {
       console.warn('Failed to fetch saved API keys:', err);
     } finally {
       setLoadingSavedKeys(false);
+    }
+  };
+
+  const handleMoveRank = async (target: number | string, direction: 'up' | 'down') => {
+    const index = typeof target === 'string' ? savedKeys.findIndex(k => k.id === target) : target;
+    if (index < 0 || (direction === 'up' && index === 0) || (direction === 'down' && index === savedKeys.length - 1)) return;
+
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    const newKeys = [...savedKeys];
+    const temp = newKeys[index];
+    newKeys[index] = newKeys[targetIndex];
+    newKeys[targetIndex] = temp;
+
+    const updatedWithRanks = newKeys.map((k, i) => ({ ...k, rank: i + 1 }));
+    setSavedKeys(updatedWithRanks);
+    localStorage.setItem('noteit_ranked_saved_keys', JSON.stringify(updatedWithRanks));
+
+    const keyRanks = updatedWithRanks.map(k => ({ id: k.id, rank: k.rank }));
+
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) return;
+      const idToken = await currentUser.getIdToken();
+      await fetch(`${API_BASE_URL}/api/ai/saved-keys/reorder`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`
+        },
+        body: JSON.stringify({ keyRanks, orderedIds: updatedWithRanks.map(k => k.id) })
+      });
+      triggerSaveNotification();
+      await fetchConfigStatus().catch(() => {});
+    } catch (err) {
+      console.error('Failed to update API key rank order:', err);
     }
   };
 
@@ -791,7 +832,8 @@ export default function SettingsView({
           body: JSON.stringify({
             key: newKey.trim(),
             provider: aiProvider,
-            model: selectedModel
+            model: selectedModel,
+            rank: newKeyRank || (savedKeys.length + 1)
           })
         });
         if (res.ok) {
@@ -826,6 +868,7 @@ export default function SettingsView({
         setShowReplaceForm(false);
         triggerSaveNotification();
         await fetchConfigStatus().catch(() => { });
+        await fetchSavedKeys().catch(() => { });
       }
     } catch (err: any) {
       console.error('Error saving new key:', err);
@@ -1290,248 +1333,188 @@ export default function SettingsView({
             </form>
           )}
 
-          {/* Tab 2: AI Provider Keys */}
+          {/* Tab 2: AI Provider & Key Settings */}
           {activeTab === 'ai' && (
-            <div className="space-y-5 text-left">
+            <div className="space-y-6 text-left">
               <div>
-                <h3 className="font-heading font-extrabold text-lg uppercase text-[#111111]">AI Generator & Provider Keys</h3>
-                <p className="text-xs font-mono font-bold text-[#666666] mt-1">Calibrate model parameters according to your reading and cognitive retention speed.</p>
+                <h3 className="font-heading font-extrabold text-lg uppercase text-[#111111]">
+                  Ranked Multi-API Key & Automatic Failover Management
+                </h3>
+                <p className="text-xs font-mono font-bold text-[#666666] mt-1">
+                  Configure priority-ranked API keys with automatic zero-downtime failover. If Rank #1 encounters rate limits (429) or quota errors, NoteIT seamlessly switches to Rank #2, Rank #3, and so on.
+                </p>
               </div>
 
               {validationError && (
-                <div className="rounded-[6px] border-2 border-[#111111] bg-[#FF4D4D]/15 p-3 flex items-start gap-2">
-                  <div className="text-xs font-mono font-bold text-[#FF4D4D]">{validationError}</div>
+                <div className="p-3.5 rounded-[6px] border-2 border-[#111111] bg-[#FF4D4D] text-white text-xs font-mono font-bold flex items-start gap-2 shadow-paper-sm">
+                  <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <div className="flex-1">{validationError}</div>
+                  <button type="button" onClick={() => setValidationError(null)} className="text-white hover:text-gray-200 text-xs font-bold cursor-pointer">✕</button>
                 </div>
               )}
 
-              {isLoadingConfig ? (
-                <div className="p-8 rounded-[6px] border-2 border-[#111111] bg-[#F6F2EA] flex flex-col items-center justify-center gap-3">
-                  <RefreshCw className="h-6 w-6 text-[#2F6BFF] animate-spin" />
-                  <span className="text-xs font-mono font-bold text-[#666666]">Fetching API Key telemetry...</span>
+              {/* CONNECTED KEYS LIST (RANK ORDERED BOXES) */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-heading font-extrabold uppercase text-[#111111] flex items-center gap-2">
+                    <Lock className="h-4 w-4 text-[#19B56B]" />
+                    <span>CONNECTED API KEYS ({savedKeys.length})</span>
+                  </h4>
+                  <span className="text-[10px] font-mono font-bold text-[#666666]">
+                    AES-256 Encrypted • Auto Failover Enabled
+                  </span>
                 </div>
-              ) : (
-                <div className="space-y-5">
-                  {/* AI Connection Telemetry Card */}
-                  <div className="p-5 rounded-[6px] border-2 border-[#111111] bg-[#F6F2EA] space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b-2 border-[#111111]">
-                      <div>
-                        <h4 className="text-xs font-heading font-extrabold uppercase text-[#111111]">AI Connection Telemetry</h4>
-                        <p className="text-[10px] font-mono font-bold text-[#666666] mt-0.5">Real-time status of your secure Bring Your Own Key configuration.</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="px-2.5 py-0.5 rounded-[4px] border border-[#111111] bg-[#FFC400] text-[#111111] text-[9px] font-mono font-extrabold uppercase">
-                          {configStatus?.lastHealthCheck?.status || 'HEALTHY'}
-                        </span>
-                        <span className="px-2.5 py-0.5 rounded-[4px] border border-[#111111] bg-[#19B56B] text-white text-[9px] font-mono font-extrabold uppercase">
-                          {configStatus?.configured ? 'CONNECTED' : 'NOT CONFIG'}
-                        </span>
-                      </div>
-                    </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-xs font-mono font-bold text-[#111111]">
-                      <div>
-                        <div className="text-[9px] uppercase text-[#666666]">AI Provider</div>
-                        <div className="mt-1 font-extrabold">
-                          {PROVIDER_METADATA[configStatus?.provider || '']?.name || configStatus?.provider || 'Google Gemini'}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-[9px] uppercase text-[#666666]">Active Model</div>
-                        <div className="mt-1 font-extrabold text-[#2F6BFF]">
-                          {configStatus?.selectedModel || 'gemini-3.6-flash'}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-[9px] uppercase text-[#666666]">Security Cipher</div>
-                        <div className="mt-1 font-extrabold flex items-center gap-1">
-                          <Lock className="h-3 w-3 text-[#2F6BFF]" />
-                          <span>AES-256-GCM</span>
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-[9px] uppercase text-[#666666]">Key Source</div>
-                        <div className="mt-1 font-extrabold text-[#19B56B]">
-                          {configStatus?.keySource === 'user-byok' ? 'Your API key (BYOK)' : 'No key configured'}
-                        </div>
-                      </div>
-                    </div>
-
-                    {configStatus?.platformQuotaAvailable && (
-                      <p className="text-[10px] font-mono font-bold text-[#666666] border-t-2 border-[#111111] pt-3">
-                        Platform quota is available only when explicitly enabled for a request; normal generation uses your configured BYOK key.
-                      </p>
-                    )}
-
-                    <div className="flex flex-wrap gap-2.5 pt-3 border-t-2 border-[#111111]">
-                      <button
-                        onClick={handleRevalidateKey}
-                        disabled={revalidating || !configStatus?.configured}
-                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-[6px] border-2 border-[#111111] bg-white text-[#111111] text-xs font-mono font-extrabold uppercase hover:bg-[#FFC400] transition-all shadow-paper-sm cursor-pointer disabled:opacity-50"
-                      >
-                        <RefreshCw className={`h-3.5 w-3.5 ${revalidating ? 'animate-spin' : ''}`} />
-                        <span>Validate Key</span>
-                      </button>
-
-                      <button
-                        onClick={() => setShowReplaceForm(!showReplaceForm)}
-                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-[6px] border-2 border-[#111111] bg-[#2F6BFF] text-white text-xs font-mono font-extrabold uppercase hover:bg-[#255cd9] transition-all shadow-paper-sm cursor-pointer"
-                      >
-                        <Key className="h-3.5 w-3.5" />
-                        <span>{showReplaceForm ? 'Hide Form' : 'Change Provider'}</span>
-                      </button>
-
-                      <button
-                        onClick={handleDeleteKey}
-                        disabled={deletingKey || !configStatus?.configured}
-                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-[6px] border-2 border-[#111111] bg-[#FF4D4D] text-white text-xs font-mono font-extrabold uppercase hover:bg-red-700 transition-all shadow-paper-sm cursor-pointer ml-auto disabled:opacity-50"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        <span>Delete Active Key</span>
-                      </button>
-                    </div>
+                {loadingSavedKeys ? (
+                  <div className="p-6 rounded-[6px] border-2 border-[#111111] bg-[#F6F2EA] text-center text-xs font-mono font-bold text-[#666666] animate-pulse">
+                    Loading connected API keys...
                   </div>
-
-                  {/* SAVED KEYS & BACKUP PRESETS ENCRYPTED VAULT CARD */}
-                  <div className="p-5 rounded-[6px] border-2 border-[#111111] bg-white space-y-4 shadow-paper-sm text-left">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b-2 border-[#111111]">
-                      <div>
-                        <span className="text-[10px] font-mono font-extrabold text-[#19B56B] uppercase tracking-[2px] block flex items-center gap-1">
-                          <Lock className="h-3 w-3 text-[#19B56B]" />
-                          AES-256 ENCRYPTED KEY VAULT
-                        </span>
-                        <h4 className="text-sm font-heading font-extrabold uppercase text-[#111111] mt-0.5">
-                          Saved API Key Presets & Backup Keys
-                        </h4>
-                        <p className="text-[10px] font-mono font-bold text-[#666666] mt-0.5">
-                          Store multiple API keys & models for 1-click switching and automatic failover if rate limits (429/quota) occur.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setShowReplaceForm(true)}
-                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-[6px] border-2 border-[#111111] bg-[#FFC400] text-[#111111] text-xs font-mono font-extrabold uppercase hover:bg-[#ffe066] transition-all shadow-paper-sm shrink-0 cursor-pointer"
-                      >
-                        <Key className="h-3.5 w-3.5" />
-                        <span>+ Add Key Preset</span>
-                      </button>
-                    </div>
-
-                    {loadingSavedKeys ? (
-                      <div className="py-4 text-center text-xs font-mono text-[#666666] animate-pulse">Loading saved key vault...</div>
-                    ) : savedKeys.length === 0 ? (
-                      <div className="p-4 rounded-[6px] border-2 border-dashed border-[#111111] bg-[#F6F2EA] text-center space-y-1">
-                        <p className="text-xs font-mono font-bold text-[#111111]">No saved backup API key presets in vault yet.</p>
-                        <p className="text-[10px] font-mono text-[#666666]">Add backup keys from OpenAI, Gemini, Groq, or OpenRouter so your workspace automatically switches if quota limits are reached.</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2.5">
-                        {savedKeys.map((preset) => (
-                          <div
-                            key={preset.id}
-                            className={`p-3.5 rounded-[6px] border-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all ${preset.isActive
-                                ? 'border-[#10B981] bg-[#F0FDF4] shadow-paper-xs'
-                                : 'border-[#111111] bg-[#F6F2EA]'
-                              }`}
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className={`p-2 rounded border-2 ${preset.isActive ? 'bg-[#10B981] text-white border-[#065F46]' : 'bg-white text-[#111111] border-[#111111]'}`}>
-                                <Key className="h-4 w-4" />
+                ) : savedKeys.length === 0 ? (
+                  <div className="p-6 rounded-[6px] border-2 border-dashed border-[#111111] bg-[#F6F2EA] text-center space-y-2">
+                    <p className="text-xs font-mono font-extrabold text-[#111111]">No API keys currently connected.</p>
+                    <p className="text-[10px] font-mono text-[#666666]">Add your Google Gemini, Groq, OpenAI, or OpenRouter API key below to enable AI note generation.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {savedKeys.map((preset, index) => {
+                      const isFirst = index === 0;
+                      const isLast = index === savedKeys.length - 1;
+                      const provMeta = PROVIDER_METADATA[preset.provider] || { name: preset.provider };
+                      return (
+                        <div
+                          key={preset.id}
+                          className={`p-4 rounded-[6px] border-2 transition-all shadow-paper-sm ${isFirst
+                              ? 'border-[#10B981] bg-[#F0FDF4]'
+                              : 'border-[#111111] bg-white'
+                            }`}
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="flex items-start sm:items-center gap-3">
+                              {/* Rank Badge */}
+                              <div className={`px-2.5 py-1 rounded-[4px] border-2 text-center font-mono font-extrabold text-xs shrink-0 ${isFirst
+                                  ? 'bg-[#10B981] text-white border-[#065F46]'
+                                  : 'bg-[#FFC400] text-[#111111] border-[#111111]'
+                                }`}>
+                                #{preset.rank || index + 1} {isFirst ? 'PRIMARY' : 'BACKUP'}
                               </div>
+
                               <div>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs font-mono font-extrabold uppercase text-[#111111]">{preset.label}</span>
-                                  {preset.isActive && (
-                                    <span className="px-2 py-0.5 rounded-[4px] bg-[#10B981] text-white text-[9px] font-mono font-extrabold border border-[#065F46] uppercase">
-                                      ACTIVE KEY
-                                    </span>
-                                  )}
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-heading font-extrabold text-sm text-[#111111] uppercase">
+                                    {provMeta.name}
+                                  </span>
+                                  <span className="text-xs font-mono font-extrabold text-[#2F6BFF] bg-[#EFF6FF] px-2 py-0.5 rounded border border-[#2F6BFF]/30">
+                                    {preset.model}
+                                  </span>
+                                  <span className="px-2 py-0.5 rounded-[4px] border border-[#111111] bg-[#19B56B] text-white text-[9px] font-mono font-extrabold uppercase">
+                                    HEALTHY
+                                  </span>
                                 </div>
-                                <div className="text-[10px] font-mono font-bold text-[#666666] flex items-center gap-2 mt-0.5">
-                                  <span>Key: <code className="bg-white px-1.5 py-0.5 rounded border border-[#111111] text-[#111111]">{preset.maskedKey}</code></span>
-                                  <span>Model: <span className="text-[#2F6BFF] font-extrabold">{preset.model}</span></span>
+                                <div className="text-[11px] font-mono font-bold text-[#666666] flex items-center gap-3 mt-1">
+                                  <span>Key: <code className="bg-[#F6F2EA] px-1.5 py-0.5 rounded border border-[#111111] text-[#111111]">{preset.maskedKey}</code></span>
+                                  <span>Label: <strong className="text-[#111111]">{preset.label || provMeta.name}</strong></span>
                                 </div>
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-2 shrink-0">
-                              {!preset.isActive && (
+                            {/* Actions & Priority Reorder Controls */}
+                            <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                              {/* Move Up/Down buttons */}
+                              <div className="flex items-center border-2 border-[#111111] rounded-[4px] bg-[#F6F2EA] overflow-hidden">
                                 <button
                                   type="button"
-                                  disabled={switchingKeyId === preset.id}
-                                  onClick={() => handleSwitchSavedKey(preset.id)}
-                                  className="px-3 py-1.5 rounded-[4px] border-2 border-[#111111] bg-[#2F6BFF] text-white text-[11px] font-mono font-extrabold uppercase hover:bg-[#255cd9] transition-all cursor-pointer shadow-paper-xs disabled:opacity-50"
+                                  disabled={isFirst}
+                                  onClick={() => handleMoveRank(preset.id, 'up')}
+                                  className="px-2 py-1 hover:bg-[#FFC400] disabled:opacity-30 disabled:hover:bg-transparent border-r border-[#111111] text-[#111111] transition-colors cursor-pointer"
+                                  title="Increase Priority Rank (Move Up)"
                                 >
-                                  {switchingKeyId === preset.id ? 'Switching...' : 'Use as Active Key'}
+                                  <ChevronUp className="h-4 w-4" />
                                 </button>
-                              )}
+                                <button
+                                  type="button"
+                                  disabled={isLast}
+                                  onClick={() => handleMoveRank(preset.id, 'down')}
+                                  className="px-2 py-1 hover:bg-[#FFC400] disabled:opacity-30 disabled:hover:bg-transparent text-[#111111] transition-colors cursor-pointer"
+                                  title="Lower Priority Rank (Move Down)"
+                                >
+                                  <ChevronDown className="h-4 w-4" />
+                                </button>
+                              </div>
+
                               <button
                                 type="button"
                                 disabled={deletingPresetId === preset.id}
                                 onClick={() => handleDeleteSavedKey(preset.id)}
                                 className="p-1.5 rounded-[4px] border-2 border-[#111111] bg-white text-[#FF4D4D] hover:bg-red-50 transition-all cursor-pointer"
-                                title="Remove preset"
+                                title="Delete Connected API Key"
                               >
-                                <Trash2 className="h-3.5 w-3.5" />
+                                <Trash2 className="h-4 w-4" />
                               </button>
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    )}
+                        </div>
+                      );
+                    })}
                   </div>
+                )}
 
-                  {/* Replace Key Form */}
-                  {showReplaceForm && (
+                {/* BELOW THE LAST BOX: EXPANDABLE "+ ADD ANOTHER API KEY" BOX */}
+                <div className="pt-2">
+                  {!showReplaceForm ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowReplaceForm(true);
+                        setNewKeyRank(savedKeys.length + 1);
+                      }}
+                      className="w-full p-4 rounded-[6px] border-2 border-dashed border-[#111111] bg-[#F6F2EA] hover:bg-[#FFC400]/20 text-[#111111] font-mono text-xs font-extrabold uppercase flex items-center justify-center gap-2 transition-all cursor-pointer shadow-paper-xs"
+                    >
+                      <Key className="h-4 w-4 text-[#2F6BFF]" />
+                      <span>+ ADD ANOTHER API KEY</span>
+                    </button>
+                  ) : (
                     <form onSubmit={handleSaveNewKey} className="p-5 rounded-[6px] border-2 border-[#111111] bg-white space-y-4 shadow-paper-md text-left">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b-2 border-[#111111]">
                         <div>
-                          <h4 className="text-xs font-heading font-extrabold uppercase text-[#111111]">Configure AI Provider Connection</h4>
-                          <p className="text-[10px] font-mono font-bold text-[#666666] mt-0.5">Your key is decrypted only during model requests and is encrypted server-side.</p>
+                          <h4 className="text-xs font-heading font-extrabold uppercase text-[#111111]">
+                            Connect & Rank New API Key
+                          </h4>
+                          <p className="text-[10px] font-mono font-bold text-[#666666] mt-0.5">
+                            Input API details and set its priority rank. Safely encrypted with AES-256.
+                          </p>
                         </div>
 
-                        {/* DIRECT BUTTON TO GOOGLE AI STUDIO / PROVIDER API KEY PORTAL */}
                         {PROVIDER_METADATA[aiProvider]?.getKeyLink && (
                           <a
                             href={PROVIDER_METADATA[aiProvider].getKeyLink}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-1.5 px-3.5 py-2 rounded-[6px] border-2 border-[#111111] bg-[#2563EB] text-white text-xs font-mono font-extrabold uppercase hover:bg-blue-700 transition-all shadow-paper-sm shrink-0 cursor-pointer"
+                            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-[6px] border-2 border-[#111111] bg-[#2563EB] text-white text-xs font-mono font-extrabold uppercase hover:bg-blue-700 transition-all shadow-paper-sm shrink-0 cursor-pointer"
                           >
                             <Key className="h-3.5 w-3.5" />
-                            <span>Get {PROVIDER_METADATA[aiProvider].name} API Key</span>
+                            <span>Get {PROVIDER_METADATA[aiProvider].name} Key</span>
                             <ExternalLink className="h-3.5 w-3.5" />
                           </a>
                         )}
                       </div>
 
-                      {/* DIRECT HELP BANNER FOR GETTING API KEY */}
-                      <div className="p-3.5 rounded-[6px] border-2 border-[#111111] bg-[#EFF6FF] dark:bg-[#1E293B] flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="p-2 rounded-md bg-[#2563EB] text-white shrink-0">
-                            <Key className="h-4 w-4" />
-                          </div>
-                          <div>
-                            <h5 className="text-xs font-mono font-extrabold uppercase text-[#111111] dark:text-white">
-                              Need an API Key for {PROVIDER_METADATA[aiProvider]?.name || 'Google Gemini'}?
-                            </h5>
-                            <p className="text-[10px] font-mono font-bold text-[#475569] dark:text-slate-300">
-                              Click to open {PROVIDER_METADATA[aiProvider]?.name || 'Google AI Studio'} directly in a new tab and create your free key.
-                            </p>
-                          </div>
-                        </div>
-                        {PROVIDER_METADATA[aiProvider]?.getKeyLink && (
-                          <a
-                            href={PROVIDER_METADATA[aiProvider].getKeyLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1 px-3 py-1.5 rounded-[4px] border-2 border-[#111111] bg-[#FFC400] text-[#111111] text-[11px] font-mono font-extrabold uppercase hover:bg-[#ffe066] transition-all shadow-paper-xs shrink-0 cursor-pointer"
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                        {/* Rank selection */}
+                        <div className="space-y-1.5">
+                          <label className="text-[9px] font-mono font-extrabold uppercase text-[#111111] block">Priority Rank</label>
+                          <select
+                            value={newKeyRank}
+                            onChange={(e) => setNewKeyRank(Number(e.target.value))}
+                            className="w-full rounded-[6px] border-2 border-[#111111] bg-[#F6F2EA] p-2.5 text-xs font-mono font-bold text-[#111111] outline-none shadow-paper-sm cursor-pointer"
                           >
-                            <span>Open Site ↗</span>
-                          </a>
-                        )}
-                      </div>
+                            {Array.from({ length: savedKeys.length + 1 }, (_, i) => i + 1).map((r) => (
+                              <option key={r} value={r}>
+                                Rank #{r} {r === 1 ? '(Primary)' : `(Backup)`}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         {/* Searchable Dropdown Selector */}
                         <div className="space-y-1.5 relative">
                           <label className="text-[9px] font-mono font-extrabold uppercase text-[#111111] block">AI Provider</label>
@@ -1562,27 +1545,11 @@ export default function SettingsView({
                                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#111111]" />
                                     <input
                                       type="text"
-                                      name="search_ai_provider_settings_no_autofill"
-                                      id="search_ai_provider_settings_no_autofill"
-                                      autoComplete="off"
-                                      autoCorrect="off"
-                                      autoCapitalize="off"
-                                      spellCheck={false}
-                                      aria-autocomplete="none"
                                       value={searchQuery}
                                       onChange={(e) => setSearchQuery(e.target.value)}
                                       placeholder="Search providers..."
                                       className="w-full rounded-[4px] border-2 border-[#111111] bg-[#F6F2EA] pl-8 pr-7 py-1 text-[11px] font-mono font-bold outline-none"
                                     />
-                                    {searchQuery && (
-                                      <button
-                                        type="button"
-                                        onClick={() => setSearchQuery('')}
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-black font-bold text-xs p-0.5"
-                                      >
-                                        ✕
-                                      </button>
-                                    )}
                                   </div>
                                   <div className="max-h-40 overflow-y-auto space-y-0.5">
                                     {Object.entries(PROVIDER_METADATA)
@@ -1613,7 +1580,7 @@ export default function SettingsView({
 
                         {/* Model Select */}
                         <div className="space-y-1.5">
-                          <label className="text-[9px] font-mono font-extrabold uppercase text-[#111111] block">Active Model</label>
+                          <label className="text-[9px] font-mono font-extrabold uppercase text-[#111111] block">AI Model</label>
                           <select
                             value={PROVIDER_METADATA[aiProvider]?.models.includes(selectedModel) ? selectedModel : 'custom'}
                             onChange={(e) => {
@@ -1622,8 +1589,6 @@ export default function SettingsView({
                                 setSelectedModel('');
                               } else {
                                 setSelectedModel(val);
-                                localStorage.setItem('noteit_active_ai_model', val);
-                                localStorage.setItem('noteit_selected_model', val);
                               }
                             }}
                             className="w-full rounded-[6px] border-2 border-[#111111] bg-[#F6F2EA] p-2.5 text-xs font-mono font-bold text-[#111111] outline-none shadow-paper-sm cursor-pointer"
@@ -1631,59 +1596,26 @@ export default function SettingsView({
                             {PROVIDER_METADATA[aiProvider]?.models.map(m => (
                               <option key={m} value={m}>{m}</option>
                             ))}
-                            <option value="custom">Custom (Type below)</option>
+                            <option value="custom">Custom Model</option>
                           </select>
-
-                          {!PROVIDER_METADATA[aiProvider]?.models.includes(selectedModel) && (
-                            <input
-                              type="text"
-                              placeholder={`Enter custom ${PROVIDER_METADATA[aiProvider]?.name} model ID (e.g. gemini-2.0-flash)`}
-                              value={selectedModel === 'custom' ? '' : selectedModel}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setSelectedModel(val);
-                                if (val.trim()) {
-                                  localStorage.setItem('noteit_active_ai_model', val.trim());
-                                  localStorage.setItem('noteit_selected_model', val.trim());
-                                }
-                              }}
-                              className="w-full mt-2 rounded-[6px] border-2 border-[#111111] bg-white p-2.5 text-xs font-mono font-bold text-[#111111] outline-none shadow-paper-sm"
-                            />
-                          )}
                         </div>
 
-                        {/* API Key */}
+                        {/* Secret API Key Input */}
                         <div className="space-y-1.5">
-                          <div className="flex items-center justify-between">
-                            <label className="text-[9px] font-mono font-extrabold uppercase text-[#111111] dark:text-slate-300 block">New API Key *</label>
-                            {PROVIDER_METADATA[aiProvider]?.getKeyLink && (
-                              <a
-                                href={PROVIDER_METADATA[aiProvider].getKeyLink}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-[10px] font-mono font-extrabold text-[#2563EB] hover:text-blue-700 hover:underline flex items-center gap-1"
-                              >
-                                <span>Get Key ↗</span>
-                              </a>
-                            )}
-                          </div>
+                          <label className="text-[9px] font-mono font-extrabold uppercase text-[#111111] block">Secret Key *</label>
                           <div className="relative flex items-center">
                             <input
                               type={showNewKeyPassword ? "text" : "password"}
                               required
                               value={newKey}
                               onChange={(e) => setNewKey(e.target.value)}
-                              placeholder={`Secret key for ${PROVIDER_METADATA[aiProvider]?.name}`}
-                              className={`w-full rounded-[6px] border-2 px-3 py-2.5 pr-10 text-xs font-mono font-extrabold outline-none shadow-paper-sm transition-all ${newKey.trim()
-                                  ? 'border-[#10B981] bg-[#F0FDF4] text-[#065F46] dark:bg-[#064E3B]/40 dark:text-[#A7F3D0]'
-                                  : 'border-[#111111] bg-white dark:bg-[#0D1117] text-[#0F172A] dark:text-white placeholder-[#777777]'
-                                }`}
+                              placeholder={`Key for ${PROVIDER_METADATA[aiProvider]?.name}`}
+                              className="w-full rounded-[6px] border-2 border-[#111111] bg-white px-3 py-2 text-xs font-mono font-extrabold outline-none shadow-paper-sm pr-9"
                             />
                             <button
                               type="button"
                               onClick={() => setShowNewKeyPassword(!showNewKeyPassword)}
-                              className="absolute right-2.5 p-1 text-[#475569] dark:text-slate-400 hover:text-[#111111] dark:hover:text-white cursor-pointer bg-slate-100 dark:bg-slate-800 rounded border border-slate-300 dark:border-slate-700"
-                              title={showNewKeyPassword ? "Hide API key" : "Show API key"}
+                              className="absolute right-2 p-1 text-[#666666] hover:text-[#111111] cursor-pointer"
                             >
                               {showNewKeyPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                             </button>
@@ -1691,7 +1623,7 @@ export default function SettingsView({
                         </div>
                       </div>
 
-                      <div className="flex justify-end gap-2 pt-2">
+                      <div className="flex justify-end gap-2 pt-2 border-t border-gray-200">
                         <button
                           type="button"
                           onClick={() => {
@@ -1699,86 +1631,28 @@ export default function SettingsView({
                             setNewKey('');
                             setValidationError(null);
                           }}
-                          className="px-3.5 py-2 rounded-[6px] border-2 border-[#111111] bg-white text-[#111111] text-xs font-mono font-extrabold uppercase hover:bg-gray-100 cursor-pointer"
+                          className="px-4 py-2 rounded-[6px] border-2 border-[#111111] bg-white text-[#111111] text-xs font-mono font-extrabold uppercase hover:bg-gray-100 cursor-pointer"
                         >
                           Cancel
                         </button>
                         <button
                           type="submit"
                           disabled={savingKey}
-                          className="flex items-center gap-1.5 px-4.5 py-2 rounded-[6px] border-2 border-[#111111] bg-[#FFC400] text-[#111111] text-xs font-mono font-extrabold uppercase hover:bg-[#ffe066] cursor-pointer shadow-paper-sm"
+                          className="flex items-center gap-1.5 px-5 py-2 rounded-[6px] border-2 border-[#111111] bg-[#FFC400] text-[#111111] text-xs font-mono font-extrabold uppercase hover:bg-[#ffe066] cursor-pointer shadow-paper-sm disabled:opacity-50"
                         >
                           {savingKey ? (
                             <>
                               <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                              <span>Validating...</span>
+                              <span>Validating Key...</span>
                             </>
                           ) : (
-                            <span>Save & Connect</span>
+                            <span>Validate & Add to Rank #{newKeyRank}</span>
                           )}
                         </button>
                       </div>
                     </form>
                   )}
                 </div>
-              )}
-
-              {/* Checkbox Parameters */}
-              <div className="space-y-4 pt-2">
-                <div className="flex items-start justify-between gap-4 p-4 border-2 border-[#111111] rounded-[6px] bg-[#F6F2EA]">
-                  <div className="flex-1">
-                    <h4 className="text-xs font-heading font-extrabold uppercase text-[#111111]">Proactive Concept Suggestion</h4>
-                    <p className="text-[11px] font-mono text-[#666666] font-bold mt-0.5">
-                      Automatically recommend linked articles and weak-topics material in your dashboard based on note contexts.
-                    </p>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={proactive}
-                    onChange={(e) => setProactive(e.target.checked)}
-                    className="h-5 w-5 rounded border-2 border-[#111111] accent-[#2F6BFF] cursor-pointer mt-0.5"
-                  />
-                </div>
-
-                <div className="flex items-start justify-between gap-4 p-4 border-2 border-[#111111] rounded-[6px] bg-[#F6F2EA]">
-                  <div className="flex-1">
-                    <h4 className="text-xs font-heading font-extrabold uppercase text-[#111111]">Automated Bibliography Generation</h4>
-                    <p className="text-[11px] font-mono text-[#666666] font-bold mt-0.5">
-                      Precompile standard LaTeX style citations references for uploaded PDFs or external research paper URLs.
-                    </p>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={bibliography}
-                    onChange={(e) => setBibliography(e.target.checked)}
-                    className="h-5 w-5 rounded border-2 border-[#111111] accent-[#2F6BFF] cursor-pointer mt-0.5"
-                  />
-                </div>
-
-                <div className="flex items-start justify-between gap-4 p-4 border-2 border-[#111111] rounded-[6px] bg-[#F6F2EA]">
-                  <div className="flex-1">
-                    <h4 className="text-xs font-heading font-extrabold uppercase text-[#111111]">High-Intensity Synthesis Engine</h4>
-                    <p className="text-[11px] font-mono text-[#666666] font-bold mt-0.5">
-                      Apply deeper token-scanning parameters for massive 100+ page textbook outlines.
-                    </p>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={synthesis}
-                    disabled={settings.subscription.planName === 'BYOK'}
-                    onChange={(e) => setSynthesis(e.target.checked)}
-                    className="h-5 w-5 rounded border-2 border-[#111111] accent-[#2F6BFF] cursor-pointer mt-0.5 disabled:opacity-50"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-4 border-t-2 border-[#111111] flex justify-end">
-                <button
-                  onClick={handleSaveAISettings}
-                  className="rounded-[6px] border-2 border-[#111111] bg-[#FFC400] text-[#111111] font-mono text-xs font-extrabold uppercase px-5 py-2.5 shadow-paper-sm hover:bg-[#ffe066] transition-all cursor-pointer"
-                >
-                  Save Parameters
-                </button>
               </div>
             </div>
           )}

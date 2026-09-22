@@ -216,10 +216,17 @@ app.post('/api/ai/validate-key', authenticateFirebaseUser, async (req, res) => {
     const user = req.body.user;
     const uid = user.uid;
     const encrypted = encryptKey(inputKey);
-
     const defaultModel = sanitizeModelName(model, activeProvider);
     const masked = maskApiKey(inputKey);
     const presetId = `key_${activeProvider}_${masked.replace(/[^a-zA-Z0-9]/g, '')}`;
+
+    const adminDb = getFirestore();
+    const userDocRef = adminDb.collection('users').doc(uid);
+    const userSnap = await userDocRef.get().catch(() => null);
+    const userData = userSnap && userSnap.exists ? userSnap.data() : {};
+
+    const existingSavedKeysCount = (userData?.savedKeys && Array.isArray(userData.savedKeys)) ? userData.savedKeys.length : 0;
+    const assignedRank = req.body.rank ? Number(req.body.rank) : (existingSavedKeysCount + 1);
 
     const newPreset = {
       id: presetId,
@@ -228,28 +235,25 @@ app.post('/api/ai/validate-key', authenticateFirebaseUser, async (req, res) => {
       encryptedKey: encrypted,
       maskedKey: masked,
       label: label || `${activeProvider.toUpperCase()} (${defaultModel})`,
+      rank: assignedRank,
       savedAt: new Date().toISOString(),
       lastUsedAt: new Date().toISOString()
     };
 
     try {
-      const adminDb = getFirestore();
-      const userDocRef = adminDb.collection('users').doc(uid);
-      const userSnap = await userDocRef.get().catch(() => null);
-      const userData = userSnap && userSnap.exists ? userSnap.data() : {};
-
       const existingSavedKeys: any[] = Array.isArray(userData?.savedKeys) ? userData.savedKeys : [];
       const updatedSavedKeys = existingSavedKeys.filter(
         (k: any) => k.id !== presetId && !(k.provider === activeProvider && k.maskedKey === masked)
       );
-      updatedSavedKeys.unshift(newPreset);
+      updatedSavedKeys.push(newPreset);
+      updatedSavedKeys.sort((a: any, b: any) => (a.rank || 99) - (b.rank || 99));
 
       const updateFields: any = {
         savedKeys: updatedSavedKeys
       };
 
-      // Update active provider & key unless specifically adding as a non-active backup key
-      if (!isBackupOnly) {
+      // Set as active provider & key if rank is 1 or not backup-only
+      if (!isBackupOnly || assignedRank === 1) {
         updateFields.aiProvider = activeProvider;
         updateFields.providerConfigured = true;
         updateFields.providerLastValidated = new Date();
@@ -269,7 +273,7 @@ app.post('/api/ai/validate-key', authenticateFirebaseUser, async (req, res) => {
       console.warn('[validate-key] Local Firestore save skipped (no GCP ADC credentials):', fsErr);
     }
 
-    res.json({ success: true, message: `${activeProvider} API key validated and saved to encrypted vault`, preset: newPreset });
+    res.json({ success: true, message: `${activeProvider} API key validated and saved to encrypted vault (Rank #${assignedRank})`, preset: newPreset });
   } catch (error: any) {
     console.error(`API key validation error for provider ${inputProvider}:`, error);
     if (error.name === 'ProviderValidationError') {
@@ -280,7 +284,7 @@ app.post('/api/ai/validate-key', authenticateFirebaseUser, async (req, res) => {
   }
 });
 
-// Endpoint to list saved API key presets (masked keys only)
+// Endpoint to list saved API key presets with ranks
 app.get('/api/ai/saved-keys', authenticateFirebaseUser, async (req, res) => {
   try {
     const uid = req.body.user.uid;
@@ -291,20 +295,73 @@ app.get('/api/ai/saved-keys', authenticateFirebaseUser, async (req, res) => {
     const activeProvider = data?.aiProvider || 'gemini';
     const activeModel = data?.selectedModel || 'gemini-3.6-flash';
 
-    const formatted = savedKeys.map((k: any) => ({
-      id: k.id,
-      provider: k.provider,
-      model: k.model,
-      maskedKey: k.maskedKey,
-      label: k.label || `${k.provider.toUpperCase()} (${k.model})`,
-      savedAt: k.savedAt,
-      lastUsedAt: k.lastUsedAt,
-      isActive: k.provider === activeProvider && k.model === activeModel
-    }));
+    const formatted = savedKeys
+      .map((k: any, idx: number) => ({
+        id: k.id,
+        provider: k.provider,
+        model: k.model,
+        maskedKey: k.maskedKey,
+        label: k.label || `${k.provider.toUpperCase()} (${k.model})`,
+        rank: k.rank || (idx + 1),
+        status: k.status || 'Healthy',
+        savedAt: k.savedAt,
+        lastUsedAt: k.lastUsedAt,
+        isActive: k.provider === activeProvider && k.model === activeModel
+      }))
+      .sort((a, b) => a.rank - b.rank);
 
     res.json({ success: true, savedKeys: formatted, activeProvider, activeModel });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to fetch saved API keys' });
+  }
+});
+
+// Endpoint to reorder API key priority ranks
+app.post('/api/ai/saved-keys/reorder', authenticateFirebaseUser, async (req, res) => {
+  const { keyRanks } = req.body;
+  if (!Array.isArray(keyRanks)) {
+    res.status(400).json({ error: 'Missing required parameter: keyRanks array' });
+    return;
+  }
+
+  try {
+    const uid = req.body.user.uid;
+    const adminDb = getFirestore();
+    const userDocRef = adminDb.collection('users').doc(uid);
+    const userDoc = await userDocRef.get();
+    if (!userDoc.exists) {
+      res.status(404).json({ error: 'User configuration not found' });
+      return;
+    }
+
+    const data = userDoc.data() || {};
+    let savedKeys: any[] = Array.isArray(data.savedKeys) ? data.savedKeys : [];
+
+    const rankMap = new Map<string, number>();
+    keyRanks.forEach((item: any) => rankMap.set(item.id, Number(item.rank)));
+
+    savedKeys = savedKeys.map((k: any) => ({
+      ...k,
+      rank: rankMap.has(k.id) ? rankMap.get(k.id) : (k.rank || 99)
+    }));
+
+    savedKeys.sort((a: any, b: any) => (a.rank || 99) - (b.rank || 99));
+
+    const updateFields: any = { savedKeys };
+
+    if (savedKeys.length > 0) {
+      const topRankKey = savedKeys[0];
+      updateFields.aiProvider = topRankKey.provider;
+      updateFields.selectedModel = topRankKey.model;
+      updateFields.encryptedApiKey = topRankKey.encryptedKey;
+      updateFields.providerConfigured = true;
+    }
+
+    await userDocRef.set(updateFields, { merge: true });
+
+    res.json({ success: true, message: 'API key priority ranks updated', savedKeys });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to reorder API keys' });
   }
 });
 
@@ -596,19 +653,28 @@ app.post('/api/ai/provider-proxy', authenticateFirebaseUser, enforceAiUsage, asy
       console.warn(`[provider-proxy] Primary provider (${providerName}) execution failed:`, primaryErr?.message || primaryErr);
       let retrySuccess = false;
 
-      // Tier 1: Saved backup keys if available
+      // Tier 1: Ranked backup keys in order of rank priority (1, 2, 3...)
       if (data?.savedKeys && Array.isArray(data.savedKeys)) {
-        const backupPresets = data.savedKeys.filter((k: any) => k.encryptedKey !== rawKey && k.encryptedKey !== data?.encryptedApiKey);
+        const sortedPresets = [...data.savedKeys].sort((a: any, b: any) => (a.rank || 99) - (b.rank || 99));
+        const backupPresets = sortedPresets.filter((k: any) => k.encryptedKey !== rawKey && k.encryptedKey !== data?.encryptedApiKey);
+
         for (const backupKeyPreset of backupPresets) {
           try {
             const backupDecrypted = decryptKey(backupKeyPreset.encryptedKey);
-            console.warn(`[provider-proxy] Retrying with user saved backup key (${backupKeyPreset.provider.toUpperCase()} - ${backupKeyPreset.model})...`);
+            const rankLabel = backupKeyPreset.rank ? `Rank #${backupKeyPreset.rank}` : 'Backup';
+            console.warn(`[provider-proxy] Primary key limit reached. Failing over to ${rankLabel} Key (${backupKeyPreset.provider.toUpperCase()} - ${backupKeyPreset.model})...`);
+
             const backupProviderInstance = ProviderFactory.getProvider(backupKeyPreset.provider, backupDecrypted);
             result = await executeProxyCall(backupProviderInstance, backupKeyPreset.model);
+
+            res.setHeader('X-NoteIT-Fallback-Used', 'true');
+            res.setHeader('X-NoteIT-Active-Rank', String(backupKeyPreset.rank || 2));
+            res.setHeader('X-NoteIT-Active-Provider', backupKeyPreset.provider);
+
             retrySuccess = true;
             break;
           } catch (backupErr: any) {
-            console.warn(`[provider-proxy] Saved backup key (${backupKeyPreset.provider}) also failed:`, backupErr?.message || backupErr);
+            console.warn(`[provider-proxy] Saved key (${backupKeyPreset.provider}) failed:`, backupErr?.message || backupErr);
           }
         }
       }
