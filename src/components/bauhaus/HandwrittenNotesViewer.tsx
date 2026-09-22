@@ -290,6 +290,7 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
 
   const isCompilingState = 
     isCompiling ||
+    !lectureData ||
     lectureData?.isGeneratingNotes ||
     lectureData?.isGeneratingSummary ||
     lectureData?.isGenerating ||
@@ -299,6 +300,8 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
     lectureData?.resourceGenerationStatus === 'generating' ||
     lectureData?.resourceGenerationStatus === 'transcribing' ||
     lectureData?.resourceGenerationStatus === 'queued' ||
+    lectureData?.status === 'uploading' ||
+    lectureData?.status === 'extracting' ||
     lectureData?.status === 'transcribing' ||
     lectureData?.status === 'analyzing' ||
     lectureData?.status === 'generating' ||
@@ -307,8 +310,12 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
   const rawNotesString =
     notesToMarkdown(lectureData?.notes, lectureData?.title || 'Lecture Study Notes') ||
     lectureData?.notes?.academic ||
+    lectureData?.notes?.quick ||
     lectureData?.notes?.detailed ||
+    (typeof lectureData?.notes === 'string' ? lectureData.notes : '') ||
     (typeof lectureData?.content === 'string' ? lectureData.content : '') ||
+    (typeof lectureData?.cleanTranscript === 'string' ? lectureData.cleanTranscript : '') ||
+    (typeof lectureData?.transcript === 'string' ? lectureData.transcript : '') ||
     '';
 
   const parsedMarkdown = React.useMemo(() => {
@@ -543,7 +550,7 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
     return pagesResult.slice(0, maxAllowedPages);
   }, [sections, overview, keyPoints, formulas, keyTerms, hasNotesContent, parsedMarkdown, rawNotesString]);
 
-  const showLoading = !hasNotesContent && isCompilingState;
+  const showLoading = (!hasNotesContent || pages.length === 0) && (isCompilingState || !lectureData);
 
   if (showLoading) {
     return (

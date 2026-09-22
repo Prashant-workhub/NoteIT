@@ -1967,9 +1967,18 @@ export default function LectureCaptureView({
                     </div>
 
                     <div className="space-y-3">
-                      {getAsset(activeLecture.id, 'notes', selectedNotesMode) ? (
+                      {(getAsset(activeLecture.id, 'notes', selectedNotesMode) || activeLecture?.notes || activeLecture?.cleanTranscript || activeLecture?.transcript) ? (
                         <div className="p-5 rounded-[6px] border border-[#111111] bg-white text-[#111111] shadow-paper-sm font-sans">
-                          <AcademicNotesViewer content={getAsset(activeLecture.id, 'notes', selectedNotesMode)} mode={selectedNotesMode} theme={theme} />
+                          <AcademicNotesViewer
+                            content={
+                              getAsset(activeLecture.id, 'notes', selectedNotesMode) ||
+                              (typeof activeLecture.notes === 'string' ? activeLecture.notes : (activeLecture.notes as any)?.[selectedNotesMode] || (activeLecture.notes as any)?.academic || (activeLecture.notes as any)?.quick) ||
+                              activeLecture.cleanTranscript ||
+                              activeLecture.transcript
+                            }
+                            mode={selectedNotesMode}
+                            theme={theme}
+                          />
                         </div>
                       ) : (isGeneratingNotes || isAssetLoading) ? (
                         <div className="py-16 flex flex-col items-center justify-center border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5">
@@ -2619,7 +2628,7 @@ export default function LectureCaptureView({
                   <HandwrittenNotesViewer
                     lectureData={activeLecture}
                     theme={theme}
-                    isCompiling={isGeneratingNotes || activeLecture?.status === 'transcribing'}
+                    isCompiling={isGeneratingNotes || isAssetLoading || activeLecture?.status === 'transcribing' || activeLecture?.status === 'uploading' || activeLecture?.status === 'extracting' || activeLecture?.status === 'analyzing' || activeLecture?.status === 'processing'}
                   />
                 )}
 
