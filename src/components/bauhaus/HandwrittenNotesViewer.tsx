@@ -20,6 +20,13 @@ function cleanMarkdownText(str: string): string {
     .replace(/\*(.*?)\*/g, '$1')
     .replace(/`(.*?)`/g, '$1')
     .replace(/\[Source:\s*[^\]]+\]/g, '')
+    .replace(/(Learning Objectives|Learning Outcomes|Lecture|Course Outcomes|Course Outcome)?\s*SLIDE\s*\d+\s*\/\s*\d+\s*(Chandigarh University|\w+\s+University)?\s*\d*\s*\/?\s*\d*/gi, '')
+    .replace(/(Chandigarh University|\b[A-Z][a-z]+\s+University)\s*\d*\s*\/?\s*\d*/gi, '')
+    .replace(/SLIDE\s*\d+\s*\/\s*\d+/gi, '')
+    .replace(/SLIDE\s*\d+/gi, '')
+    .replace(/(\bCO[1-6]\b|\bBT[1-6]\b|\bBT LEVEL\b|\bCourse OutcomeCO\b|\bDESCRIPTION CO[1-6]\b)[^\n]*/gi, '')
+    .replace(/Source:\s*media\.geeksforgeeks\.org/gi, '')
+    .replace(/\s{2,}/g, ' ')
     .trim();
 }
 

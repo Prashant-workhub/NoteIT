@@ -42,7 +42,7 @@ const notesResponseCache = new Map<string, any>();
 export const sanitizeTranscriptInput = (transcriptText: string): string => {
   if (!transcriptText || typeof transcriptText !== 'string') return '';
   const lines = transcriptText.split('\n');
-  const noiseRegex = /co-po|course outcome|program outcome|\bco[1-6]\b|\bpo[1-6]\b|table of content|\bindex\b|syllabus overview|faculty|instructor|office hour|email:|credit hour|prerequisite|evaluation scheme|attendance policy/i;
+  const noiseRegex = /co-po|course outcome|program outcome|\bco[1-6]\b|\bpo[1-6]\b|\bbt[1-6]\b|bt level|bloom level|table of content|\bindex\b|syllabus overview|faculty|instructor|office hour|email:|credit hour|prerequisite|evaluation scheme|attendance policy|slide\s*\d+|chandigarh university|\d+\s*\/\s*\d+/i;
 
   const cleanedLines = lines
     .map(line => line.trim())
@@ -1314,16 +1314,17 @@ export const generateInitialLectureAssets = async (
   onBusy?: (isBusy: boolean) => void,
   mode: string = 'academic'
 ): Promise<any> => {
-  // Pre-sanitize rawText to remove syllabus noise lines
+  // Pre-sanitize rawText to remove syllabus and slide header noise lines
   const lines = rawText.split('\n');
-  const noiseRegex = /co-po|course outcome|program outcome|\bco[1-6]\b|\bpo[1-6]\b|table of content|\bindex\b|syllabus overview|faculty|instructor|office hour|email:|credit hour|prerequisite|evaluation scheme|attendance policy/i;
+  const noiseRegex = /co-po|course outcome|program outcome|\bco[1-6]\b|\bpo[1-6]\b|\bbt[1-6]\b|bt level|bloom level|table of content|\bindex\b|syllabus overview|faculty|instructor|office hour|email:|credit hour|prerequisite|evaluation scheme|attendance policy|slide\s*\d+|chandigarh university|\d+\s*\/\s*\d+/i;
   const cleanRawText = lines.filter(line => !noiseRegex.test(line.trim())).join('\n').trim();
 
   const prompt = `
     You are an expert academic tutor and editor. Analyze the following raw source text.
     
     Tasks to perform:
-    1. Clean up the raw text, converting spoken language or raw layout text into clean, professional academic prose. Preserve any bracketed timestamps (e.g. [00:00], [01:15]) at their approximate correct locations if present in the source. Save this cleaned text under the 'cleanTranscript' field.
+    1. Clean up the raw text, converting spoken language or raw layout text into clean, professional academic prose. 
+       CRITICAL: Strip out all irrelevant slide page numbers (e.g., SLIDE 3 / 10), university headers/footers (e.g., Chandigarh University), Course Outcome mapping tables (CO1, BT3, BT LEVEL), or raw slide template headers. Preserve any real content bracketed timestamps (e.g. [00:00], [01:15]) if present in the source. Save this cleaned text under the 'cleanTranscript' field.
     2. Divide the lecture into logical structural sections/chapters. Each section must have an 'id', 'title', 'startTime', 'endTime', and 'content'.
     3. Generate a concise, high-yield summary of the lecture in professional ${mode} style.
     

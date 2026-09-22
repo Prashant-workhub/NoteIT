@@ -49,7 +49,7 @@ export interface AttachmentInputPayload {
 export function sanitizeDocumentText(rawText: string): string {
   if (!rawText) return '';
   const lines = rawText.split('\n');
-  const noiseRegex = /co-po|course outcome|program outcome|\bco[1-6]\b|\bpo[1-6]\b|table of content|\bindex\b|syllabus overview|faculty|instructor|office hour|email:|credit hour|prerequisite|evaluation scheme|attendance policy/i;
+  const noiseRegex = /co-po|course outcome|program outcome|\bco[1-6]\b|\bpo[1-6]\b|\bbt[1-6]\b|bt level|bloom level|table of content|\bindex\b|syllabus overview|faculty|instructor|office hour|email:|credit hour|prerequisite|evaluation scheme|attendance policy|slide\s*\d+|chandigarh university|\d+\s*\/\s*\d+/i;
   
   const cleanLines = lines.filter(line => !noiseRegex.test(line.trim()));
   return cleanLines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
@@ -60,7 +60,7 @@ export function sanitizeDocumentText(rawText: string): string {
  */
 export function filterNoiseConceptCards(cards: AcademicConceptCard[]): AcademicConceptCard[] {
   if (!cards || !Array.isArray(cards)) return [];
-  const noiseRegex = /co-po|course outcome|program outcome|\bco[1-6]\b|\bpo[1-6]\b|table of content|\bindex\b|syllabus|faculty|office hour|prerequisites/i;
+  const noiseRegex = /co-po|course outcome|program outcome|\bco[1-6]\b|\bpo[1-6]\b|\bbt[1-6]\b|bt level|bloom level|table of content|\bindex\b|syllabus|faculty|office hour|prerequisites|slide\s*\d+|chandigarh university/i;
   return cards.filter(card => {
     if (noiseRegex.test(card.title || '')) return false;
     if (noiseRegex.test(card.conceptExplanation || '')) return false;

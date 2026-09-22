@@ -15,19 +15,52 @@ interface AcademicNotesViewerProps {
 }
 
 /**
- * Strips timestamp and source tags like [Source: Timestamp 00:08] or [00:08] or [Source: Page 3]
+ * Strips timestamp, source tags, slide numbering (e.g. SLIDE 3 / 10),
+ * university boilerplate (e.g. Chandigarh University), and syllabus metadata noise
  * to produce clean, textbook-quality notes without visual clutter.
  */
-export function cleanNotesTimestamps(text: string): string {
+export function cleanAcademicNotesNoise(text: string): string {
   if (!text || typeof text !== 'string') return '';
-  return text
+
+  let cleaned = text;
+
+  // 1. Remove slide header/footer markers, SLIDE numbers, university branding, and timestamp noise
+  cleaned = cleaned
+    .replace(/(Learning Objectives|Learning Outcomes|Lecture|Course Outcomes|Course Outcome)?\s*SLIDE\s*\d+\s*\/\s*\d+\s*(Chandigarh University|\w+\s+University)?\s*\d*\s*\/?\s*\d*/gi, '')
+    .replace(/(Chandigarh University|\b[A-Z][a-z]+\s+University)\s*\d*\s*\/?\s*\d*/gi, '')
+    .replace(/SLIDE\s*\d+\s*\/\s*\d+/gi, '')
+    .replace(/SLIDE\s*\d+/gi, '')
     .replace(/\[Source:\s*Timestamp\s*\d{1,2}:\d{2}\]/gi, '')
     .replace(/\[Source:\s*Page\s*\d+\]/gi, '')
     .replace(/\[Source:\s*[^\]]+\]/gi, '')
-    .replace(/\[\d{1,2}:\d{2}\]/g, '')
-    .replace(/\s{2,}/g, ' ')
+    .replace(/Source:\s*media\.geeksforgeeks\.org/gi, '')
+    .replace(/Source:\s*https?:\/\/[^\s]+/gi, '')
+    .replace(/\[\d{1,2}:\d{2}\]/g, '');
+
+  // 2. Remove Course Outcomes / BT Level syllabus mapping boilerplate tables (e.g. CO1 BT3, CO2 BT4, BT LEVEL DESCRIPTION...)
+  cleaned = cleaned.replace(/Course Outcomes?\s*SLIDE.*?(?=\n\n|By the end|In this session|Let's look|##|#|$)/gis, '');
+  cleaned = cleaned.replace(/Course Outcomes?.*?BT LEVEL.*?DESCRIPTION.*?(?=(By the end|In this session|Let's look|##|\n\n|$))/gis, '');
+  cleaned = cleaned.replace(/(\bCO[1-6]\b|\bBT[1-6]\b|\bBT LEVEL\b|\bCourse OutcomeCO\b|\bDESCRIPTION CO[1-6]\b|\bBT LEVEL DESCRIPTION\b)[^\n]*/gi, '');
+
+  // 3. Fix OCR concatenated words/numbers without spaces (e.g., "1Define" -> "1. Define", "2Analyze" -> "2. Analyze", "Definition1Logic" -> "Definition 1 Logic")
+  cleaned = cleaned
+    .replace(/(\b[A-Za-z]+)(\d+)([A-Z][a-z]+)/g, '$1 $2 $3')
+    .replace(/(Definition|Equation|Example|Overview|Outcome|Objective)(\d+)/gi, '$1 $2')
+    .replace(/(^\s*|\n)(\d+)([A-Z][a-z]{2,})/g, '$1$2. $3')
+    .replace(/([a-z])([A-Z][a-z]{3,})/g, '$1. $2')
+    .replace(/([a-z])(SLIDE|GOVERNING|OPERATION|DEFINITION)/gi, '$1 $2');
+
+  // 4. Clean multiple spaces and blank lines
+  cleaned = cleaned
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
     .trim();
+
+  return cleaned;
 }
+
+/** Legacy alias for backward compatibility */
+export const cleanNotesTimestamps = cleanAcademicNotesNoise;
 
 /**
  * Automatically structures raw un-synthesized document text or transcripts
@@ -100,10 +133,10 @@ export const AcademicNotesViewer: React.FC<AcademicNotesViewerProps> = ({
           <BookOpen className="h-6 w-6 text-[var(--text-primary)]" />
         </div>
         <div className="space-y-1">
-          <span className="px-2.5 py-0.5 rounded bg-[#FFC400] text-[#111111] text-[10px] font-mono font-extrabold uppercase border border-[#111111]">
+          <span className="px-2.5 py-0.5 rounded bg-[#FFC400] text-[#111111] text-xs font-mono font-extrabold uppercase border border-[#111111]">
             COMPILING STUDY NOTES
           </span>
-          <h4 className="text-sm font-heading font-extrabold text-[var(--text-primary)] uppercase">
+          <h4 className="text-base font-heading font-extrabold text-[var(--text-primary)] uppercase">
             Formatting Academic Notes & Structure...
           </h4>
           <p className="text-xs font-mono font-bold text-[var(--text-secondary)]">
@@ -132,14 +165,14 @@ export const AcademicNotesViewer: React.FC<AcademicNotesViewerProps> = ({
     rawText = content[mode] || content.academic || content.detailed || content.quick || Object.values(content)[0] || '';
   }
 
-  const structuredText = autoStructureRawText(cleanNotesTimestamps(rawText));
+  const structuredText = autoStructureRawText(cleanAcademicNotesNoise(rawText));
   const cleanedText = ensureGfgTagsInMarkdown(structuredText);
 
   if (!cleanedText.trim()) {
     return (
       <div className="text-center py-12 border border-dashed border-[#111111] rounded-[6px] bg-white p-6 space-y-3 font-sans">
         <BookOpen className="h-8 w-8 text-[#666666] mx-auto animate-pulse" />
-        <p className="text-xs font-mono font-bold text-[#666666]">No study notes available for this section.</p>
+        <p className="text-sm font-mono font-bold text-[#666666]">No study notes available for this section.</p>
       </div>
     );
   }
@@ -187,11 +220,11 @@ export const AcademicNotesViewer: React.FC<AcademicNotesViewerProps> = ({
                 href={gfgUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 font-semibold text-[#2F8D46] dark:text-[#4ADE80] hover:underline bg-[#2F8D46]/10 px-1.5 py-0.5 rounded text-[11px] font-sans no-underline transition-colors mx-0.5 cursor-pointer group"
+                className="inline-flex items-center gap-1 font-semibold text-[#2F8D46] dark:text-[#4ADE80] hover:underline bg-[#2F8D46]/10 px-1.5 py-0.5 rounded text-xs font-sans no-underline transition-colors mx-0.5 cursor-pointer group"
                 title={urlMatch ? `Open "${linkText}" on GeeksforGeeks` : `Look up "${cleanQuery}" on GeeksforGeeks`}
               >
                 <span>{linkText}</span>
-                <span className="text-[9px] font-mono font-bold bg-[#2F8D46] text-white px-1 rounded group-hover:bg-[#257338] transition-colors flex items-center gap-0.5">
+                <span className="text-[10px] font-mono font-bold bg-[#2F8D46] text-white px-1 rounded group-hover:bg-[#257338] transition-colors flex items-center gap-0.5">
                   GFG ↗
                 </span>
               </a>
@@ -218,13 +251,13 @@ export const AcademicNotesViewer: React.FC<AcademicNotesViewerProps> = ({
         // Highlight specific labels like Definition:, Given:, Result:, Formula: or [HIGH WEIGHTAGE]
         if (/^(\[?🔥\s*HIGH WEIGHTAGE\]?|\[?⭐\s*EXAM PRIORITY\]?|HIGH WEIGHTAGE|EXAM PRIORITY)/i.test(inner)) {
           formatted.push(
-            <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[4px] bg-[#FF4D4D] text-white font-mono font-extrabold text-[10px] uppercase border border-[#111111] shadow-paper-sm mr-1 my-0.5">
+            <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[4px] bg-[#FF4D4D] text-white font-mono font-extrabold text-xs uppercase border border-[#111111] shadow-paper-sm mr-1 my-0.5">
               🔥 HIGH WEIGHTAGE
             </span>
           );
         } else if (/^(Definition|Key Idea|Important|Formula|Given|Process|Result|Example|Where|Common Confusion):/i.test(inner)) {
           formatted.push(
-            <span key={idx} className="inline-block px-1.5 py-0.5 rounded-[3px] bg-[#FFC400] text-[#111111] font-mono font-extrabold text-[11px] uppercase tracking-wide mr-1 border border-[#111111] shadow-paper-sm">
+            <span key={idx} className="inline-block px-1.5 py-0.5 rounded-[3px] bg-[#FFC400] text-[#111111] font-mono font-extrabold text-xs uppercase tracking-wide mr-1 border border-[#111111] shadow-paper-sm">
               {inner}
             </span>
           );
@@ -238,7 +271,7 @@ export const AcademicNotesViewer: React.FC<AcademicNotesViewerProps> = ({
       } else if ((part.startsWith('`') && part.endsWith('`')) || (part.startsWith('$') && part.endsWith('$'))) {
         const inner = part.slice(1, -1);
         formatted.push(
-          <code key={idx} className="px-1.5 py-0.5 rounded-[3px] bg-[var(--panel-bg)] text-[#111111] font-mono text-[11px] font-bold border border-[var(--border-main)] mx-0.5">
+          <code key={idx} className="px-1.5 py-0.5 rounded-[3px] bg-[var(--panel-bg)] text-[#111111] dark:text-gray-100 font-mono text-xs font-bold border border-[var(--border-main)] mx-0.5">
             {inner}
           </code>
         );
@@ -257,11 +290,11 @@ export const AcademicNotesViewer: React.FC<AcademicNotesViewerProps> = ({
 
       elements.push(
         <div key={`table-${keyCounter++}`} className="my-5 overflow-x-auto rounded-[6px] border border-[#111111] bg-white text-[#111111] shadow-paper-sm font-sans">
-          <table className="w-full text-left font-sans text-xs border-collapse">
+          <table className="w-full text-left font-sans text-sm border-collapse">
             <thead>
               <tr className="bg-[#FFC400] text-[#111111] border-b border-[#111111]">
                 {headerRow.map((col, cIdx) => (
-                  <th key={cIdx} className="p-3 font-mono font-extrabold uppercase tracking-wider border-r border-[#111111] last:border-r-0">
+                  <th key={cIdx} className="p-3 font-mono font-extrabold text-xs uppercase tracking-wider border-r border-[#111111] last:border-r-0">
                     {col.trim()}
                   </th>
                 ))}
@@ -271,7 +304,7 @@ export const AcademicNotesViewer: React.FC<AcademicNotesViewerProps> = ({
               {dataRows.map((row, rIdx) => (
                 <tr key={rIdx} className="hover:bg-gray-50 transition-colors">
                   {row.map((cell, cIdx) => (
-                    <td key={cIdx} className="p-3 font-medium text-[#111111] border-r border-[#111111] last:border-r-0">
+                    <td key={cIdx} className="p-3 font-medium text-sm text-[#111111] border-r border-[#111111] last:border-r-0">
                       {renderFormattedInlineText(cell.trim())}
                     </td>
                   ))}
@@ -310,11 +343,11 @@ export const AcademicNotesViewer: React.FC<AcademicNotesViewerProps> = ({
       elements.push(
         <div key={`h1-${keyCounter++}`} className="pb-3 mb-4 border-b border-[#111111] bg-[#F6F2EA] p-4 rounded-[6px] shadow-paper-sm border border-[#111111] font-sans">
           <div className="flex items-center gap-2 mb-1">
-            <span className="px-2 py-0.5 rounded-[4px] bg-[#FFC400] text-[#111111] font-mono text-[9px] font-extrabold uppercase border border-[#111111] shadow-paper-sm">
+            <span className="px-2 py-0.5 rounded-[4px] bg-[#FFC400] text-[#111111] font-mono text-[10px] font-extrabold uppercase border border-[#111111] shadow-paper-sm">
               STRUCTURED STUDY NOTES
             </span>
           </div>
-          <h1 className="font-heading text-base sm:text-lg font-bold tracking-tight text-[#111111] leading-snug">
+          <h1 className="font-heading text-lg sm:text-xl font-bold tracking-tight text-[#111111] leading-snug">
             {titleText}
           </h1>
         </div>
@@ -371,8 +404,8 @@ export const AcademicNotesViewer: React.FC<AcademicNotesViewerProps> = ({
       } else {
         elements.push(
           <div key={`h2-${keyCounter++}`} className="mt-6 mb-2.5 pt-2.5 border-t border-[#111111]/20 font-sans">
-            <h2 className="font-heading text-xs sm:text-sm font-extrabold uppercase tracking-wider text-[#111111] dark:text-white flex items-center gap-2 font-mono border-b border-[#111111] pb-1.5">
-              <span className="h-2 w-2 rounded-full bg-[#FFC400] border border-[#111111] inline-block shrink-0" />
+            <h2 className="font-heading text-sm sm:text-base font-extrabold uppercase tracking-wider text-[#111111] dark:text-white flex items-center gap-2 font-mono border-b border-[#111111] pb-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-[#FFC400] border border-[#111111] inline-block shrink-0" />
               <span>{h2Text}</span>
             </h2>
           </div>
@@ -383,7 +416,7 @@ export const AcademicNotesViewer: React.FC<AcademicNotesViewerProps> = ({
     else if (line.startsWith('### ')) {
       const h3Text = line.replace(/^###\s+/, '');
       elements.push(
-        <h3 key={`h3-${keyCounter++}`} className="font-heading text-xs font-bold text-[#111111] dark:text-white mt-3 mb-1.5 flex items-center gap-1.5 font-mono uppercase tracking-wide">
+        <h3 key={`h3-${keyCounter++}`} className="font-heading text-sm font-bold text-[#111111] dark:text-white mt-3.5 mb-2 flex items-center gap-1.5 font-mono uppercase tracking-wide">
           <span className="text-[#FFC400]">▪</span>
           <span>{h3Text}</span>
         </h3>
@@ -393,7 +426,7 @@ export const AcademicNotesViewer: React.FC<AcademicNotesViewerProps> = ({
     else if (line.startsWith('* ') || line.startsWith('- ')) {
       const itemText = line.replace(/^[*\-]\s+/, '');
       elements.push(
-        <li key={`li-${keyCounter++}`} className="ml-4 pl-1 text-xs font-sans font-normal text-[#111111] dark:text-gray-200 leading-relaxed mb-1.5 list-disc">
+        <li key={`li-${keyCounter++}`} className="ml-4 pl-1 text-sm font-sans font-normal text-[#111111] dark:text-gray-200 leading-relaxed mb-2 list-disc">
           {renderFormattedInlineText(itemText)}
         </li>
       );
@@ -403,8 +436,8 @@ export const AcademicNotesViewer: React.FC<AcademicNotesViewerProps> = ({
       const numMatch = line.match(/^(\d+)\.\s+(.*)/);
       if (numMatch) {
         elements.push(
-          <div key={`num-${keyCounter++}`} className="flex items-start gap-2.5 my-2 ml-1 text-xs font-sans">
-            <span className="px-2 py-0.5 rounded-[4px] bg-[#FFC400] text-[#111111] font-mono font-extrabold border border-[#111111] text-[10px] shrink-0">
+          <div key={`num-${keyCounter++}`} className="flex items-start gap-2.5 my-2.5 ml-1 text-sm font-sans">
+            <span className="px-2 py-0.5 rounded-[4px] bg-[#FFC400] text-[#111111] font-mono font-extrabold border border-[#111111] text-xs shrink-0">
               {numMatch[1]}
             </span>
             <div className="font-normal text-[#111111] dark:text-gray-200 leading-relaxed pt-0.5">
@@ -417,7 +450,7 @@ export const AcademicNotesViewer: React.FC<AcademicNotesViewerProps> = ({
     // Standard Paragraph
     else {
       elements.push(
-        <p key={`p-${keyCounter++}`} className="text-xs font-sans font-normal text-[#111111] dark:text-gray-200 leading-relaxed mb-3">
+        <p key={`p-${keyCounter++}`} className="text-sm font-sans font-normal text-[#111111] dark:text-gray-200 leading-relaxed mb-3.5">
           {renderFormattedInlineText(line)}
         </p>
       );
@@ -466,7 +499,7 @@ export const AcademicNotesViewer: React.FC<AcademicNotesViewerProps> = ({
   return (
     <div 
       onMouseUp={handleMouseUp}
-      className="academic-notes-container space-y-2 selection:bg-[#FFC400] selection:text-[#111111] relative"
+      className="academic-notes-container text-sm space-y-2 selection:bg-[#FFC400] selection:text-[#111111] relative"
     >
       {elements}
 
