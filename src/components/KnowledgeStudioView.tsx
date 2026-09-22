@@ -151,6 +151,8 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
   // Lazy Loading & Caching State
   const [localAssets, setLocalAssets] = useState<any>({});
   const [isAssetLoading, setIsAssetLoading] = useState<boolean>(false);
+  const [selectedSectionKey, setSelectedSectionKey] = useState<string>('executiveOverview');
+  const [viewAllSections, setViewAllSections] = useState<boolean>(false);
 
   const getAsset = (sourceId: string | null | undefined, type: string, mode: string = '') => {
     if (!sourceId) return null;
@@ -3131,14 +3133,87 @@ ${queryText}`;
                             { key: 'quickRecap', label: 'Quick Recap', content: sections.quickRecap }
                           ];
 
-                          return allSections.map((sec, idx) => (
-                            <div key={idx} className="p-5 rounded-[6px] border border-[#111111] bg-white text-[#111111] shadow-paper-sm font-sans">
-                              <h4 className="text-xs font-heading font-extrabold text-[#111111] uppercase tracking-wider font-mono border-b border-[#111111] pb-1.5 mb-2.5">{sec.label}</h4>
-                              <p className="text-xs text-[#111111] leading-relaxed whitespace-pre-wrap mt-2">
-                                {renderTextWithCitations(sec.content)}
-                              </p>
+                          return (
+                            <div className="space-y-4">
+                              {/* Section Selector Pills */}
+                              <div className="flex items-center gap-1.5 overflow-x-auto pb-2 border-b border-[#111111]/20">
+                                <span className="text-[10px] font-mono font-extrabold uppercase text-[#666666] shrink-0">Sections:</span>
+                                {allSections.map((sec) => {
+                                  const hasContent = sec.content.trim().length > 0;
+                                  const isSelected = selectedSectionKey === sec.key && !viewAllSections;
+                                  return (
+                                    <button
+                                      key={sec.key}
+                                      onClick={() => {
+                                        setSelectedSectionKey(sec.key);
+                                        setViewAllSections(false);
+                                      }}
+                                      className={`px-3 py-1 rounded-[4px] border text-xs font-mono font-extrabold uppercase transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                                        isSelected
+                                          ? 'bg-[#2F6BFF] text-white border-[#111111] shadow-paper-sm'
+                                          : hasContent
+                                            ? 'bg-white text-[#111111] border-[#111111] hover:bg-gray-100'
+                                            : 'bg-gray-100 text-gray-400 border-gray-300'
+                                      }`}
+                                    >
+                                      <span>{sec.label}</span>
+                                      {hasContent && <span className="text-[9px] text-[#19B56B]">✓</span>}
+                                    </button>
+                                  );
+                                })}
+                                <button
+                                  onClick={() => setViewAllSections(prev => !prev)}
+                                  className={`px-3 py-1 rounded-[4px] border text-xs font-mono font-extrabold uppercase transition-all whitespace-nowrap cursor-pointer ml-auto ${
+                                    viewAllSections ? 'bg-[#FFC400] text-[#111111] border-[#111111] shadow-paper-sm' : 'bg-white text-[#666666] border-[#111111] hover:text-[#111111]'
+                                  }`}
+                                >
+                                  {viewAllSections ? 'Single Section' : 'Show All'}
+                                </button>
+                              </div>
+
+                              {/* Render Selected Section Only (Initial View: 1 Section) */}
+                              {viewAllSections ? (
+                                allSections.filter(sec => sec.content.trim().length > 0).map((sec, idx) => (
+                                  <div key={idx} className="p-5 rounded-[6px] border border-[#111111] bg-white text-[#111111] shadow-paper-sm font-sans">
+                                    <h4 className="text-xs font-heading font-extrabold text-[#111111] uppercase tracking-wider font-mono border-b border-[#111111] pb-1.5 mb-2.5">{sec.label}</h4>
+                                    <p className="text-xs text-[#111111] leading-relaxed whitespace-pre-wrap mt-2">
+                                      {renderTextWithCitations(sec.content)}
+                                    </p>
+                                  </div>
+                                ))
+                              ) : (
+                                (() => {
+                                  const activeSec = allSections.find(s => s.key === selectedSectionKey) || allSections[0];
+                                  if (activeSec.content.trim().length > 0) {
+                                    return (
+                                      <div className="p-5 rounded-[6px] border border-[#111111] bg-white text-[#111111] shadow-paper-sm font-sans">
+                                        <div className="flex items-center justify-between border-b border-[#111111] pb-1.5 mb-2.5">
+                                          <h4 className="text-xs font-heading font-extrabold text-[#111111] uppercase tracking-wider font-mono">{activeSec.label}</h4>
+                                          <span className="text-[9px] font-mono font-extrabold uppercase bg-[#19B56B] text-white px-2 py-0.5 rounded-[3px]">SELECTED SECTION</span>
+                                        </div>
+                                        <p className="text-xs text-[#111111] leading-relaxed whitespace-pre-wrap mt-2">
+                                          {renderTextWithCitations(activeSec.content)}
+                                        </p>
+                                      </div>
+                                    );
+                                  }
+                                  return (
+                                    <div className="text-center py-12 border border-dashed border-[#111111] rounded-[6px] bg-white p-6 space-y-3">
+                                      <FileText className="h-8 w-8 text-[#2F6BFF] mx-auto animate-pulse" />
+                                      <h4 className="text-xs font-mono font-extrabold text-[#111111] uppercase">Section "{activeSec.label}" Not Generated Yet</h4>
+                                      <p className="text-[11px] text-[#666666] font-mono">Click below to generate notes specifically for this section.</p>
+                                      <button
+                                        onClick={() => triggerGenerateSummary(summaryFormat)}
+                                        className="px-4 py-2 bg-[#2F6BFF] hover:bg-blue-600 text-white rounded-[4px] border border-[#111111] text-xs font-mono font-extrabold uppercase shadow-paper-sm cursor-pointer"
+                                      >
+                                        ⚡ Generate Notes for {activeSec.label}
+                                      </button>
+                                    </div>
+                                  );
+                                })()
+                              )}
                             </div>
-                          ));
+                          );
                         })()
                       ) : (
                         <div className="text-center py-16 border border-dashed border-gray-200 dark:border-neutral-800 rounded-2xl bg-gray-50/10 dark:bg-neutral-900/5 p-6 space-y-4">
