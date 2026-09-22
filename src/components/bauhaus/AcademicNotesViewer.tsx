@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { BookOpen, Sparkles, Check, AlertTriangle, HelpCircle, Layers, Lightbulb, Target, Flame, ExternalLink } from 'lucide-react';
+import { ensureGfgTagsInMarkdown } from '../../services/gemini';
 
 interface AcademicNotesViewerProps {
   content: string | Record<string, string> | any[];
@@ -78,7 +79,7 @@ export const AcademicNotesViewer: React.FC<AcademicNotesViewerProps> = ({
     rawText = content[mode] || content.academic || content.detailed || content.quick || Object.values(content)[0] || '';
   }
 
-  const cleanedText = cleanNotesTimestamps(rawText);
+  const cleanedText = ensureGfgTagsInMarkdown(cleanNotesTimestamps(rawText));
 
   if (!cleanedText.trim()) {
     return (
@@ -265,13 +266,13 @@ export const AcademicNotesViewer: React.FC<AcademicNotesViewerProps> = ({
     if (line.startsWith('# ') && !line.startsWith('## ')) {
       const titleText = line.replace(/^#\s+/, '');
       elements.push(
-        <div key={`h1-${keyCounter++}`} className="pb-4 mb-6 border-b-4 border-[var(--border-main)] bg-[var(--panel-bg)] p-5 rounded-[6px] shadow-paper-md border-2 border-[var(--border-main)]">
+        <div key={`h1-${keyCounter++}`} className="pb-3 mb-4 border-b-2 border-[var(--border-main)] bg-[var(--panel-bg)] p-4 rounded-[6px] shadow-paper-sm border border-[var(--border-main)]">
           <div className="flex items-center gap-2 mb-1">
-            <span className="px-2.5 py-0.5 rounded-[4px] bg-[#FFC400] text-[#111111] font-mono text-[10px] font-extrabold uppercase border border-[#111111] shadow-paper-sm">
-              UNIVERSITY STUDY GUIDE
+            <span className="px-2 py-0.5 rounded-[4px] bg-[#FFC400] text-[#111111] font-mono text-[9px] font-extrabold uppercase border border-[#111111] shadow-paper-sm">
+              STUDY NOTES
             </span>
           </div>
-          <h1 className="font-heading text-2xl sm:text-3xl font-extrabold uppercase tracking-tight text-[var(--text-primary)] leading-tight">
+          <h1 className="font-heading text-base sm:text-lg font-bold tracking-tight text-[var(--text-primary)] leading-snug">
             {titleText}
           </h1>
         </div>
@@ -283,10 +284,10 @@ export const AcademicNotesViewer: React.FC<AcademicNotesViewerProps> = ({
 
       if (h2Text.includes('🧠 Remember') || h2Text.toLowerCase().includes('remember')) {
         elements.push(
-          <div key={`remember-${keyCounter++}`} className="mt-8 mb-4 p-5 rounded-[6px] border-2 border-[#111111] bg-[#FFC400]/15 text-[var(--text-primary)] shadow-paper-md">
-            <div className="flex items-center gap-2 border-b-2 border-[#111111] pb-2 mb-3">
-              <Sparkles className="h-5 w-5 text-[#111111] fill-[#FFC400]" />
-              <h2 className="font-heading text-base font-extrabold uppercase tracking-wider text-[#111111]">
+          <div key={`remember-${keyCounter++}`} className="mt-6 mb-3 p-4 rounded-[6px] border-2 border-[#111111] bg-[#FFC400]/15 text-[var(--text-primary)] shadow-paper-sm">
+            <div className="flex items-center gap-2 border-b border-[#111111] pb-1.5 mb-2">
+              <Sparkles className="h-4 w-4 text-[#111111] fill-[#FFC400]" />
+              <h2 className="font-heading text-sm font-bold uppercase tracking-wider text-[#111111]">
                 🧠 REMEMBER (QUICK REVISION)
               </h2>
             </div>
@@ -294,10 +295,10 @@ export const AcademicNotesViewer: React.FC<AcademicNotesViewerProps> = ({
         );
       } else if (h2Text.includes('🎯 Exam Focus') || h2Text.toLowerCase().includes('exam focus')) {
         elements.push(
-          <div key={`exam-${keyCounter++}`} className="mt-8 mb-4 p-5 rounded-[6px] border-2 border-[#111111] bg-[#19B56B]/15 text-[var(--text-primary)] shadow-paper-md">
-            <div className="flex items-center gap-2 border-b-2 border-[#111111] pb-2 mb-3">
-              <Target className="h-5 w-5 text-[#19B56B]" />
-              <h2 className="font-heading text-base font-extrabold uppercase tracking-wider text-[#111111]">
+          <div key={`exam-${keyCounter++}`} className="mt-6 mb-3 p-4 rounded-[6px] border-2 border-[#111111] bg-[#19B56B]/15 text-[var(--text-primary)] shadow-paper-sm">
+            <div className="flex items-center gap-2 border-b border-[#111111] pb-1.5 mb-2">
+              <Target className="h-4 w-4 text-[#19B56B]" />
+              <h2 className="font-heading text-sm font-bold uppercase tracking-wider text-[#111111]">
                 🎯 EXAM FOCUS & HIGH-YIELD TOPICS
               </h2>
             </div>
@@ -305,10 +306,10 @@ export const AcademicNotesViewer: React.FC<AcademicNotesViewerProps> = ({
         );
       } else if (h2Text.includes('⚠️ Common Confusion') || h2Text.toLowerCase().includes('common confusion')) {
         elements.push(
-          <div key={`confusion-${keyCounter++}`} className="mt-8 mb-4 p-5 rounded-[6px] border-2 border-[#111111] bg-[#FF4D4D]/15 text-[var(--text-primary)] shadow-paper-md">
-            <div className="flex items-center gap-2 border-b-2 border-[#111111] pb-2 mb-3">
-              <AlertTriangle className="h-5 w-5 text-[#FF4D4D]" />
-              <h2 className="font-heading text-base font-extrabold uppercase tracking-wider text-[#111111]">
+          <div key={`confusion-${keyCounter++}`} className="mt-6 mb-3 p-4 rounded-[6px] border-2 border-[#111111] bg-[#FF4D4D]/15 text-[var(--text-primary)] shadow-paper-sm">
+            <div className="flex items-center gap-2 border-b border-[#111111] pb-1.5 mb-2">
+              <AlertTriangle className="h-4 w-4 text-[#FF4D4D]" />
+              <h2 className="font-heading text-sm font-bold uppercase tracking-wider text-[#111111]">
                 ⚠️ COMMON CONFUSION & DISTINCTIONS
               </h2>
             </div>
@@ -316,10 +317,10 @@ export const AcademicNotesViewer: React.FC<AcademicNotesViewerProps> = ({
         );
       } else if (h2Text.includes('🔥') || h2Text.toLowerCase().includes('teacher') || h2Text.toLowerCase().includes('high-weightage')) {
         elements.push(
-          <div key={`teacher-callouts-${keyCounter++}`} className="mt-8 mb-4 p-5 rounded-[6px] border-2 border-[#111111] bg-[#FFC400]/25 text-[var(--text-primary)] shadow-paper-md">
-            <div className="flex items-center gap-2 border-b-2 border-[#111111] pb-2 mb-3">
-              <Flame className="h-5 w-5 text-[#FF4D4D] fill-[#FF4D4D]" />
-              <h2 className="font-heading text-base font-extrabold uppercase tracking-wider text-[#111111]">
+          <div key={`teacher-callouts-${keyCounter++}`} className="mt-6 mb-3 p-4 rounded-[6px] border-2 border-[#111111] bg-[#FFC400]/25 text-[var(--text-primary)] shadow-paper-sm">
+            <div className="flex items-center gap-2 border-b border-[#111111] pb-1.5 mb-2">
+              <Flame className="h-4 w-4 text-[#FF4D4D] fill-[#FF4D4D]" />
+              <h2 className="font-heading text-sm font-bold uppercase tracking-wider text-[#111111]">
                 🔥 TEACHER'S SPOKEN CALLOUTS & HIGH-WEIGHTAGE TOPICS
               </h2>
             </div>
@@ -327,9 +328,9 @@ export const AcademicNotesViewer: React.FC<AcademicNotesViewerProps> = ({
         );
       } else {
         elements.push(
-          <div key={`h2-${keyCounter++}`} className="mt-8 mb-3 pt-3 border-t-2 border-[var(--border-main)]">
-            <h2 className="font-heading text-lg sm:text-xl font-extrabold uppercase tracking-tight text-[var(--text-primary)] flex items-center gap-2">
-              <span className="h-3.5 w-3.5 rounded-full bg-[#FFC400] border border-[#111111] inline-block shrink-0" />
+          <div key={`h2-${keyCounter++}`} className="mt-6 mb-2.5 pt-2.5 border-t border-[var(--border-main)]">
+            <h2 className="font-heading text-sm sm:text-base font-bold tracking-tight text-[var(--text-primary)] flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full bg-[#FFC400] border border-[#111111] inline-block shrink-0" />
               <span>{h2Text}</span>
             </h2>
           </div>
@@ -340,7 +341,7 @@ export const AcademicNotesViewer: React.FC<AcademicNotesViewerProps> = ({
     else if (line.startsWith('### ')) {
       const h3Text = line.replace(/^###\s+/, '');
       elements.push(
-        <h3 key={`h3-${keyCounter++}`} className="font-heading text-sm font-extrabold uppercase text-[var(--text-primary)] mt-4 mb-2 flex items-center gap-1.5">
+        <h3 key={`h3-${keyCounter++}`} className="font-heading text-xs sm:text-sm font-bold text-[var(--text-primary)] mt-3 mb-1.5 flex items-center gap-1.5">
           <span className="text-[#FFC400]">▪</span>
           <span>{h3Text}</span>
         </h3>

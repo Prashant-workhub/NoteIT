@@ -198,13 +198,28 @@ export const ensureGfgTagsInMarkdown = (text: string, keyTerms?: string[]): stri
     });
   }
 
+  const techMatches = text.match(/\b([A-Z][A-Za-z0-9_]+(?:\s+[A-Z][A-Za-z0-9_]+)*)\b/g);
+  if (techMatches) {
+    techMatches.forEach(m => {
+      const trimmed = m.trim();
+      if (
+        trimmed.length >= 3 &&
+        !/^(HIGH WEIGHTAGE|EXAM PRIORITY|Definition|Formula|Result|Example|Given|Process|Section|Chapter|University|Study|Guide|Summary|Notes|Overview|Basic|Computer|Main|Parts|Unit|The|And|With|From|This|That)/i.test(trimmed)
+      ) {
+        termsToTag.push(trimmed);
+      }
+    });
+  }
+
   const stopWords = new Set([
     'this', 'that', 'with', 'from', 'have', 'which', 'when', 'where', 'these',
     'those', 'about', 'their', 'there', 'what', 'some', 'more', 'first', 'second',
-    'third', 'after', 'before', 'overall', 'summary', 'overview', 'details'
+    'third', 'after', 'before', 'overall', 'summary', 'overview', 'details', 'main', 'parts'
   ]);
 
-  const uniqueTerms = Array.from(new Set(termsToTag)).filter(t => !stopWords.has(t.toLowerCase()));
+  const uniqueTerms = Array.from(new Set(termsToTag))
+    .filter(t => !stopWords.has(t.toLowerCase()))
+    .sort((a, b) => b.length - a.length);
 
   for (const term of uniqueTerms) {
     const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -225,46 +240,62 @@ export const executeOpenRouterFallbackCall = async (
   onBusy?: (isBusy: boolean) => void
 ): Promise<any> => {
   const openrouterKey = getFallbackOpenRouterKey();
-  const model = 'nvidia/nemotron-3-ultra-550b-a55b:free';
+  const freeModels = [
+    'nvidia/nemotron-3-ultra-550b-a55b:free',
+    'google/gemini-2.0-flash-exp:free',
+    'meta-llama/llama-3.3-70b-instruct:free',
+    'qwen/qwen-2.5-72b-instruct:free',
+    'mistralai/mistral-7b-instruct:free'
+  ];
 
-  console.warn(`[OpenRouter Error Fallback] Reverting to OpenRouter model (${model})...`);
+  let lastErr: any = null;
+  for (const model of freeModels) {
+    try {
+      console.warn(`[OpenRouter Fallback] Attempting model: ${model}...`);
+      const payload: any = {
+        model,
+        messages: [
+          { role: 'user', content: prompt }
+        ]
+      };
 
-  const payload: any = {
-    model,
-    messages: [
-      { role: 'user', content: prompt }
-    ]
-  };
+      if (responseSchema) {
+        payload.response_format = { type: 'json_object' };
+      }
 
-  if (responseSchema) {
-    payload.response_format = { type: 'json_object' };
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${openrouterKey}`,
+          'HTTP-Referer': 'https://noteit.ai',
+          'X-Title': 'NoteIT'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const text = data.choices?.[0]?.message?.content || '';
+
+        if (responseSchema) {
+          const cleanedText = extractJsonObject(text);
+          return JSON.parse(cleanedText);
+        }
+
+        return text;
+      }
+
+      const errText = await response.text().catch(() => '');
+      console.warn(`[OpenRouter Fallback] Model ${model} returned ${response.status}: ${errText}`);
+      lastErr = new Error(`OpenRouter fallback error (${response.status}): ${errText}`);
+    } catch (err) {
+      console.warn(`[OpenRouter Fallback] Model ${model} failed:`, err);
+      lastErr = err;
+    }
   }
 
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${openrouterKey}`,
-      'HTTP-Referer': 'https://noteit.ai',
-      'X-Title': 'NoteIT'
-    },
-    body: JSON.stringify(payload)
-  });
-
-  if (!response.ok) {
-    const errText = await response.text().catch(() => '');
-    throw new Error(`OpenRouter fallback error (${response.status}): ${errText}`);
-  }
-
-  const data = await response.json();
-  const text = data.choices?.[0]?.message?.content || '';
-
-  if (responseSchema) {
-    const cleanedText = extractJsonObject(text);
-    return JSON.parse(cleanedText);
-  }
-
-  return text;
+  throw lastErr || new Error('All OpenRouter fallback models failed.');
 };
 
 export const executeGeminiCall = async (
