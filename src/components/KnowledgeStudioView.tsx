@@ -357,6 +357,18 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
     if (text && text.trim().length > 0) return text.trim();
 
     if (source.id && userId) {
+      // 1. Instant 0ms local storage check FIRST
+      try {
+        const localKey = `noteit_transcript_${userId}_${source.id}`;
+        const rawLocal = localStorage.getItem(localKey);
+        if (rawLocal) {
+          const parsed = JSON.parse(rawLocal);
+          const localText = parsed.cleanTranscript || parsed.transcript || parsed.text || '';
+          if (localText.trim()) return localText.trim();
+        }
+      } catch (_) {}
+
+      // 2. Fallback to Azure Blob multi-tier fetch ONLY if not cached locally
       try {
         const fetched = await getTranscriptMultiTier(userId, source.id);
         if (fetched && (fetched.cleanTranscript || fetched.transcriptText)) {
@@ -365,16 +377,6 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
       } catch (e) {
         console.warn('[KnowledgeStudio] Azure Blob multi-tier fetch error:', e);
       }
-
-      try {
-        const localKey = `noteit_transcript_${userId}_${source.id}`;
-        const rawLocal = localStorage.getItem(localKey);
-        if (rawLocal) {
-          const parsed = JSON.parse(rawLocal);
-          const localText = parsed.cleanTranscript || parsed.transcript || '';
-          if (localText.trim()) return localText.trim();
-        }
-      } catch (_) {}
     }
 
     return '';
@@ -912,12 +914,15 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
         return { storageProvider: 'client' };
       });
 
-      // Store ONLY lightweight metadata in Firestore
+      // Store lightweight metadata AND cleanTranscript directly in Firestore source doc for instant zero-latency retrieval
       await updateDoc(docRef, {
         status: 'ready',
         progress: 100,
         selectedMode: notesFormat,
         selectedSummaryMode: 'academic',
+        cleanTranscript: fastData.cleanTranscript || extractedText,
+        transcript: extractedText,
+        content: extractedText,
         transcriptStorageProvider: storageRes.storageProvider,
         transcriptBlobPath: (storageRes as any)?.blobPath || null,
         storedInBlob: true,
