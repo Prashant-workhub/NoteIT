@@ -32,7 +32,8 @@ import {
   Eye,
   EyeOff,
   CheckCircle2,
-  Bell
+  Bell,
+  Clock
 } from 'lucide-react';
 import { PageId, UserSettings } from '../types';
 import { auth, db } from '../firebaseConfig';
@@ -255,10 +256,15 @@ export default function SettingsView({
     label: string;
     rank?: number;
     status?: string;
+    rateLimitedUntil?: string | null;
+    totalCalls?: number;
+    failedCalls?: number;
     savedAt: string;
     lastUsedAt?: string;
     isActive: boolean;
   }>>([]);
+  const [allowEmergencyQuota, setAllowEmergencyQuota] = useState<boolean>(true);
+  const [togglingEmergencyQuota, setTogglingEmergencyQuota] = useState<boolean>(false);
   const [loadingSavedKeys, setLoadingSavedKeys] = useState(false);
   const [switchingKeyId, setSwitchingKeyId] = useState<string | null>(null);
   const [deletingPresetId, setDeletingPresetId] = useState<string | null>(null);
@@ -639,11 +645,37 @@ export default function SettingsView({
           setNewKeyRank(data.savedKeys.length + 1);
           localStorage.setItem('noteit_ranked_saved_keys', JSON.stringify(data.savedKeys));
         }
+        if (data.allowEmergencyPlatformQuota !== undefined) {
+          setAllowEmergencyQuota(data.allowEmergencyPlatformQuota);
+        }
       }
     } catch (err) {
       console.warn('Failed to fetch saved API keys:', err);
     } finally {
       setLoadingSavedKeys(false);
+    }
+  };
+
+  const handleToggleEmergencyQuota = async (enabled: boolean) => {
+    setAllowEmergencyQuota(enabled);
+    setTogglingEmergencyQuota(true);
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) return;
+      const idToken = await currentUser.getIdToken();
+      await fetch(`${API_BASE_URL}/api/ai/toggle-emergency-quota`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`
+        },
+        body: JSON.stringify({ enabled })
+      });
+      triggerSaveNotification();
+    } catch (err) {
+      console.error('Failed to toggle emergency quota preference:', err);
+    } finally {
+      setTogglingEmergencyQuota(false);
     }
   };
 
@@ -1380,12 +1412,16 @@ export default function SettingsView({
                       const isFirst = index === 0;
                       const isLast = index === savedKeys.length - 1;
                       const provMeta = PROVIDER_METADATA[preset.provider] || { name: preset.provider };
+                      const isLimited = preset.status === 'Rate Limited' || preset.status === 'RATE_LIMITED';
+
                       return (
                         <div
                           key={preset.id}
-                          className={`p-4 rounded-[6px] border-2 transition-all shadow-paper-sm ${isFirst
-                              ? 'border-[#10B981] bg-[#10B981]/15'
-                              : 'border-[var(--border-main)] bg-[var(--card-bg)]'
+                          className={`p-4 rounded-[6px] border-2 transition-all shadow-paper-sm space-y-3 ${isLimited
+                              ? 'border-[#F59E0B] bg-[#F59E0B]/10'
+                              : isFirst
+                                ? 'border-[#10B981] bg-[#10B981]/15'
+                                : 'border-[var(--border-main)] bg-[var(--card-bg)]'
                             }`}
                         >
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1406,9 +1442,19 @@ export default function SettingsView({
                                   <span className="text-xs font-mono font-extrabold text-[#2F6BFF] dark:text-[#38BDF8] bg-[#2F6BFF]/10 px-2 py-0.5 rounded border border-[#2F6BFF]/30">
                                     {preset.model}
                                   </span>
-                                  <span className="px-2 py-0.5 rounded-[4px] border border-[#111111] bg-[#19B56B] text-white text-[9px] font-mono font-extrabold uppercase">
-                                    HEALTHY
-                                  </span>
+
+                                  {/* Status Pill */}
+                                  {isLimited ? (
+                                    <span className="px-2 py-0.5 rounded-[4px] border border-[#F59E0B] bg-[#F59E0B]/20 text-[#F59E0B] text-[9px] font-mono font-extrabold uppercase flex items-center gap-1">
+                                      <Clock className="w-3 h-3" />
+                                      RATE LIMITED (COOLDOWN: {resetCountdown})
+                                    </span>
+                                  ) : (
+                                    <span className="px-2 py-0.5 rounded-[4px] border border-[#10B981] bg-[#10B981]/20 text-[#10B981] text-[9px] font-mono font-extrabold uppercase flex items-center gap-1">
+                                      <Check className="w-3 h-3" />
+                                      HEALTHY & ACTIVE
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="text-[11px] font-mono font-bold text-[var(--text-secondary)] flex items-center gap-3 mt-1 flex-wrap">
                                   <span>Key: <code className="bg-[var(--panel-bg)] px-1.5 py-0.5 rounded border border-[var(--border-main)] text-[var(--text-primary)]">{preset.maskedKey}</code></span>
@@ -1419,7 +1465,6 @@ export default function SettingsView({
 
                             {/* Actions & Priority Reorder Controls */}
                             <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-                              {/* Move Up/Down buttons */}
                               <div className="flex items-center border-2 border-[var(--border-main)] rounded-[4px] bg-[var(--panel-bg)] overflow-hidden">
                                 <button
                                   type="button"
@@ -1452,9 +1497,67 @@ export default function SettingsView({
                               </button>
                             </div>
                           </div>
+
+                          {/* LIVE USAGE TELEMETRY & TRACKING BAR INSIDE THE API KEY BOX */}
+                          <div className="pt-2 border-t border-[var(--border-main)]/50 grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-[10px]">
+                            <div className="p-2 rounded bg-[var(--panel-bg)] border border-[var(--border-main)]/50">
+                              <span className="text-[var(--text-secondary)] uppercase block">Total Requests</span>
+                              <span className="font-extrabold text-[var(--text-primary)] text-xs">{preset.totalCalls || 0} calls</span>
+                            </div>
+
+                            <div className="p-2 rounded bg-[var(--panel-bg)] border border-[var(--border-main)]/50">
+                              <span className="text-[var(--text-secondary)] uppercase block">Quota Failures</span>
+                              <span className={`font-extrabold text-xs ${(preset.failedCalls || 0) > 0 ? 'text-[#FF4D4D]' : 'text-[var(--text-primary)]'}`}>
+                                {preset.failedCalls || 0} errors
+                              </span>
+                            </div>
+
+                            <div className="p-2 rounded bg-[var(--panel-bg)] border border-[var(--border-main)]/50">
+                              <span className="text-[var(--text-secondary)] uppercase block">Last Used</span>
+                              <span className="font-extrabold text-[var(--text-primary)] text-xs truncate block">
+                                {preset.lastUsedAt ? new Date(preset.lastUsedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Never'}
+                              </span>
+                            </div>
+
+                            <div className="p-2 rounded bg-[var(--panel-bg)] border border-[var(--border-main)]/50">
+                              <span className="text-[var(--text-secondary)] uppercase block">Reset Window</span>
+                              <span className="font-extrabold text-[#38BDF8] text-xs block">
+                                00:00 UTC ({resetCountdown})
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       );
                     })}
+
+                    {/* EMERGENCY PLATFORM QUOTA FALLBACK TOGGLE CARD */}
+                    <div className="p-4 rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--card-bg)] shadow-paper-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mt-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <ShieldCheck className="h-4 w-4 text-[#10B981]" />
+                          <h5 className="font-heading font-extrabold text-xs text-[var(--text-primary)] uppercase">
+                            Emergency Platform Quota Fallback
+                          </h5>
+                          <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-[#10B981]/20 text-[#10B981] border border-[#10B981]/40">
+                            ZERO DOWNTIME GUARANTEE
+                          </span>
+                        </div>
+                        <p className="text-[10px] font-mono text-[var(--text-secondary)] leading-relaxed">
+                          If all of your connected API keys reach their rate limit or daily quota, automatically allow NoteIT to use emergency platform quota fallback so your note generation never fails.
+                        </p>
+                      </div>
+
+                      <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                        <input
+                          type="checkbox"
+                          checked={allowEmergencyQuota}
+                          disabled={togglingEmergencyQuota}
+                          onChange={(e) => handleToggleEmergencyQuota(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#10B981]"></div>
+                      </label>
+                    </div>
                   </div>
                 )}
 

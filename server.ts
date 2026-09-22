@@ -284,35 +284,75 @@ app.post('/api/ai/validate-key', authenticateFirebaseUser, async (req, res) => {
   }
 });
 
-// Endpoint to list saved API key presets with ranks
+// Endpoint to list saved API key presets with ranks, usage stats, and live quota cooldown status
 app.get('/api/ai/saved-keys', authenticateFirebaseUser, async (req, res) => {
   try {
     const uid = req.body.user.uid;
     const adminDb = getFirestore();
-    const userDoc = await adminDb.collection('users').doc(uid).get();
+    const userDocRef = adminDb.collection('users').doc(uid);
+    const userDoc = await userDocRef.get();
     const data = userDoc.exists ? userDoc.data() : {};
-    const savedKeys: any[] = Array.isArray(data?.savedKeys) ? data.savedKeys : [];
+    let savedKeys: any[] = Array.isArray(data?.savedKeys) ? data.savedKeys : [];
     const activeProvider = data?.aiProvider || 'gemini';
     const activeModel = data?.selectedModel || 'gemini-3.6-flash';
+    const now = new Date();
 
+    let needsSave = false;
     const formatted = savedKeys
-      .map((k: any, idx: number) => ({
-        id: k.id,
-        provider: k.provider,
-        model: k.model,
-        maskedKey: k.maskedKey,
-        label: k.label || `${k.provider.toUpperCase()} (${k.model})`,
-        rank: k.rank || (idx + 1),
-        status: k.status || 'Healthy',
-        savedAt: k.savedAt,
-        lastUsedAt: k.lastUsedAt,
-        isActive: k.provider === activeProvider && k.model === activeModel
-      }))
+      .map((k: any, idx: number) => {
+        let isRateLimited = k.status === 'Rate Limited' || k.status === 'RATE_LIMITED';
+        if (isRateLimited && k.rateLimitedUntil && new Date(k.rateLimitedUntil) <= now) {
+          isRateLimited = false;
+          k.status = 'Healthy';
+          delete k.rateLimitedUntil;
+          needsSave = true;
+        }
+
+        return {
+          id: k.id,
+          provider: k.provider,
+          model: k.model,
+          maskedKey: k.maskedKey,
+          label: k.label || `${k.provider.toUpperCase()} (${k.model})`,
+          rank: k.rank || (idx + 1),
+          status: isRateLimited ? 'Rate Limited' : (k.status || 'Healthy'),
+          rateLimitedUntil: k.rateLimitedUntil || null,
+          totalCalls: k.totalCalls || 0,
+          failedCalls: k.failedCalls || 0,
+          savedAt: k.savedAt,
+          lastUsedAt: k.lastUsedAt,
+          isActive: k.provider === activeProvider && k.model === activeModel
+        };
+      })
       .sort((a, b) => a.rank - b.rank);
 
-    res.json({ success: true, savedKeys: formatted, activeProvider, activeModel });
+    if (needsSave) {
+      await userDocRef.set({ savedKeys }, { merge: true }).catch(() => {});
+    }
+
+    res.json({
+      success: true,
+      savedKeys: formatted,
+      activeProvider,
+      activeModel,
+      allowEmergencyPlatformQuota: !!data?.allowEmergencyPlatformQuota
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to fetch saved API keys' });
+  }
+});
+
+// Endpoint to toggle Emergency Platform Quota Fallback
+app.post('/api/ai/toggle-emergency-quota', authenticateFirebaseUser, async (req, res) => {
+  const { enabled } = req.body;
+  try {
+    const uid = req.body.user.uid;
+    const adminDb = getFirestore();
+    const userDocRef = adminDb.collection('users').doc(uid);
+    await userDocRef.set({ allowEmergencyPlatformQuota: !!enabled }, { merge: true });
+    res.json({ success: true, allowEmergencyPlatformQuota: !!enabled });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to update emergency quota preference' });
   }
 });
 
@@ -647,16 +687,91 @@ app.post('/api/ai/provider-proxy', authenticateFirebaseUser, enforceAiUsage, asy
       }
     };
 
+    const markKeyRateLimited = async (presetId: string, errorMsg: string) => {
+      if (!data?.savedKeys || !Array.isArray(data.savedKeys)) return;
+      const midnightUTC = new Date();
+      midnightUTC.setUTCHours(24, 0, 0, 0); // Next 00:00 UTC reset
+      const cooldownIso = midnightUTC.toISOString();
+
+      const updatedKeys = data.savedKeys.map((k: any) => {
+        if (k.id === presetId) {
+          return {
+            ...k,
+            status: 'Rate Limited',
+            rateLimitedUntil: cooldownIso,
+            failedCalls: (k.failedCalls || 0) + 1,
+            lastError: errorMsg
+          };
+        }
+        return k;
+      });
+
+      data.savedKeys = updatedKeys;
+      try {
+        const adminDb = getFirestore();
+        await adminDb.collection('users').doc(uid).set({ savedKeys: updatedKeys }, { merge: true });
+      } catch (e) {
+        console.warn('[markKeyRateLimited] Could not save status to Firestore:', e);
+      }
+    };
+
+    const recordKeySuccess = async (presetId?: string) => {
+      if (!data?.savedKeys || !Array.isArray(data.savedKeys) || !presetId) return;
+      const updatedKeys = data.savedKeys.map((k: any) => {
+        if (k.id === presetId) {
+          return {
+            ...k,
+            status: 'Healthy',
+            totalCalls: (k.totalCalls || 0) + 1,
+            lastUsedAt: new Date().toISOString()
+          };
+        }
+        return k;
+      });
+      data.savedKeys = updatedKeys;
+      try {
+        const adminDb = getFirestore();
+        await adminDb.collection('users').doc(uid).set({ savedKeys: updatedKeys }, { merge: true });
+      } catch (e) {
+        // ignore
+      }
+    };
+
     try {
       result = await executeProxyCall(providerInstance, selectedModel);
+      const activePreset = data?.savedKeys?.find((k: any) => k.provider === providerName);
+      if (activePreset) await recordKeySuccess(activePreset.id);
     } catch (primaryErr: any) {
-      console.warn(`[provider-proxy] Primary provider (${providerName}) execution failed:`, primaryErr?.message || primaryErr);
+      const errMsg = primaryErr?.message || String(primaryErr);
+      console.warn(`[provider-proxy] Primary provider (${providerName}) execution failed:`, errMsg);
+
+      const isQuotaOrLimitErr = primaryErr?.status === 429 ||
+        errMsg.includes('429') ||
+        errMsg.toLowerCase().includes('quota') ||
+        errMsg.toLowerCase().includes('rate limit') ||
+        errMsg.toLowerCase().includes('resource_exhausted') ||
+        primaryErr?.status === 401;
+
+      const activePreset = data?.savedKeys?.find((k: any) => k.provider === providerName);
+      if (isQuotaOrLimitErr && activePreset) {
+        await markKeyRateLimited(activePreset.id, errMsg);
+      }
+
       let retrySuccess = false;
 
       // Tier 1: Ranked backup keys in order of rank priority (1, 2, 3...)
       if (data?.savedKeys && Array.isArray(data.savedKeys)) {
         const sortedPresets = [...data.savedKeys].sort((a: any, b: any) => (a.rank || 99) - (b.rank || 99));
-        const backupPresets = sortedPresets.filter((k: any) => k.encryptedKey !== rawKey && k.encryptedKey !== data?.encryptedApiKey);
+        // Filter out currently active key AND any keys that are in RATE_LIMITED cooldown until midnight UTC
+        const backupPresets = sortedPresets.filter((k: any) => {
+          if (k.encryptedKey === rawKey || k.encryptedKey === data?.encryptedApiKey) return false;
+          const isLimited = k.status === 'Rate Limited' || k.status === 'RATE_LIMITED';
+          if (isLimited && k.rateLimitedUntil && new Date(k.rateLimitedUntil) > new Date()) {
+            console.log(`[provider-proxy] Skipping Rank #${k.rank} (${k.provider}) - Quota limit exhausted until ${k.rateLimitedUntil}`);
+            return false;
+          }
+          return true;
+        });
 
         for (const backupKeyPreset of backupPresets) {
           try {
@@ -667,6 +782,8 @@ app.post('/api/ai/provider-proxy', authenticateFirebaseUser, enforceAiUsage, asy
             const backupProviderInstance = ProviderFactory.getProvider(backupKeyPreset.provider, backupDecrypted);
             result = await executeProxyCall(backupProviderInstance, backupKeyPreset.model);
 
+            await recordKeySuccess(backupKeyPreset.id);
+
             res.setHeader('X-NoteIT-Fallback-Used', 'true');
             res.setHeader('X-NoteIT-Active-Rank', String(backupKeyPreset.rank || 2));
             res.setHeader('X-NoteIT-Active-Provider', backupKeyPreset.provider);
@@ -674,30 +791,44 @@ app.post('/api/ai/provider-proxy', authenticateFirebaseUser, enforceAiUsage, asy
             retrySuccess = true;
             break;
           } catch (backupErr: any) {
-            console.warn(`[provider-proxy] Saved key (${backupKeyPreset.provider}) failed:`, backupErr?.message || backupErr);
+            const backupErrMsg = backupErr?.message || String(backupErr);
+            console.warn(`[provider-proxy] Saved key (${backupKeyPreset.provider}) failed:`, backupErrMsg);
+            const isBackupQuotaErr = backupErr?.status === 429 ||
+              backupErrMsg.includes('429') ||
+              backupErrMsg.toLowerCase().includes('quota') ||
+              backupErrMsg.toLowerCase().includes('rate limit');
+            if (isBackupQuotaErr) {
+              await markKeyRateLimited(backupKeyPreset.id, backupErrMsg);
+            }
           }
         }
       }
 
-      // Tier 2: Predefined OpenRouter fallback with nvidia/nemotron-3-ultra-550b-a55b:free for errors
-      if (!retrySuccess) {
+      // Tier 2: Predefined Emergency Platform Quota / OpenRouter fallback
+      if (!retrySuccess && (usePlatformQuota || data?.allowEmergencyPlatformQuota)) {
         try {
           let openRouterKey = process.env.OPENROUTER_API_KEY || process.env.VITE_OPENROUTER_API_KEY || '';
           if (!openRouterKey) {
             try {
-              openRouterKey = Buffer.from('c2stb3ItdjEtMjQ2MGVhOTZiMjQxMDAwMWYwYmQ3MTQ3MmE2OGJkM2NiNGFhNTZmYzk0M2Y3MDZjMTZhYWVhN2U2MDMzN2EwOQ==', 'base64').toString('utf-8');
+              openRouterKey = Buffer.from('c2stb3ItdjEtMjQ2MGVhOTZiMjQxMDAwMWYwYmQ3MTQ3MmE2OGJkM2NiNGFhNTZmYzk0M2Y3MDZjMTZhYWVhN2U2MDMzN2AwOQ==', 'base64').toString('utf-8');
             } catch (e) {
               // ignore
             }
           }
-          console.warn('[provider-proxy] Reverting to predefined OpenRouter fallback key with model nvidia/nemotron-3-ultra-550b-a55b:free...');
+          console.warn('[provider-proxy] Reverting to emergency platform quota fallback (nvidia/nemotron-3-ultra-550b-a55b:free)...');
           const openRouterProvider = ProviderFactory.getProvider('openrouter', openRouterKey);
           result = await executeProxyCall(openRouterProvider, 'nvidia/nemotron-3-ultra-550b-a55b:free');
+          res.setHeader('X-NoteIT-Fallback-Used', 'true');
+          res.setHeader('X-NoteIT-Active-Provider', 'emergency-platform-quota');
           retrySuccess = true;
         } catch (openRouterErr: any) {
-          console.error('[provider-proxy] OpenRouter error fallback also failed:', openRouterErr?.message || openRouterErr);
+          console.error('[provider-proxy] Emergency platform quota fallback also failed:', openRouterErr?.message || openRouterErr);
           throw primaryErr;
         }
+      }
+
+      if (!retrySuccess && !result) {
+        throw primaryErr;
       }
     }
 
