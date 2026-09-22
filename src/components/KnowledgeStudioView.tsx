@@ -48,7 +48,7 @@ import { db, auth } from '../firebaseConfig';
 import { API_BASE_URL } from '../config';
 import { collection, addDoc, getDocs, deleteDoc, doc, setDoc, updateDoc, serverTimestamp, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { generateLectureContentFromText, generateFastDocumentAssets, generateStructuredNotes, generateSummary, generateFlashcards, generateQuiz, generateMoreQuestions, generateMindmap, getAIConfig } from '../services/gemini';
-import { getAzureUploadSasUrl, uploadBlobToAzure, extractTextFromDocument, extractTextFromUrl, saveTranscriptMultiTier } from '../services/storageService';
+import { getAzureUploadSasUrl, uploadBlobToAzure, extractTextFromDocument, extractTextFromUrl, saveTranscriptMultiTier, getTranscriptMultiTier } from '../services/storageService';
 import pptxgen from 'pptxgenjs';
 import BruteLoader from './BruteLoader';
 import PresentationWorkspace from './PresentationWorkspace';
@@ -344,6 +344,35 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
     return '';
   };
 
+  const getSourceTextContent = async (source: any): Promise<string> => {
+    if (!source) return '';
+    let text = source.transcript || source.cleanTranscript || source.content || source.text || '';
+    if (text && text.trim().length > 0) return text.trim();
+
+    if (source.id && userId) {
+      try {
+        const fetched = await getTranscriptMultiTier(userId, source.id);
+        if (fetched && (fetched.cleanTranscript || fetched.transcriptText)) {
+          return (fetched.cleanTranscript || fetched.transcriptText).trim();
+        }
+      } catch (e) {
+        console.warn('[KnowledgeStudio] Azure Blob multi-tier fetch error:', e);
+      }
+
+      try {
+        const localKey = `noteit_transcript_${userId}_${source.id}`;
+        const rawLocal = localStorage.getItem(localKey);
+        if (rawLocal) {
+          const parsed = JSON.parse(rawLocal);
+          const localText = parsed.cleanTranscript || parsed.transcript || '';
+          if (localText.trim()) return localText.trim();
+        }
+      } catch (_) {}
+    }
+
+    return '';
+  };
+
   const triggerGenerateNotes = async (format: 'academic' | 'executive' | 'revision' | 'bhailang' | 'bhailang_normal' | 'bhailang_savage' | 'bhailang_pro') => {
     if (!activeSourceId || !activeSource || isGeneratingNotes) return;
     if (!userId) {
@@ -361,7 +390,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
       }
     } catch (_) {}
 
-    const textContent = activeSource.transcript || activeSource.cleanTranscript || activeSource.content || activeSource.text || '';
+    const textContent = await getSourceTextContent(activeSource);
     if (!textContent.trim()) {
       setImportError("A valid transcript is required to generate notes.");
       return;
@@ -401,7 +430,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
       }
     } catch (_) {}
 
-    const textContent = activeSource.content || activeSource.transcript || '';
+    const textContent = await getSourceTextContent(activeSource);
     if (!textContent.trim()) {
       setImportError("No content available to generate summary.");
       return;
@@ -438,7 +467,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
   const triggerGenerateFlashcards = async () => {
     if (!activeSourceId || !userId || !activeSource || isGeneratingFlashcards) return;
 
-    const textContent = activeSource.content || activeSource.transcript || '';
+    const textContent = await getSourceTextContent(activeSource);
     if (!textContent.trim()) {
       setImportError("No content available to generate flashcards.");
       return;
@@ -468,7 +497,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
   const triggerGenerateQuiz = async () => {
     if (!activeSourceId || !userId || !activeSource || isGeneratingQuiz) return;
 
-    const textContent = activeSource.content || activeSource.transcript || '';
+    const textContent = await getSourceTextContent(activeSource);
     if (!textContent.trim()) {
       setImportError("No content available to generate quiz.");
       return;
@@ -495,7 +524,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
   const triggerGenerateMoreQuiz = async () => {
     if (!activeSourceId || !userId || !activeSource || isGeneratingQuiz) return;
 
-    const textContent = activeSource.content || activeSource.transcript || '';
+    const textContent = await getSourceTextContent(activeSource);
     if (!textContent.trim()) {
       setImportError("No content available to generate quiz.");
       return;
@@ -526,7 +555,7 @@ export default function KnowledgeStudioView({ userId, theme, setActivePage }: Kn
   const triggerGenerateMindmap = async () => {
     if (!activeSourceId || !userId || !activeSource || isGeneratingMindmap) return;
 
-    const textContent = activeSource.content || activeSource.transcript || '';
+    const textContent = await getSourceTextContent(activeSource);
     if (!textContent.trim()) {
       setImportError("No content available to generate mind map.");
       return;
