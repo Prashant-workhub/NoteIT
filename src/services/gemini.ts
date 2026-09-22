@@ -176,58 +176,67 @@ export const ensureGfgTagsInMarkdown = (text: string, keyTerms?: string[]): stri
   let result = text;
   const termsToTag: string[] = [];
 
+  // 1. Key terms explicitly passed
   if (keyTerms && Array.isArray(keyTerms)) {
     keyTerms.forEach(t => {
-      if (typeof t === 'string' && t.trim().length > 3) {
+      if (typeof t === 'string' && t.trim().length >= 3) {
         termsToTag.push(t.trim());
       }
     });
   }
 
+  // 2. Bold terms **Term**
   const boldMatches = text.match(/\*\*([^*]+)\*\*/g);
   if (boldMatches) {
     boldMatches.forEach(m => {
       const inner = m.slice(2, -2).trim();
       if (
-        inner.length > 3 &&
+        inner.length >= 3 &&
         !inner.includes(':') &&
-        !/^(HIGH WEIGHTAGE|EXAM PRIORITY|Definition|Formula|Result|Example|Given|Process)/i.test(inner)
+        !/^(HIGH WEIGHTAGE|EXAM PRIORITY|Definition|Formula|Result|Example|Given|Process|Section|Unit|Chapter)/i.test(inner)
       ) {
         termsToTag.push(inner);
       }
     });
   }
 
-  const techMatches = text.match(/\b([A-Z][A-Za-z0-9_]+(?:\s+[A-Z][A-Za-z0-9_]+)*)\b/g);
-  if (techMatches) {
-    techMatches.forEach(m => {
-      const trimmed = m.trim();
-      if (
-        trimmed.length >= 3 &&
-        !/^(HIGH WEIGHTAGE|EXAM PRIORITY|Definition|Formula|Result|Example|Given|Process|Section|Chapter|University|Study|Guide|Summary|Notes|Overview|Basic|Computer|Main|Parts|Unit|The|And|With|From|This|That)/i.test(trimmed)
-      ) {
-        termsToTag.push(trimmed);
-      }
-    });
-  }
+  // 3. Known technical computer science & academic terms
+  const knownTechTerms = [
+    'Von Neumann Architecture', 'Indirect Addressing', 'Direct Addressing',
+    'Stack Organization', 'Instruction Formats', 'Register Transfer Language',
+    'Micro Operations', 'Program Control', 'RISC', 'CISC', 'Fetch Decode Execute',
+    'Arithmetic Logic Unit', 'Control Unit', 'Central Processing Unit',
+    'General Register Organization', 'Memory Unit', 'Cache Memory',
+    'Virtual Memory', 'Paging', 'Segmentation', 'Interrupts', 'Direct Memory Access',
+    'ALU', 'CPU', 'CU', 'RAM', 'ROM', 'DMA', 'FLIP FLOPS', 'MUX', 'DEMUX',
+    'Assembly Language', 'Machine Cycle', 'Bus Transfer', 'Memory Transfer'
+  ];
+
+  knownTechTerms.forEach(term => {
+    if (new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(text)) {
+      termsToTag.push(term);
+    }
+  });
 
   const stopWords = new Set([
     'this', 'that', 'with', 'from', 'have', 'which', 'when', 'where', 'these',
     'those', 'about', 'their', 'there', 'what', 'some', 'more', 'first', 'second',
-    'third', 'after', 'before', 'overall', 'summary', 'overview', 'details', 'main', 'parts'
+    'third', 'after', 'before', 'overall', 'summary', 'overview', 'details', 'main', 'parts',
+    'basic', 'computer', 'unit', 'class', 'content', 'docx', 'notes', 'study'
   ]);
 
   const uniqueTerms = Array.from(new Set(termsToTag))
-    .filter(t => !stopWords.has(t.toLowerCase()))
+    .filter(t => t.length >= 3 && !stopWords.has(t.toLowerCase()))
     .sort((a, b) => b.length - a.length);
 
   for (const term of uniqueTerms) {
     const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Match term strictly if not already inside a markdown link [...] or (...) or **...**
     const regex = new RegExp(`(?<!\\[)(?<!\\gfg:)(?<!\\*\\*)\\b(${escaped})\\b(?!\\])(?!\\))(?!\\*\\*)`, 'gi');
     let count = 0;
     result = result.replace(regex, match => {
       count++;
-      return count <= 2 ? `[${match}](gfg)` : match;
+      return count <= 1 ? `[${match}](gfg)` : match;
     });
   }
 
