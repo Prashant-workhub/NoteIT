@@ -170,6 +170,55 @@ export const getFallbackOpenRouterKey = (): string => {
   return '';
 };
 
+export const ensureGfgTagsInMarkdown = (text: string, keyTerms?: string[]): string => {
+  if (!text || typeof text !== 'string') return text;
+
+  let result = text;
+  const termsToTag: string[] = [];
+
+  if (keyTerms && Array.isArray(keyTerms)) {
+    keyTerms.forEach(t => {
+      if (typeof t === 'string' && t.trim().length > 3) {
+        termsToTag.push(t.trim());
+      }
+    });
+  }
+
+  const boldMatches = text.match(/\*\*([^*]+)\*\*/g);
+  if (boldMatches) {
+    boldMatches.forEach(m => {
+      const inner = m.slice(2, -2).trim();
+      if (
+        inner.length > 3 &&
+        !inner.includes(':') &&
+        !/^(HIGH WEIGHTAGE|EXAM PRIORITY|Definition|Formula|Result|Example|Given|Process)/i.test(inner)
+      ) {
+        termsToTag.push(inner);
+      }
+    });
+  }
+
+  const stopWords = new Set([
+    'this', 'that', 'with', 'from', 'have', 'which', 'when', 'where', 'these',
+    'those', 'about', 'their', 'there', 'what', 'some', 'more', 'first', 'second',
+    'third', 'after', 'before', 'overall', 'summary', 'overview', 'details'
+  ]);
+
+  const uniqueTerms = Array.from(new Set(termsToTag)).filter(t => !stopWords.has(t.toLowerCase()));
+
+  for (const term of uniqueTerms) {
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(?<!\\[)(?<!\\gfg:)(?<!\\*\\*)\\b(${escaped})\\b(?!\\])(?!\\))(?!\\*\\*)`, 'gi');
+    let count = 0;
+    result = result.replace(regex, match => {
+      count++;
+      return count <= 2 ? `[${match}](gfg)` : match;
+    });
+  }
+
+  return result;
+};
+
 export const executeOpenRouterFallbackCall = async (
   prompt: string,
   responseSchema?: any,
@@ -1197,7 +1246,26 @@ export const generateIngestedAssetsFromText = async (
     required: ['cleanTranscript', 'sections', 'summary', 'notes', 'flashcards', 'quiz', 'keyConcepts', 'weakTopics', 'timeline', 'sourceIntelligence']
   };
 
-  return executeGeminiCall(prompt, apiKey, undefined, schema, onBusy);
+  const result = await executeGeminiCall(prompt, apiKey, undefined, schema, onBusy);
+  if (result) {
+    const keyTerms = result.sourceIntelligence?.keyTerms || [];
+    if (result.notes && Array.isArray(result.notes)) {
+      result.notes = result.notes.map((n: any) => {
+        if (typeof n === 'string') return ensureGfgTagsInMarkdown(n, keyTerms);
+        if (n && typeof n === 'object') {
+          return {
+            ...n,
+            content: ensureGfgTagsInMarkdown(n.content || n.text || '', keyTerms)
+          };
+        }
+        return n;
+      });
+    }
+    if (result.summary && typeof result.summary === 'string') {
+      result.summary = ensureGfgTagsInMarkdown(result.summary, keyTerms);
+    }
+  }
+  return result;
 };
 
 export const generateInitialLectureAssets = async (
@@ -2020,8 +2088,9 @@ export const generateNotes = async (
   `;
 
   const res = await executeGeminiCall(prompt, apiKey, undefined, undefined, onBusy);
-  notesResponseCache.set(cacheKey, res);
-  return res;
+  const formattedRes = typeof res === 'string' ? ensureGfgTagsInMarkdown(res) : res;
+  notesResponseCache.set(cacheKey, formattedRes);
+  return formattedRes;
 };
 
 export const generateStructuredNotes = async (
@@ -2097,7 +2166,13 @@ export const generateStructuredNotes = async (
   };
 
   const res = await executeGeminiCall(prompt, apiKey, undefined, schema, onBusy);
-  const result = res.notes || [];
+  let result = res.notes || [];
+  if (Array.isArray(result)) {
+    result = result.map((n: any) => ({
+      ...n,
+      content: ensureGfgTagsInMarkdown(n.content || '')
+    }));
+  }
   notesResponseCache.set(cacheKey, result);
   return result;
 };

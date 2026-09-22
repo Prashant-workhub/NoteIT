@@ -601,7 +601,7 @@ app.post('/api/ai/format-transcript-openrouter', authenticateFirebaseUser, async
     let openRouterKey = process.env.OPENROUTER_API_KEY || process.env.VITE_OPENROUTER_API_KEY || '';
     if (!openRouterKey) {
       try {
-        openRouterKey = Buffer.from('c2stb3ItdjEtMjQ2MGVhOTZiMjQxMDAwMWYwYmQ3MTQ3MmE2OGJkM2NiNGFhNTZmYzk0M2Y3MDZjMTZhYWVhN2U2MDMzN2AwOQ==', 'base64').toString('utf-8');
+        openRouterKey = Buffer.from('c2stb3ItdjEtMjQ2MGVhOTZiMjQxMDAwMWYwYmQ3MTQ3MmE2OGJkM2NiNGFhNTZmYzk0M2Y3MDZjMTZhYWVhN2U2MDMzN2EwOQ==', 'base64').toString('utf-8');
       } catch (e) {
         // ignore
       }
@@ -909,7 +909,7 @@ app.post('/api/ai/provider-proxy', authenticateFirebaseUser, enforceAiUsage, asy
           let openRouterKey = process.env.OPENROUTER_API_KEY || process.env.VITE_OPENROUTER_API_KEY || '';
           if (!openRouterKey) {
             try {
-              openRouterKey = Buffer.from('c2stb3ItdjEtMjQ2MGVhOTZiMjQxMDAwMWYwYmQ3MTQ3MmE2OGJkM2NiNGFhNTZmYzk0M2Y3MDZjMTZhYWVhN2U2MDMzN2AwOQ==', 'base64').toString('utf-8');
+              openRouterKey = Buffer.from('c2stb3ItdjEtMjQ2MGVhOTZiMjQxMDAwMWYwYmQ3MTQ3MmE2OGJkM2NiNGFhNTZmYzk0M2Y3MDZjMTZhYWVhN2U2MDMzN2EwOQ==', 'base64').toString('utf-8');
             } catch (e) {
               // ignore
             }
