@@ -7,8 +7,23 @@
 
 import { Capacitor } from '@capacitor/core';
 
-const isProd = import.meta.env.PROD;
-const apiEnvUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL;
+const getEnv = (key: string): string => {
+  if (typeof process !== 'undefined' && process.env && process.env[key]) {
+    return process.env[key] || '';
+  }
+  try {
+    const metaEnv = (import.meta as any)?.env;
+    if (metaEnv && metaEnv[key]) {
+      return metaEnv[key];
+    }
+  } catch {
+    // ignore
+  }
+  return '';
+};
+
+const isProd = getEnv('PROD') === 'true' || (typeof process !== 'undefined' && process.env.NODE_ENV === 'production');
+const apiEnvUrl = getEnv('VITE_API_URL') || getEnv('VITE_BACKEND_URL');
 
 if (isProd && !apiEnvUrl) {
   console.warn("VITE_API_URL is not configured; API requests will use this deployment's /api routes.");

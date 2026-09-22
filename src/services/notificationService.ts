@@ -108,9 +108,13 @@ export async function requestNotificationPermission(uid: string): Promise<{
     let token = '';
     let pushSub: any = null;
 
+    const vapidKey = (typeof process !== 'undefined' && process.env?.VITE_FIREBASE_VAPID_KEY) ||
+      (typeof import.meta !== 'undefined' && (import.meta as any)?.env?.VITE_FIREBASE_VAPID_KEY) ||
+      SCHEDULER_CONFIG.DEFAULT_VAPID_KEY;
+
     try {
       token = await getToken(messaging, {
-        vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY || SCHEDULER_CONFIG.DEFAULT_VAPID_KEY,
+        vapidKey,
         serviceWorkerRegistration: swReg || undefined
       });
     } catch (fcmErr: any) {
@@ -124,7 +128,7 @@ export async function requestNotificationPermission(uid: string): Promise<{
         if (!sub) {
           sub = await swReg.pushManager.subscribe({
             userVisibleOnly: true,
-            applicationServerKey: import.meta.env.VITE_FIREBASE_VAPID_KEY || SCHEDULER_CONFIG.DEFAULT_VAPID_KEY
+            applicationServerKey: vapidKey
           });
         }
         if (sub) {
