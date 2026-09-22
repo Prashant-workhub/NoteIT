@@ -108,9 +108,16 @@ export const AcademicNotesViewer: React.FC<AcademicNotesViewerProps> = ({
           const linkText = linkMatch[1];
           const linkHref = linkMatch[2].trim();
 
-          if (linkHref.toLowerCase() === 'gfg' || linkHref.toLowerCase().startsWith('gfg:') || linkHref.toLowerCase().includes('geeksforgeeks')) {
+          const lowerHref = linkHref.toLowerCase();
+          const isGfgLink = lowerHref === 'gfg' || lowerHref.startsWith('gfg:') || lowerHref.startsWith('gfg_') || lowerHref.includes('geeksforgeeks');
+
+          if (isGfgLink) {
             const queryTerm = linkHref.includes(':') ? linkHref.split(':')[1] : linkText;
-            const gfgUrl = `https://www.geeksforgeeks.org/search/?q=${encodeURIComponent(queryTerm)}`;
+            const cleanQuery = (queryTerm || linkText).trim().replace(/^(gfg:?|geeksforgeeks:?)/i, '').trim();
+            const gfgUrl = (linkHref.startsWith('http://') || linkHref.startsWith('https://')) && !linkHref.includes('/search')
+              ? linkHref
+              : `https://www.google.com/search?q=${encodeURIComponent(`site:geeksforgeeks.org ${cleanQuery}`)}`;
+
             formatted.push(
               <a
                 key={idx}
@@ -118,7 +125,7 @@ export const AcademicNotesViewer: React.FC<AcademicNotesViewerProps> = ({
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[4px] bg-[#2F8D46]/15 text-[#2F8D46] dark:bg-[#2F8D46]/25 dark:text-[#4ADE80] font-mono text-xs font-extrabold border border-[#2F8D46]/40 hover:bg-[#2F8D46] hover:text-white transition-all shadow-paper-sm mx-1 my-0.5 select-none no-underline cursor-pointer group"
-                title={`Look up "${queryTerm}" explanation on GeeksforGeeks`}
+                title={`Look up "${cleanQuery}" explanation on GeeksforGeeks`}
               >
                 <span>{linkText}</span>
                 <span className="text-[9px] font-mono bg-[#2F8D46] text-white px-1 rounded group-hover:bg-white group-hover:text-[#2F8D46] transition-colors flex items-center gap-0.5">
@@ -159,7 +166,7 @@ export const AcademicNotesViewer: React.FC<AcademicNotesViewerProps> = ({
             </span>
           );
         } else {
-          const gfgUrl = `https://www.geeksforgeeks.org/search/?q=${encodeURIComponent(inner)}`;
+          const gfgUrl = `https://www.google.com/search?q=${encodeURIComponent(`site:geeksforgeeks.org ${inner}`)}`;
           formatted.push(
             <span key={idx} className="inline-wrap group/term">
               <strong className="font-extrabold text-[var(--text-primary)]">{inner}</strong>
