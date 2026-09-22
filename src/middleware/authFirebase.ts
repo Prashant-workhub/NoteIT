@@ -3,20 +3,21 @@ import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { Request, Response, NextFunction } from 'express';
 
-// Initialise Firebase Admin SDK if not already initialised
+const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID;
+const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+
 if (!getApps().length) {
-  if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
+  if (privateKey && clientEmail) {
     initializeApp({
       credential: cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+        projectId: projectId || 'noteit-3bb0f',
+        clientEmail: clientEmail,
+        privateKey: privateKey.replace(/\\n/g, '\n'),
       }),
     });
   } else {
-    initializeApp(process.env.FIREBASE_PROJECT_ID
-      ? { projectId: process.env.FIREBASE_PROJECT_ID }
-      : undefined);
+    initializeApp(projectId ? { projectId } : { projectId: 'noteit-3bb0f' });
   }
 }
 
