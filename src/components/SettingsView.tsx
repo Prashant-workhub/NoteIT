@@ -1335,18 +1335,18 @@ export default function SettingsView({
 
           {/* Tab 2: AI Provider & Key Settings */}
           {activeTab === 'ai' && (
-            <div className="space-y-6 text-left">
+            <div className="space-y-6 text-left text-[var(--text-primary)]">
               <div>
-                <h3 className="font-heading font-extrabold text-lg uppercase text-[#111111]">
+                <h3 className="font-heading font-extrabold text-lg uppercase text-[var(--text-primary)]">
                   Ranked Multi-API Key & Automatic Failover Management
                 </h3>
-                <p className="text-xs font-mono font-bold text-[#666666] mt-1">
+                <p className="text-xs font-mono font-bold text-[var(--text-secondary)] mt-1">
                   Configure priority-ranked API keys with automatic zero-downtime failover. If Rank #1 encounters rate limits (429) or quota errors, NoteIT seamlessly switches to Rank #2, Rank #3, and so on.
                 </p>
               </div>
 
               {validationError && (
-                <div className="p-3.5 rounded-[6px] border-2 border-[#111111] bg-[#FF4D4D] text-white text-xs font-mono font-bold flex items-start gap-2 shadow-paper-sm">
+                <div className="p-3.5 rounded-[6px] border-2 border-[var(--border-main)] bg-[#FF4D4D] text-white text-xs font-mono font-bold flex items-start gap-2 shadow-paper-sm">
                   <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
                   <div className="flex-1">{validationError}</div>
                   <button type="button" onClick={() => setValidationError(null)} className="text-white hover:text-gray-200 text-xs font-bold cursor-pointer">✕</button>
@@ -1356,23 +1356,23 @@ export default function SettingsView({
               {/* CONNECTED KEYS LIST (RANK ORDERED BOXES) */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-heading font-extrabold uppercase text-[#111111] flex items-center gap-2">
+                  <h4 className="text-xs font-heading font-extrabold uppercase text-[var(--text-primary)] flex items-center gap-2">
                     <Lock className="h-4 w-4 text-[#19B56B]" />
                     <span>CONNECTED API KEYS ({savedKeys.length})</span>
                   </h4>
-                  <span className="text-[10px] font-mono font-bold text-[#666666]">
+                  <span className="text-[10px] font-mono font-bold text-[var(--text-secondary)]">
                     AES-256 Encrypted • Auto Failover Enabled
                   </span>
                 </div>
 
                 {loadingSavedKeys ? (
-                  <div className="p-6 rounded-[6px] border-2 border-[#111111] bg-[#F6F2EA] text-center text-xs font-mono font-bold text-[#666666] animate-pulse">
+                  <div className="p-6 rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--panel-bg)] text-center text-xs font-mono font-bold text-[var(--text-secondary)] animate-pulse">
                     Loading connected API keys...
                   </div>
                 ) : savedKeys.length === 0 ? (
-                  <div className="p-6 rounded-[6px] border-2 border-dashed border-[#111111] bg-[#F6F2EA] text-center space-y-2">
-                    <p className="text-xs font-mono font-extrabold text-[#111111]">No API keys currently connected.</p>
-                    <p className="text-[10px] font-mono text-[#666666]">Add your Google Gemini, Groq, OpenAI, or OpenRouter API key below to enable AI note generation.</p>
+                  <div className="p-6 rounded-[6px] border-2 border-dashed border-[var(--border-main)] bg-[var(--panel-bg)] text-center space-y-2">
+                    <p className="text-xs font-mono font-extrabold text-[var(--text-primary)]">No API keys currently connected.</p>
+                    <p className="text-[10px] font-mono text-[var(--text-secondary)]">Add your Google Gemini, Groq, OpenAI, or OpenRouter API key below to enable AI note generation.</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -1384,8 +1384,8 @@ export default function SettingsView({
                         <div
                           key={preset.id}
                           className={`p-4 rounded-[6px] border-2 transition-all shadow-paper-sm ${isFirst
-                              ? 'border-[#10B981] bg-[#F0FDF4]'
-                              : 'border-[#111111] bg-white'
+                              ? 'border-[#10B981] bg-[#10B981]/15'
+                              : 'border-[var(--border-main)] bg-[var(--card-bg)]'
                             }`}
                         >
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1400,19 +1400,19 @@ export default function SettingsView({
 
                               <div>
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="font-heading font-extrabold text-sm text-[#111111] uppercase">
+                                  <span className="font-heading font-extrabold text-sm text-[var(--text-primary)] uppercase">
                                     {provMeta.name}
                                   </span>
-                                  <span className="text-xs font-mono font-extrabold text-[#2F6BFF] bg-[#EFF6FF] px-2 py-0.5 rounded border border-[#2F6BFF]/30">
+                                  <span className="text-xs font-mono font-extrabold text-[#2F6BFF] dark:text-[#38BDF8] bg-[#2F6BFF]/10 px-2 py-0.5 rounded border border-[#2F6BFF]/30">
                                     {preset.model}
                                   </span>
                                   <span className="px-2 py-0.5 rounded-[4px] border border-[#111111] bg-[#19B56B] text-white text-[9px] font-mono font-extrabold uppercase">
                                     HEALTHY
                                   </span>
                                 </div>
-                                <div className="text-[11px] font-mono font-bold text-[#666666] flex items-center gap-3 mt-1">
-                                  <span>Key: <code className="bg-[#F6F2EA] px-1.5 py-0.5 rounded border border-[#111111] text-[#111111]">{preset.maskedKey}</code></span>
-                                  <span>Label: <strong className="text-[#111111]">{preset.label || provMeta.name}</strong></span>
+                                <div className="text-[11px] font-mono font-bold text-[var(--text-secondary)] flex items-center gap-3 mt-1 flex-wrap">
+                                  <span>Key: <code className="bg-[var(--panel-bg)] px-1.5 py-0.5 rounded border border-[var(--border-main)] text-[var(--text-primary)]">{preset.maskedKey}</code></span>
+                                  <span>Label: <strong className="text-[var(--text-primary)]">{preset.label || provMeta.name}</strong></span>
                                 </div>
                               </div>
                             </div>
@@ -1420,12 +1420,12 @@ export default function SettingsView({
                             {/* Actions & Priority Reorder Controls */}
                             <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
                               {/* Move Up/Down buttons */}
-                              <div className="flex items-center border-2 border-[#111111] rounded-[4px] bg-[#F6F2EA] overflow-hidden">
+                              <div className="flex items-center border-2 border-[var(--border-main)] rounded-[4px] bg-[var(--panel-bg)] overflow-hidden">
                                 <button
                                   type="button"
                                   disabled={isFirst}
                                   onClick={() => handleMoveRank(preset.id, 'up')}
-                                  className="px-2 py-1 hover:bg-[#FFC400] disabled:opacity-30 disabled:hover:bg-transparent border-r border-[#111111] text-[#111111] transition-colors cursor-pointer"
+                                  className="px-2.5 py-1.5 hover:bg-[#FFC400] hover:text-[#111111] disabled:opacity-30 disabled:hover:bg-transparent border-r border-[var(--border-main)] text-[var(--text-primary)] transition-colors cursor-pointer"
                                   title="Increase Priority Rank (Move Up)"
                                 >
                                   <ChevronUp className="h-4 w-4" />
@@ -1434,7 +1434,7 @@ export default function SettingsView({
                                   type="button"
                                   disabled={isLast}
                                   onClick={() => handleMoveRank(preset.id, 'down')}
-                                  className="px-2 py-1 hover:bg-[#FFC400] disabled:opacity-30 disabled:hover:bg-transparent text-[#111111] transition-colors cursor-pointer"
+                                  className="px-2.5 py-1.5 hover:bg-[#FFC400] hover:text-[#111111] disabled:opacity-30 disabled:hover:bg-transparent text-[var(--text-primary)] transition-colors cursor-pointer"
                                   title="Lower Priority Rank (Move Down)"
                                 >
                                   <ChevronDown className="h-4 w-4" />
@@ -1445,7 +1445,7 @@ export default function SettingsView({
                                 type="button"
                                 disabled={deletingPresetId === preset.id}
                                 onClick={() => handleDeleteSavedKey(preset.id)}
-                                className="p-1.5 rounded-[4px] border-2 border-[#111111] bg-white text-[#FF4D4D] hover:bg-red-50 transition-all cursor-pointer"
+                                className="p-1.5 rounded-[4px] border-2 border-[var(--border-main)] bg-[var(--card-bg)] text-[#FF4D4D] hover:bg-[#FF4D4D]/20 transition-all cursor-pointer"
                                 title="Delete Connected API Key"
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -1467,19 +1467,19 @@ export default function SettingsView({
                         setShowReplaceForm(true);
                         setNewKeyRank(savedKeys.length + 1);
                       }}
-                      className="w-full p-4 rounded-[6px] border-2 border-dashed border-[#111111] bg-[#F6F2EA] hover:bg-[#FFC400]/20 text-[#111111] font-mono text-xs font-extrabold uppercase flex items-center justify-center gap-2 transition-all cursor-pointer shadow-paper-xs"
+                      className="w-full p-4 rounded-[6px] border-2 border-dashed border-[var(--border-main)] bg-[var(--panel-bg)] hover:bg-[#FFC400]/20 text-[var(--text-primary)] font-mono text-xs font-extrabold uppercase flex items-center justify-center gap-2 transition-all cursor-pointer shadow-paper-xs"
                     >
                       <Key className="h-4 w-4 text-[#2F6BFF]" />
                       <span>+ ADD ANOTHER API KEY</span>
                     </button>
                   ) : (
-                    <form onSubmit={handleSaveNewKey} className="p-5 rounded-[6px] border-2 border-[#111111] bg-white space-y-4 shadow-paper-md text-left">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b-2 border-[#111111]">
+                    <form onSubmit={handleSaveNewKey} className="p-5 rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--card-bg)] space-y-4 shadow-paper-md text-left">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b-2 border-[var(--border-main)]">
                         <div>
-                          <h4 className="text-xs font-heading font-extrabold uppercase text-[#111111]">
+                          <h4 className="text-xs font-heading font-extrabold uppercase text-[var(--text-primary)]">
                             Connect & Rank New API Key
                           </h4>
-                          <p className="text-[10px] font-mono font-bold text-[#666666] mt-0.5">
+                          <p className="text-[10px] font-mono font-bold text-[var(--text-secondary)] mt-0.5">
                             Input API details and set its priority rank. Safely encrypted with AES-256.
                           </p>
                         </div>
@@ -1489,7 +1489,7 @@ export default function SettingsView({
                             href={PROVIDER_METADATA[aiProvider].getKeyLink}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-[6px] border-2 border-[#111111] bg-[#2563EB] text-white text-xs font-mono font-extrabold uppercase hover:bg-blue-700 transition-all shadow-paper-sm shrink-0 cursor-pointer"
+                            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-[6px] border-2 border-[var(--border-main)] bg-[#2563EB] text-white text-xs font-mono font-extrabold uppercase hover:bg-blue-700 transition-all shadow-paper-sm shrink-0 cursor-pointer"
                           >
                             <Key className="h-3.5 w-3.5" />
                             <span>Get {PROVIDER_METADATA[aiProvider].name} Key</span>
@@ -1501,14 +1501,14 @@ export default function SettingsView({
                       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                         {/* Rank selection */}
                         <div className="space-y-1.5">
-                          <label className="text-[9px] font-mono font-extrabold uppercase text-[#111111] block">Priority Rank</label>
+                          <label className="text-[9px] font-mono font-extrabold uppercase text-[var(--text-primary)] block">Priority Rank</label>
                           <select
                             value={newKeyRank}
                             onChange={(e) => setNewKeyRank(Number(e.target.value))}
-                            className="w-full rounded-[6px] border-2 border-[#111111] bg-[#F6F2EA] p-2.5 text-xs font-mono font-bold text-[#111111] outline-none shadow-paper-sm cursor-pointer"
+                            className="w-full rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--panel-bg)] p-2.5 text-xs font-mono font-bold text-[var(--text-primary)] outline-none shadow-paper-sm cursor-pointer"
                           >
                             {Array.from({ length: savedKeys.length + 1 }, (_, i) => i + 1).map((r) => (
-                              <option key={r} value={r}>
+                              <option key={r} value={r} className="bg-[var(--card-bg)] text-[var(--text-primary)]">
                                 Rank #{r} {r === 1 ? '(Primary)' : `(Backup)`}
                               </option>
                             ))}
@@ -1517,7 +1517,7 @@ export default function SettingsView({
 
                         {/* Searchable Dropdown Selector */}
                         <div className="space-y-1.5 relative">
-                          <label className="text-[9px] font-mono font-extrabold uppercase text-[#111111] block">AI Provider</label>
+                          <label className="text-[9px] font-mono font-extrabold uppercase text-[var(--text-primary)] block">AI Provider</label>
                           <div className="relative">
                             <button
                               type="button"
@@ -1525,10 +1525,10 @@ export default function SettingsView({
                                 setIsDropdownOpen((prev) => !prev);
                                 setSearchQuery('');
                               }}
-                              className="w-full flex items-center justify-between rounded-[6px] border-2 border-[#111111] bg-[#F6F2EA] p-2.5 text-xs font-mono font-bold text-[#111111] outline-none shadow-paper-sm cursor-pointer"
+                              className="w-full flex items-center justify-between rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--panel-bg)] p-2.5 text-xs font-mono font-bold text-[var(--text-primary)] outline-none shadow-paper-sm cursor-pointer"
                             >
                               <span>{PROVIDER_METADATA[aiProvider]?.name || 'Select...'}</span>
-                              <ChevronDown className="h-3.5 w-3.5 text-[#111111]" />
+                              <ChevronDown className="h-3.5 w-3.5 text-[var(--text-primary)]" />
                             </button>
 
                             {isDropdownOpen && (
@@ -1540,15 +1540,15 @@ export default function SettingsView({
                                     setSearchQuery('');
                                   }}
                                 />
-                                <div className="absolute z-50 mt-1.5 w-full rounded-[6px] border-2 border-[#111111] bg-white shadow-paper-lg p-2.5 space-y-2 text-[#111111]">
+                                <div className="absolute z-50 mt-1.5 w-full rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--card-bg)] shadow-paper-lg p-2.5 space-y-2 text-[var(--text-primary)]">
                                   <div className="relative">
-                                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#111111]" />
+                                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-primary)]" />
                                     <input
                                       type="text"
                                       value={searchQuery}
                                       onChange={(e) => setSearchQuery(e.target.value)}
                                       placeholder="Search providers..."
-                                      className="w-full rounded-[4px] border-2 border-[#111111] bg-[#F6F2EA] pl-8 pr-7 py-1 text-[11px] font-mono font-bold outline-none"
+                                      className="w-full rounded-[4px] border-2 border-[var(--border-main)] bg-[var(--panel-bg)] pl-8 pr-7 py-1 text-[11px] font-mono font-bold outline-none text-[var(--text-primary)]"
                                     />
                                   </div>
                                   <div className="max-h-40 overflow-y-auto space-y-0.5">
@@ -1564,7 +1564,7 @@ export default function SettingsView({
                                             setIsDropdownOpen(false);
                                             setSearchQuery('');
                                           }}
-                                          className={`w-full text-left px-2 py-1.5 rounded text-xs font-mono font-bold flex items-center justify-between cursor-pointer hover:bg-[#FFC400] transition-colors ${aiProvider === key ? 'bg-[#FFC400]' : ''
+                                          className={`w-full text-left px-2 py-1.5 rounded text-xs font-mono font-bold flex items-center justify-between cursor-pointer hover:bg-[#FFC400] hover:text-[#111111] transition-colors ${aiProvider === key ? 'bg-[#FFC400] text-[#111111]' : 'text-[var(--text-primary)]'
                                             }`}
                                         >
                                           <span>{meta.name}</span>
@@ -1580,7 +1580,7 @@ export default function SettingsView({
 
                         {/* Model Select */}
                         <div className="space-y-1.5">
-                          <label className="text-[9px] font-mono font-extrabold uppercase text-[#111111] block">AI Model</label>
+                          <label className="text-[9px] font-mono font-extrabold uppercase text-[var(--text-primary)] block">AI Model</label>
                           <select
                             value={PROVIDER_METADATA[aiProvider]?.models.includes(selectedModel) ? selectedModel : 'custom'}
                             onChange={(e) => {
@@ -1591,12 +1591,12 @@ export default function SettingsView({
                                 setSelectedModel(val);
                               }
                             }}
-                            className="w-full rounded-[6px] border-2 border-[#111111] bg-[#F6F2EA] p-2.5 text-xs font-mono font-bold text-[#111111] outline-none shadow-paper-sm cursor-pointer"
+                            className="w-full rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--panel-bg)] p-2.5 text-xs font-mono font-bold text-[var(--text-primary)] outline-none shadow-paper-sm cursor-pointer"
                           >
                             {PROVIDER_METADATA[aiProvider]?.models.map(m => (
-                              <option key={m} value={m}>{m}</option>
+                              <option key={m} value={m} className="bg-[var(--card-bg)] text-[var(--text-primary)]">{m}</option>
                             ))}
-                            <option value="custom">Custom Model (Type below)</option>
+                            <option value="custom" className="bg-[var(--card-bg)] text-[var(--text-primary)]">Custom Model (Type below)</option>
                           </select>
 
                           {(!PROVIDER_METADATA[aiProvider]?.models.includes(selectedModel) || selectedModel === '') && (
@@ -1606,14 +1606,14 @@ export default function SettingsView({
                               placeholder={`Enter custom model ID (e.g. llama-3.3-70b-versatile)`}
                               value={selectedModel}
                               onChange={(e) => setSelectedModel(e.target.value)}
-                              className="w-full mt-2 rounded-[6px] border-2 border-[#111111] bg-white p-2.5 text-xs font-mono font-bold text-[#111111] outline-none shadow-paper-sm"
+                              className="w-full mt-2 rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--panel-bg)] p-2.5 text-xs font-mono font-bold text-[var(--text-primary)] outline-none shadow-paper-sm"
                             />
                           )}
                         </div>
 
                         {/* Secret API Key Input */}
                         <div className="space-y-1.5">
-                          <label className="text-[9px] font-mono font-extrabold uppercase text-[#111111] block">Secret Key *</label>
+                          <label className="text-[9px] font-mono font-extrabold uppercase text-[var(--text-primary)] block">Secret Key *</label>
                           <div className="relative flex items-center">
                             <input
                               type={showNewKeyPassword ? "text" : "password"}
@@ -1621,12 +1621,12 @@ export default function SettingsView({
                               value={newKey}
                               onChange={(e) => setNewKey(e.target.value)}
                               placeholder={`Key for ${PROVIDER_METADATA[aiProvider]?.name}`}
-                              className="w-full rounded-[6px] border-2 border-[#111111] bg-white px-3 py-2 text-xs font-mono font-extrabold outline-none shadow-paper-sm pr-9"
+                              className="w-full rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--panel-bg)] px-3 py-2 text-xs font-mono font-extrabold outline-none shadow-paper-sm pr-9 text-[var(--text-primary)]"
                             />
                             <button
                               type="button"
                               onClick={() => setShowNewKeyPassword(!showNewKeyPassword)}
-                              className="absolute right-2 p-1 text-[#666666] hover:text-[#111111] cursor-pointer"
+                              className="absolute right-2 p-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
                             >
                               {showNewKeyPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                             </button>
@@ -1634,7 +1634,7 @@ export default function SettingsView({
                         </div>
                       </div>
 
-                      <div className="flex justify-end gap-2 pt-2 border-t border-gray-200">
+                      <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border-main)]">
                         <button
                           type="button"
                           onClick={() => {
@@ -1642,14 +1642,14 @@ export default function SettingsView({
                             setNewKey('');
                             setValidationError(null);
                           }}
-                          className="px-4 py-2 rounded-[6px] border-2 border-[#111111] bg-white text-[#111111] text-xs font-mono font-extrabold uppercase hover:bg-gray-100 cursor-pointer"
+                          className="px-4 py-2 rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--card-bg)] text-[var(--text-primary)] text-xs font-mono font-extrabold uppercase hover:bg-[var(--panel-bg)] cursor-pointer"
                         >
                           Cancel
                         </button>
                         <button
                           type="submit"
                           disabled={savingKey}
-                          className="flex items-center gap-1.5 px-5 py-2 rounded-[6px] border-2 border-[#111111] bg-[#FFC400] text-[#111111] text-xs font-mono font-extrabold uppercase hover:bg-[#ffe066] cursor-pointer shadow-paper-sm disabled:opacity-50"
+                          className="flex items-center gap-1.5 px-5 py-2 rounded-[6px] border-2 border-[var(--border-main)] bg-[#FFC400] text-[#111111] text-xs font-mono font-extrabold uppercase hover:bg-[#ffe066] cursor-pointer shadow-paper-sm disabled:opacity-50"
                         >
                           {savingKey ? (
                             <>
