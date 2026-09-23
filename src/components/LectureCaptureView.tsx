@@ -1922,7 +1922,7 @@ export default function LectureCaptureView({
                         : 'bg-white text-[#111111] border border-[#111111] shadow-paper-sm hover:bg-[#FFF8D6]'
                       }`}
                   >
-                    {tab === 'mindmap' ? 'Mind Map' : tab === 'handwritten' ? '📝 Handwritten' : tab === 'chat' ? 'Ask Lecture AI' : tab}
+                    {tab === 'mindmap' ? 'Mind Map' : tab === 'handwritten' ? '📝 Handwritten' : tab === 'chat' ? 'Ask Lecture AI' : tab === 'slides' ? '📊 PPT Slides' : tab}
                   </button>
                 ))}
               </div>
@@ -2620,8 +2620,8 @@ export default function LectureCaptureView({
                 {activeOutputTab === 'slides' && (
                   <PresentationWorkspace
                     theme={theme}
-                    apiKey=""
-                    contentSourceText={activeLecture.transcript || activeLecture.summary || ''}
+                    apiKey={getAIConfig().geminiKey}
+                    contentSourceText={activeLecture.cleanTranscript || activeLecture.transcript || activeLecture.summary || ''}
                     initialBlueprint={activeLecture.presentationBlueprint}
                     title={activeLecture.title}
                     onUpdateSlides={async (updatedBlueprint) => {

@@ -2276,15 +2276,25 @@ app.get('/api/images/search', authenticateFirebaseUser, async (req, res) => {
     return fallbacks;
   };
 
-  let fetched = await fetchUnsplash(cleanQuery);
-  if (fetched.length > 0) {
-    images.push(...fetched);
+  const [unsplashResults, pexelsResults] = await Promise.all([
+    fetchUnsplash(cleanQuery),
+    fetchPexels(cleanQuery)
+  ]);
+
+  const combined: string[] = [];
+  const maxLen = Math.max(unsplashResults.length, pexelsResults.length);
+  for (let i = 0; i < maxLen; i++) {
+    if (i < unsplashResults.length) combined.push(unsplashResults[i]);
+    if (i < pexelsResults.length) combined.push(pexelsResults[i]);
   }
 
-  if (images.length === 0) {
-    fetched = await fetchPexels(cleanQuery);
-    if (fetched.length > 0) {
-      images.push(...fetched);
+  if (combined.length > 0) {
+    const seen = new Set<string>();
+    for (const url of combined) {
+      if (!seen.has(url)) {
+        seen.add(url);
+        images.push(url);
+      }
     }
   }
 

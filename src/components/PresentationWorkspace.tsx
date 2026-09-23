@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { fetchGeminiApi } from '../providers/GeminiProvider';
+import { getAIConfig } from '../services/gemini';
 import {
   Sparkles,
   Download,
@@ -128,6 +129,7 @@ export default function PresentationWorkspace({
     );
 
     try {
+      const effectiveApiKey = apiKey || getAIConfig().geminiKey;
       // 1. Generate blueprint
       const plannedSlides = await generatePresentationBlueprint(
         contentSourceText,
@@ -135,7 +137,7 @@ export default function PresentationWorkspace({
         slideCount,
         selectedPurpose,
         regLevel,
-        apiKey
+        effectiveApiKey
       );
 
       setStatusMsg('Retrieving stock illustrations & resolving duplicates...');
@@ -320,9 +322,40 @@ Return JSON only matching this schema:
         </div>
 
         {slides.length === 0 ? (
-          <div className="text-center py-20 border-2 border-dashed border-[#111111] rounded-[6px] bg-white p-6 shadow-paper-sm">
-            <AlertCircle className="h-8 w-8 text-[#666666] mx-auto animate-pulse" />
-            <p className="text-xs text-[#111111] mt-3 font-mono font-bold">No presentation blueprint created. Press "Regenerate Deck Blueprint" to build.</p>
+          <div className="text-center py-16 px-6 border-2 border-dashed border-[#111111] rounded-[6px] bg-white shadow-paper-sm flex flex-col items-center justify-center space-y-4">
+            {isGenerating ? (
+              <div className="space-y-3 py-6 flex flex-col items-center">
+                <RefreshCw className="h-10 w-10 text-[#FFC400] animate-spin stroke-[2.5]" />
+                <h4 className="text-xs font-mono font-extrabold text-[#111111] uppercase tracking-wider">
+                  {statusMsg || 'Generating Presentation Blueprint...'}
+                </h4>
+                <p className="text-[11px] text-[#666666] font-mono max-w-sm">
+                  Synthesizing slide layouts, bullet points & stock imagery via Gemini AI.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="h-14 w-14 rounded-full bg-[#FFC400]/20 border border-[#111111] flex items-center justify-center">
+                  <Sparkles className="h-7 w-7 text-[#111111]" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-mono font-extrabold text-[#111111] uppercase tracking-wider">
+                    No Presentation Deck Generated Yet
+                  </h4>
+                  <p className="text-[11px] text-[#666666] font-mono mt-1 max-w-md leading-relaxed">
+                    Convert your lecture notes, transcript, or summary into a structured PowerPoint slide presentation with custom themes and visuals.
+                  </p>
+                </div>
+                <button
+                  onClick={handleRegenerateDeck}
+                  disabled={isGenerating || !contentSourceText}
+                  className="px-6 py-3 bg-[#FFC400] hover:bg-[#ffe066] text-[#111111] text-xs font-mono font-extrabold rounded-[4px] border-2 border-[#111111] shadow-paper-sm cursor-pointer inline-flex items-center gap-2 uppercase disabled:opacity-50 transition-all hover:scale-105 active:scale-95"
+                >
+                  <Sparkles className="h-4 w-4 text-[#111111]" />
+                  <span>⚡ Generate PPT Presentation Deck</span>
+                </button>
+              </>
+            )}
           </div>
         ) : (
           <div className="space-y-4">
