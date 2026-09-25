@@ -388,7 +388,8 @@ export default function App() {
                 onboardingCompleted: isCompleted,
                 role: detectedRole,
                 teacherCode: calculatedCode
-              }
+              },
+              subscription: data.subscription ? data.subscription : prev.subscription
             }));
             setSessionUser({
               ...loggedUser,
@@ -845,23 +846,36 @@ export default function App() {
       'Priority Email & Chat Support'
     ];
 
+    const updatedSubscription = {
+      planName,
+      price,
+      billingCycle,
+      nextBillDate: billingCycle === 'yearly' ? 'Dec 15, 2027' : 'Jan 15, 2027',
+      features: planName === 'BYOK' 
+        ? [
+            'Bring Your Own Key (BYOK)',
+            'Unlimited AI Synthesis & Chats',
+            '100 GB High-Speed Storage',
+            'Academic Library & Quiz Workspace'
+          ] 
+        : upgradedFeatures
+    };
+
     setSettings(prev => ({
       ...prev,
-      subscription: {
-        planName,
-        price,
-        billingCycle,
-        nextBillDate: billingCycle === 'yearly' ? 'Dec 15, 2027' : 'Jan 15, 2027',
-        features: planName === 'BYOK' 
-          ? [
-              'Bring Your Own Key (BYOK)',
-              'Unlimited AI Synthesis & Chats',
-              '100 GB High-Speed Storage',
-              'Academic Library & Quiz Workspace'
-            ] 
-          : upgradedFeatures
-      }
+      subscription: updatedSubscription
     }));
+
+    if (sessionUser?.uid) {
+      try {
+        const userDocRef = doc(db, 'users', sessionUser.uid);
+        setDoc(userDocRef, { subscription: updatedSubscription }, { merge: true }).catch(err => {
+          console.warn("Failed to persist subscription upgrade to Firestore:", err);
+        });
+      } catch (err) {
+        console.warn("Error initiating subscription upgrade Firestore save:", err);
+      }
+    }
   };
 
   // Sync click shortcut helper

@@ -22,10 +22,6 @@ if (!getApps().length) {
 }
 
 
-/**
- * Middleware that verifies a Firebase ID token sent in the Authorization header.
- * On success, the decoded token is attached to req.user and req.body.user for downstream handlers.
- */
 export const authenticateFirebaseUser = async (
   req: Request,
   res: Response,

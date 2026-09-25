@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { BookOpen, Sparkles, Check, AlertTriangle, HelpCircle, Layers, Lightbulb, Target, Flame, ExternalLink } from 'lucide-react';
-import { ensureGfgTagsInMarkdown } from '../../services/gemini';
+import { ensureGfgTagsInMarkdown, formatNotesWithAI } from '../../services/gemini';
 
 interface AcademicNotesViewerProps {
   content: string | Record<string, string> | any[];
@@ -63,6 +63,103 @@ export function cleanAcademicNotesNoise(text: string): string {
 export const cleanNotesTimestamps = cleanAcademicNotesNoise;
 
 /**
+ * Detects vertical pseudo-table lists (e.g. Header line followed by option names, then repeated 3-tuples)
+ * and automatically converts them into GitHub-Flavored Markdown tables (| Feature | RISC | CISC |).
+ */
+export function detectAndConvertVerticalTables(text: string): string {
+  if (!text || typeof text !== 'string') return '';
+
+  const rawLines = text.split(/\r?\n/);
+  const outputLines: string[] = [];
+  let i = 0;
+
+  while (i < rawLines.length) {
+    const line = rawLines[i].trim();
+
+    const isFeatureHeader = /^(Feature|Parameter|Property|Comparison|Aspect|Metric|Criteria|Specification|Attribute|Item|Category)s?\b/i.test(line)
+      || /^#{1,3}\s*(Feature|Parameter|Property|Comparison|Aspect|Metric)s?/i.test(line);
+
+    if (isFeatureHeader && i + 2 < rawLines.length) {
+      const col0 = line.replace(/^#{1,6}\s+/, '').replace(/:$/, '').trim();
+
+      const colItems: string[] = [];
+      let j = i + 1;
+
+      while (j < rawLines.length && colItems.length < 4) {
+        const nextLine = rawLines[j].trim();
+        if (!nextLine) break;
+        if (/^#{1,3}\s+/.test(nextLine)) break;
+
+        const cleanItem = nextLine.replace(/^[*\-•▪]\s+/, '').replace(/\*\*/g, '').replace(/:$/, '').trim();
+        if (cleanItem.length > 0 && cleanItem.length < 60) {
+          colItems.push(cleanItem);
+          j++;
+        } else {
+          break;
+        }
+      }
+
+      if (colItems.length >= 2 && colItems.length <= 4) {
+        const numCols = colItems.length;
+        const headers = [col0, ...colItems];
+        const tableRows: string[][] = [];
+
+        let rowPtr = j;
+        while (rowPtr < rawLines.length) {
+          while (rowPtr < rawLines.length && !rawLines[rowPtr].trim()) rowPtr++;
+          if (rowPtr >= rawLines.length) break;
+
+          const rowLabelLine = rawLines[rowPtr].trim();
+          if (/^#{1,3}\s+/.test(rowLabelLine) || rowLabelLine.startsWith('|')) break;
+
+          const rowLabel = rowLabelLine.replace(/^[*\-•▪]\s+/, '').replace(/\*\*/g, '').replace(/:$/, '').trim();
+          if (!rowLabel || rowLabel.length > 100) break;
+
+          const rowValues: string[] = [];
+          let valPtr = rowPtr + 1;
+
+          while (valPtr < rawLines.length && rowValues.length < numCols) {
+            const valLine = rawLines[valPtr].trim();
+            if (!valLine) {
+              valPtr++;
+              continue;
+            }
+            if (/^#{1,3}\s+/.test(valLine) || valLine.startsWith('|')) break;
+
+            const cleanVal = valLine.replace(/^[*\-•▪]\s+/, '').trim();
+            rowValues.push(cleanVal);
+            valPtr++;
+          }
+
+          if (rowValues.length === numCols) {
+            tableRows.push([rowLabel, ...rowValues]);
+            rowPtr = valPtr;
+          } else {
+            break;
+          }
+        }
+
+        if (tableRows.length >= 2) {
+          outputLines.push(`| ${headers.join(' | ')} |`);
+          outputLines.push(`| ${headers.map(() => ':---').join(' | ')} |`);
+          tableRows.forEach(row => {
+            outputLines.push(`| ${row.join(' | ')} |`);
+          });
+
+          i = rowPtr;
+          continue;
+        }
+      }
+    }
+
+    outputLines.push(rawLines[i]);
+    i++;
+  }
+
+  return outputLines.join('\n');
+}
+
+/**
  * Automatically structures raw un-synthesized document text or transcripts
  * into clean, textbook-grade academic sections with headers, bold labels, and bullet points.
  */
@@ -73,6 +170,9 @@ export function autoStructureRawText(text: string): string {
 
   // Strip leading file name noise e.g. "Class Content Unit 2.docx Unit 2 "
   cleaned = cleaned.replace(/^(Class Content |Document |File |Unit \d+[\.a-z0-9_\-\s]*)+/i, '');
+
+  // 0. Convert vertical pseudo-tables into Markdown tables
+  cleaned = detectAndConvertVerticalTables(cleaned);
 
   // 1. Separate concatenated topic headers into distinct lines
   cleaned = cleaned
@@ -86,10 +186,12 @@ export function autoStructureRawText(text: string): string {
       return match;
     });
 
-  // 2. If text already has full Markdown headers and multiple bullet points, return cleaned version
+  // 2. If text already has full Markdown headers and multiple bullet points or tables, return cleaned version
   const headerCount = (cleaned.match(/^#{1,3}\s+/gm) || []).length;
   const bulletCount = (cleaned.match(/^\s*[\*\-\•▪]\s+/gm) || []).length;
-  if (headerCount >= 2 && bulletCount >= 3) {
+  const tableCount = (cleaned.match(/^\|[^\n]+\|/gm) || []).length;
+
+  if (headerCount >= 2 && (bulletCount >= 3 || tableCount >= 2)) {
     return cleaned;
   }
 
@@ -105,6 +207,11 @@ export function autoStructureRawText(text: string): string {
   for (let line of rawLines) {
     let trimmed = line.trim();
     if (!trimmed) continue;
+
+    if (trimmed.startsWith('|')) {
+      structuredLines.push(trimmed);
+      continue;
+    }
 
     // Existing Markdown headers
     if (/^#{1,3}\s+/.test(trimmed)) {
@@ -144,7 +251,21 @@ export function autoStructureRawText(text: string): string {
     }
   }
 
-  return structuredLines.join('\n\n').replace(/\n{3,}/g, '\n\n').trim();
+  // Group markdown table lines without inserting double newlines between them
+  const joinedBlocks: string[] = [];
+  for (let idx = 0; idx < structuredLines.length; idx++) {
+    const curr = structuredLines[idx];
+    const prev = idx > 0 ? structuredLines[idx - 1] : '';
+
+    if (curr.startsWith('|') && prev.startsWith('|')) {
+      joinedBlocks.push('\n' + curr);
+    } else {
+      if (idx > 0) joinedBlocks.push('\n\n');
+      joinedBlocks.push(curr);
+    }
+  }
+
+  return joinedBlocks.join('').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 /**
@@ -157,6 +278,9 @@ export const AcademicNotesViewer: React.FC<AcademicNotesViewerProps> = ({
   theme = 'light',
   isCompiling = false
 }) => {
+  const [formattedOverrideText, setFormattedOverrideText] = React.useState<string | null>(null);
+  const [isFormattingAI, setIsFormattingAI] = React.useState<boolean>(false);
+
   if (isCompiling) {
     return (
       <div className="p-8 rounded-[6px] border-2 border-[var(--border-main)] bg-[var(--panel-bg)] shadow-paper-sm text-center space-y-4 my-6 font-sans">
@@ -197,8 +321,24 @@ export const AcademicNotesViewer: React.FC<AcademicNotesViewerProps> = ({
     rawText = content[mode] || content.academic || content.detailed || content.quick || Object.values(content)[0] || '';
   }
 
-  const structuredText = autoStructureRawText(cleanAcademicNotesNoise(rawText));
+  const activeRawText = formattedOverrideText || rawText;
+  const structuredText = autoStructureRawText(cleanAcademicNotesNoise(activeRawText));
   const cleanedText = ensureGfgTagsInMarkdown(structuredText);
+
+  const handleAIFormatClick = async () => {
+    setIsFormattingAI(true);
+    try {
+      const res = await formatNotesWithAI(activeRawText);
+      if (res && res !== activeRawText) {
+        setFormattedOverrideText(res);
+      }
+    } catch (e) {
+      console.warn('AI format error:', e);
+    } finally {
+      setIsFormattingAI(false);
+    }
+  };
+
 
   if (!cleanedText.trim()) {
     return (
@@ -362,6 +502,9 @@ export const AcademicNotesViewer: React.FC<AcademicNotesViewerProps> = ({
       currentTableRows.push(cells);
       continue;
     } else if (isInsideTable) {
+      if (!line) {
+        continue;
+      }
       flushTable();
     }
 
@@ -531,8 +674,34 @@ export const AcademicNotesViewer: React.FC<AcademicNotesViewerProps> = ({
   return (
     <div 
       onMouseUp={handleMouseUp}
-      className="academic-notes-container text-sm space-y-2 selection:bg-[#FFC400] selection:text-[#111111] relative"
+      className="academic-notes-container text-sm space-y-2 selection:bg-[#FFC400] selection:text-[#111111] relative font-sans"
     >
+      {/* AI AUTO-FORMAT TOOLBAR */}
+      <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 mb-4 rounded-[6px] border border-[#111111] bg-[#F6F2EA] shadow-paper-sm text-xs font-mono font-bold print:hidden">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-[#FFC400] fill-[#FFC400]" />
+          <span className="text-[#111111]">STUDY NOTES & TABLE STRUCTURE</span>
+        </div>
+        <button
+          onClick={handleAIFormatClick}
+          disabled={isFormattingAI}
+          className="flex items-center gap-1.5 px-3 py-1 bg-[#FFC400] text-[#111111] rounded-[4px] border border-[#111111] shadow-paper-sm hover:bg-[#ffe066] transition-all cursor-pointer font-extrabold disabled:opacity-50"
+          title="Use AI to automatically re-structure messy notes into clean textbook Markdown and convert comparison lists into proper tables"
+        >
+          {isFormattingAI ? (
+            <>
+              <div className="w-3 h-3 rounded-full border-2 border-[#111111] border-t-transparent animate-spin" />
+              <span>FORMATTING WITH AI...</span>
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-3.5 w-3.5" />
+              <span>✨ AUTO-FORMAT WITH AI (FIX TABLES)</span>
+            </>
+          )}
+        </button>
+      </div>
+
       {elements}
 
       {/* FLOATING CONTEXTUAL 'ASK THIS AS DOUBT' POPUP (PHASE 8 & SAFEGUARD #7) */}

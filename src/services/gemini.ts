@@ -2445,4 +2445,47 @@ export const generateMindmap = async (
   return res.keyConcepts || [];
 };
 
+/**
+ * Re-formats messy, unformatted or vertical notes into textbook-grade Markdown
+ * with clean comparison tables (| Feature | Option A | Option B |) and clear headers.
+ */
+export async function formatNotesWithAI(rawNotesText: string): Promise<string> {
+  if (!rawNotesText || !rawNotesText.trim()) return rawNotesText;
+
+  try {
+    const { fetchGeminiApi } = await import('../providers/GeminiProvider');
+    const apiKey = getAIConfig().geminiKey || '';
+    const prompt = `You are a chief textbook editor and university study notes compiler.
+Re-structure and format the following raw notes into clean, textbook-quality Markdown.
+
+CRITICAL INSTRUCTIONS:
+1. MANDATORY MARKDOWN TABLES FOR COMPARISONS: If the text contains any comparisons, feature breakdowns, property comparisons, or contrasting items (such as RISC vs CISC, RAM vs ROM, TCP vs UDP), YOU MUST format them as strict GitHub-Flavored Markdown tables (| Feature | Option A | Option B |). NEVER format comparisons as vertical bullet lists or alternating key-value text lines.
+2. CLEAR HEADER HIERARCHY: Use # for main document title, ## for major topic sections, and ### for subsections (Definition, Process, Example, Formula, Comparison).
+3. REVISION & EXAM CALLOUTS: Include "🧠 Remember" callout boxes for quick revision and "🎯 Exam Focus" sections for high-yield exam points.
+4. BOLD KEY TERMS & FORMULAS: Bold important terms and format math equations ($E = mc^2$ or code blocks).
+5. PRESERVE ALL DETAILS: Do NOT remove or truncate technical content or definitions. Only clean up formatting, structure, and tabular presentation.
+
+RAW STUDY NOTES TO FORMAT:
+${rawNotesText.slice(0, 50000)}`;
+
+    const body = {
+      contents: [{ parts: [{ text: prompt }] }]
+    };
+
+    const response = await fetchGeminiApi(apiKey, getAIConfig().model || 'gemini-3.6-flash', body);
+    if (response && response.ok) {
+      const data = await response.json();
+      const outputText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (outputText && outputText.trim().length > 20) {
+        return outputText.trim();
+      }
+    }
+  } catch (e) {
+    console.warn('[formatNotesWithAI] AI formatting failed or offline:', e);
+  }
+
+  return rawNotesText;
+}
+
+
 

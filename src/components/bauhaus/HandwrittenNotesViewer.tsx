@@ -3,8 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { Download, ArrowRight, Sparkles, BookOpen, CheckCircle, FileText, PenTool } from 'lucide-react';
+import { detectAndConvertVerticalTables } from './AcademicNotesViewer';
+import { formatNotesWithAI } from '../../services/gemini';
 
 interface HandwrittenNotesViewerProps {
   lectureData: any;
@@ -104,6 +106,7 @@ interface HandwrittenItem {
   type: 'text' | 'concept' | 'diagram' | 'formula' | 'terms' | 'bullets' | 'table' | 'remember' | 'examFocus' | 'definition' | 'example';
   content: any;
   table?: Array<{ col1: string; col2: string }>;
+  tableData?: { headers: string[]; rows: string[][] };
   weight: number; // Height budget weight units for A4 bin-packing
 }
 
@@ -117,7 +120,8 @@ function parseMarkdownToHandwrittenSections(rawMarkdown: string) {
     return { title: '', overview: '', keyPoints: [], sections: [], remember: '', examFocus: '', formulas: [], definitions: [], examples: [] };
   }
 
-  const lines = rawMarkdown.split('\n');
+  const cleanedMarkdown = detectAndConvertVerticalTables(rawMarkdown);
+  const lines = cleanedMarkdown.split('\n');
   let title = '';
   let overview = '';
   const keyPoints: string[] = [];
@@ -132,9 +136,10 @@ function parseMarkdownToHandwrittenSections(rawMarkdown: string) {
   let currentTitle = '';
   let currentContentLines: string[] = [];
   let currentTable: Array<{ col1: string; col2: string }> = [];
+  let currentTableData: { headers: string[]; rows: string[][] } = { headers: [], rows: [] };
 
   const flushSection = () => {
-    if (currentTitle || currentContentLines.length > 0 || currentTable.length > 0) {
+    if (currentTitle || currentContentLines.length > 0 || currentTable.length > 0 || currentTableData.headers.length > 0) {
       const items: HandwrittenItem[] = [];
       const linesArr = currentContentLines.map(l => cleanMarkdownText(l)).filter(Boolean);
 
@@ -176,15 +181,16 @@ function parseMarkdownToHandwrittenSections(rawMarkdown: string) {
       // Condense long paragraph lines into crisp, high-yield academic bullets
       const condensedBullets = condenseTextToAcademicBullets(textLines.join(' '), 4);
 
-      if (condensedBullets.length > 0 || currentTable.length > 0) {
+      if (condensedBullets.length > 0 || currentTable.length > 0 || currentTableData.headers.length > 0) {
         const lineUnits = Math.ceil(condensedBullets.length * 0.9);
-        const tableUnits = currentTable.length > 0 ? (2 + currentTable.length * 0.7) : 0;
+        const tableUnits = currentTableData.rows.length > 0 ? (2 + currentTableData.rows.length * 0.7) : (currentTable.length > 0 ? (2 + currentTable.length * 0.7) : 0);
         
         items.unshift({
           type: 'concept',
           title: cleanMarkdownText(currentTitle) || 'Key Concepts',
           content: condensedBullets,
           table: currentTable.length > 0 ? [...currentTable] : undefined,
+          tableData: currentTableData.headers.length > 0 ? { headers: [...currentTableData.headers], rows: [...currentTableData.rows] } : undefined,
           weight: Math.max(2.5, lineUnits + tableUnits)
         });
       }
@@ -197,6 +203,7 @@ function parseMarkdownToHandwrittenSections(rawMarkdown: string) {
       currentTitle = '';
       currentContentLines = [];
       currentTable = [];
+      currentTableData = { headers: [], rows: [] };
     }
   };
 
@@ -273,8 +280,13 @@ function parseMarkdownToHandwrittenSections(rawMarkdown: string) {
 
     if (line.startsWith('|') && line.endsWith('|')) {
       if (line.includes('---')) continue;
-      const cells = line.split('|').map(c => cleanMarkdownText(c)).filter(Boolean);
+      const cells = line.split('|').map(c => cleanMarkdownText(c)).map(c => c.trim()).filter(Boolean);
       if (cells.length >= 2) {
+        if (!currentTableData.headers.length) {
+          currentTableData.headers = cells;
+        } else {
+          currentTableData.rows.push(cells);
+        }
         currentTable.push({ col1: cells[0], col2: cells[1] });
       }
       continue;
@@ -314,6 +326,9 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
     lectureData?.status === 'generating' ||
     lectureData?.status === 'processing';
 
+  const [formattedOverrideText, setFormattedOverrideText] = useState<string | null>(null);
+  const [isFormattingAI, setIsFormattingAI] = useState<boolean>(false);
+
   const rawNotesString =
     notesToMarkdown(lectureData?.notes, lectureData?.title || 'Lecture Study Notes') ||
     lectureData?.notes?.academic ||
@@ -325,9 +340,25 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
     (typeof lectureData?.transcript === 'string' ? lectureData.transcript : '') ||
     '';
 
+  const activeRawNotes = formattedOverrideText || rawNotesString;
+
   const parsedMarkdown = React.useMemo(() => {
-    return parseMarkdownToHandwrittenSections(rawNotesString);
-  }, [rawNotesString]);
+    return parseMarkdownToHandwrittenSections(activeRawNotes);
+  }, [activeRawNotes]);
+
+  const handleAIFormatClick = async () => {
+    setIsFormattingAI(true);
+    try {
+      const res = await formatNotesWithAI(activeRawNotes);
+      if (res && res !== activeRawNotes) {
+        setFormattedOverrideText(res);
+      }
+    } catch (e) {
+      console.warn('AI format error:', e);
+    } finally {
+      setIsFormattingAI(false);
+    }
+  };
 
   const title = cleanMarkdownText(parsedMarkdown.title || lectureData?.title || 'Lecture Study Notes');
   const overview = cleanMarkdownText(parsedMarkdown.overview || lectureData?.summary || lectureData?.notes?.overview || '');
@@ -637,6 +668,24 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
 
         <div className="flex items-center gap-2">
           <button
+            onClick={handleAIFormatClick}
+            disabled={isFormattingAI}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#FFC400] text-[#111111] text-xs font-mono font-bold uppercase rounded-[4px] border border-[#111111] shadow-paper-sm hover:bg-[#ffe066] cursor-pointer transition-all disabled:opacity-50"
+            title="Use AI to automatically re-structure messy notes into clean textbook Markdown and convert comparison lists into proper tables"
+          >
+            {isFormattingAI ? (
+              <>
+                <div className="w-3 h-3 rounded-full border-2 border-[#111111] border-t-transparent animate-spin" />
+                <span>FORMATTING...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-3.5 w-3.5 text-[#111111] fill-[#111111]" />
+                <span>✨ AUTO-FORMAT WITH AI (FIX TABLES)</span>
+              </>
+            )}
+          </button>
+          <button
             onClick={handlePrint}
             className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#FFC400] text-[#111111] text-xs font-mono font-bold uppercase rounded-[4px] border border-[#111111] shadow-paper-sm hover:bg-[#ffe066] cursor-pointer transition-all"
           >
@@ -803,23 +852,40 @@ export const HandwrittenNotesViewer: React.FC<HandwrittenNotesViewerProps> = ({
                         )}
 
                         {/* HANDWRITTEN COMPARISON TABLE */}
-                        {item.table && item.table.length > 0 && (
-                          <div className="my-4 overflow-hidden rounded-[6px] border-2 border-[#2563EB] bg-[#FAF8F5] p-3 shadow-sm">
-                            <div className="text-xs font-mono font-bold uppercase text-[#2563EB] mb-2">Structured Reference Table</div>
-                            <table className="w-full text-left border-collapse text-base font-bold">
+                        {(item.tableData?.headers?.length || (item.table && item.table.length > 0)) && (
+                          <div className="my-4 overflow-x-auto rounded-[6px] border-2 border-[#2563EB] bg-[#FAF8F5] p-3 shadow-sm font-sans">
+                            <div className="text-xs font-mono font-bold uppercase text-[#2563EB] mb-2 flex items-center gap-1.5">
+                              <span>📊 Structured Reference Table</span>
+                            </div>
+                            <table className="w-full text-left border-collapse text-sm font-sans font-bold">
                               <thead>
                                 <tr className="border-b-2 border-[#2563EB] bg-[#E2E8F0] text-[#0F294A]">
-                                  <th className="p-2 border-r border-[#CBD5E1] font-bold">{item.table[0]?.col1 || 'Concept / Parameter'}</th>
-                                  <th className="p-2 font-bold">{item.table[0]?.col2 || 'Description / Value'}</th>
+                                  {(item.tableData?.headers || [item.table?.[0]?.col1 || 'Concept', item.table?.[0]?.col2 || 'Value']).map((head: string, hIdx: number) => (
+                                    <th key={hIdx} className="p-2 border-r border-[#CBD5E1] font-mono font-extrabold uppercase text-xs last:border-r-0">
+                                      {head}
+                                    </th>
+                                  ))}
                                 </tr>
                               </thead>
                               <tbody>
-                                {item.table.slice(1).map((row: any, rIdx: number) => (
-                                  <tr key={rIdx} className="border-b border-[#CBD5E1] last:border-b-0 hover:bg-[#F1F5F9]">
-                                    <td className="p-2 border-r border-[#CBD5E1] font-bold text-[#1E293B]">{row.col1}</td>
-                                    <td className="p-2 font-bold text-[#0F294A]">{row.col2}</td>
-                                  </tr>
-                                ))}
+                                {item.tableData ? (
+                                  item.tableData.rows.map((rowArr: string[], rIdx: number) => (
+                                    <tr key={rIdx} className="border-b border-[#CBD5E1] last:border-b-0 hover:bg-[#F1F5F9]">
+                                      {rowArr.map((cell: string, cIdx: number) => (
+                                        <td key={cIdx} className="p-2 border-r border-[#CBD5E1] font-medium text-xs text-[#0F294A] last:border-r-0">
+                                          {cell}
+                                        </td>
+                                      ))}
+                                    </tr>
+                                  ))
+                                ) : (
+                                  item.table.slice(1).map((row: any, rIdx: number) => (
+                                    <tr key={rIdx} className="border-b border-[#CBD5E1] last:border-b-0 hover:bg-[#F1F5F9]">
+                                      <td className="p-2 border-r border-[#CBD5E1] font-bold text-[#1E293B]">{row.col1}</td>
+                                      <td className="p-2 font-bold text-[#0F294A]">{row.col2}</td>
+                                    </tr>
+                                  ))
+                                )}
                               </tbody>
                             </table>
                           </div>
