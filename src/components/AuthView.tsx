@@ -25,6 +25,7 @@ import {
   Lock,
   User,
   Sparkles,
+  Zap,
   Eye,
   EyeOff,
   CheckCircle,
@@ -614,13 +615,27 @@ export default function AuthView({
           <Card shadow="lg" className="p-8 bg-[var(--card-bg)] border-2 border-[var(--border-main)] space-y-6">
             <header className="space-y-1">
               <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-heading font-extrabold uppercase text-[var(--text-primary)] tracking-tight">
-                  {isFacultyMode ? (
-                    mode === 'login' ? 'FACULTY PORTAL LOGIN' : 'FACULTY REGISTRATION'
-                  ) : (
-                    mode === 'login' ? 'ACCESS AI WORKSPACE' : mode === 'signup' ? 'CREATE ACADEMIC IDENTITY' : 'DISCHARGE RESET TOKEN'
+                <div className="flex items-center gap-2">
+                  <h2 className="text-2xl font-heading font-extrabold uppercase text-[var(--text-primary)] tracking-tight">
+                    {isFacultyMode ? (
+                      mode === 'login' ? 'FACULTY PORTAL LOGIN' : 'FACULTY REGISTRATION'
+                    ) : (
+                      mode === 'login' ? 'ACCESS AI WORKSPACE' : mode === 'signup' ? 'CREATE ACADEMIC IDENTITY' : 'DISCHARGE RESET TOKEN'
+                    )}
+                  </h2>
+                  {!isFacultyMode && mode === 'login' && (
+                    <button
+                      type="button"
+                      onClick={handleQuickPremiumLogin}
+                      disabled={loading}
+                      title="Quick Premium Access"
+                      className="text-[#FFC400] hover:scale-110 active:scale-95 transition-transform cursor-pointer p-1 rounded hover:bg-[#FFC400]/10"
+                      aria-label="Quick Premium Login"
+                    >
+                      <Zap className="h-5 w-5 fill-[#FFC400] text-[#FFC400]" />
+                    </button>
                   )}
-                </h2>
+                </div>
               </div>
               <p className="text-xs font-mono text-[var(--text-secondary)]">
                 {isFacultyMode
@@ -629,28 +644,6 @@ export default function AuthView({
                 }
               </p>
             </header>
-
-            {!isFacultyMode && mode === 'login' && (
-              <div className="p-3 bg-[#FFC400]/10 border-2 border-[#FFC400] rounded-[6px] flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-paper-sm">
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <Sparkles className="h-3.5 w-3.5 text-[#FFC400]" />
-                    <span className="text-xs font-heading font-extrabold uppercase text-[var(--text-primary)]">PREMIUM DEMO STUDENT</span>
-                  </div>
-                  <span className="text-[10px] font-mono text-[var(--text-secondary)] block mt-0.5">
-                    Email: <code className="text-[#FFC400]">premium.student@noteit.ai</code> | Pass: <code className="text-[#FFC400]">PremiumUser123!</code>
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleQuickPremiumLogin}
-                  disabled={loading}
-                  className="px-3 py-1.5 bg-[#FFC400] text-[#111111] font-mono font-bold text-[11px] uppercase rounded-[4px] border border-[#111111] hover:bg-[#ffe066] shadow-paper-sm cursor-pointer whitespace-nowrap"
-                >
-                  ⚡ Quick 1-Click Login
-                </button>
-              </div>
-            )}
 
             {error && error.trim() && (
               <div className="p-3 rounded-[4px] bg-[#FF4D4D]/10 border-2 border-[#FF4D4D] text-[#FF4D4D] text-xs font-mono font-bold flex items-center gap-2">

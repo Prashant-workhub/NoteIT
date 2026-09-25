@@ -97,7 +97,6 @@ export default function LandingView({
           </a>
           <a href="#features" style={{ color: 'var(--text-primary)' }} className="landing-nav-link px-2.5 py-1 rounded-[3px] border border-transparent transition-colors font-bold">Features</a>
           <a href="#workflow" style={{ color: 'var(--text-primary)' }} className="landing-nav-link px-2.5 py-1 rounded-[3px] border border-transparent transition-colors font-bold">Workflow</a>
-          <a href="#team" style={{ color: 'var(--text-primary)' }} className="landing-nav-link px-2.5 py-1 rounded-[3px] border border-transparent transition-colors font-bold">Founders</a>
           <a href="#pricing" style={{ color: 'var(--text-primary)' }} className="landing-nav-link px-2.5 py-1 rounded-[3px] border border-transparent transition-colors font-bold">Pricing</a>
           <a href="#faq" style={{ color: 'var(--text-primary)' }} className="landing-nav-link px-2.5 py-1 rounded-[3px] border border-transparent transition-colors font-bold">FAQ</a>
         </nav>
@@ -569,7 +568,6 @@ export default function LandingView({
             <a href="#broot-showcase" className="hover:text-[#FFC400] transition-colors">BROOT AI</a>
             <a href="#features" className="hover:text-[#FFC400] transition-colors">FEATURES</a>
             <a href="#workflow" className="hover:text-[#FFC400] transition-colors">WORKFLOW</a>
-            <a href="#team" className="hover:text-[#FFC400] transition-colors">FOUNDERS</a>
             <a href="#pricing" className="hover:text-[#FFC400] transition-colors">PRICING</a>
             <a href="#faq" className="hover:text-[#FFC400] transition-colors">FAQ</a>
           </div>
