@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { pageIdToPath, pathToPageId } from './routes';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { onAuthStateChanged, signOut, updateProfile as updateFirebaseProfile } from 'firebase/auth';
 import { auth, db } from './firebaseConfig';
 import { doc, getDoc, setDoc, serverTimestamp, collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { App as CapApp } from '@capacitor/app';
@@ -796,10 +796,28 @@ export default function App() {
   // Callbacks: Settings & Upgrading Tiers
   const handleUpdateSettings = async (newSettings: UserSettings) => {
     setSettings(newSettings);
+    try {
+      localStorage.setItem('noteit_user_settings', JSON.stringify(newSettings));
+    } catch (e) {
+      console.warn('[Settings] Failed to save settings to localStorage:', e);
+    }
+
     if (newSettings.profile?.theme && newSettings.profile.theme !== theme) {
       setTheme(newSettings.profile.theme as 'light' | 'dark');
     }
+
     if (sessionUser) {
+      const fullDisplayName = `${newSettings.profile.firstName || ''} ${newSettings.profile.lastName || ''}`.trim() || newSettings.profile.fullName;
+
+      if (auth.currentUser) {
+        updateFirebaseProfile(auth.currentUser, {
+          displayName: fullDisplayName,
+          photoURL: newSettings.profile.avatarUrl || undefined
+        }).catch((err) => console.warn('[Settings] Firebase Auth profile sync warning:', err));
+      }
+
+      setSessionUser(prev => prev ? { ...prev, fullName: fullDisplayName } : null);
+
       const profileData = {
         first_name: newSettings.profile.firstName || '',
         last_name: newSettings.profile.lastName || '',
@@ -808,6 +826,7 @@ export default function App() {
         country_code: newSettings.profile.countryCode || '',
         phone_number: newSettings.profile.phoneNumber || '',
         profile_image_url: newSettings.profile.avatarUrl || '',
+        student_uid: newSettings.profile.uid || '',
         theme: newSettings.profile.theme || theme,
         onboarding_completed: true,
         updated_at: serverTimestamp()

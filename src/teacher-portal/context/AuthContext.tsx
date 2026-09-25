@@ -34,7 +34,16 @@ export function AuthProvider({
   initialStage?: AuthStage
 }) {
   const [stage, setStage] = useState<AuthStage>(initialStage)
-  const [profile, setProfile] = useState<FacultyProfile | null>(initialProfile || DEMO_PROFILE)
+  const [profile, setProfile] = useState<FacultyProfile | null>(() => {
+    if (initialProfile) return initialProfile
+    try {
+      const saved = localStorage.getItem('noteit_faculty_profile')
+      if (saved) return JSON.parse(saved)
+    } catch (e) {
+      console.warn('[AuthContext] Failed reading saved faculty profile:', e)
+    }
+    return DEMO_PROFILE
+  })
 
   const openLogin = useCallback(() => setStage('login'), [])
   const cancelAuth = useCallback(() => setStage('unauthenticated'), [])
@@ -45,7 +54,13 @@ export function AuthProvider({
   }, [])
 
   const completeSetup = useCallback((input: FacultySetupInput) => {
-    setProfile(makeFacultyProfile(input))
+    const newProf = makeFacultyProfile(input)
+    setProfile(newProf)
+    try {
+      localStorage.setItem('noteit_faculty_profile', JSON.stringify(newProf))
+    } catch (e) {
+      console.warn('[AuthContext] Failed saving faculty profile:', e)
+    }
     setStage('ready')
   }, [])
 
@@ -56,6 +71,11 @@ export function AuthProvider({
 
   const initProfile = useCallback((prof: FacultyProfile) => {
     setProfile(prof)
+    try {
+      localStorage.setItem('noteit_faculty_profile', JSON.stringify(prof))
+    } catch (e) {
+      console.warn('[AuthContext] Failed saving faculty profile:', e)
+    }
   }, [])
 
   const updateProfile = useCallback((patch: Partial<FacultyProfile>) => {
@@ -66,6 +86,11 @@ export function AuthProvider({
       if (nameChanged) {
         next.teacherCode = patch.teacherCode || generateTeacherCode(next.firstName, next.surname)
         next.avatarInitials = initialsFrom(next.firstName, next.surname)
+      }
+      try {
+        localStorage.setItem('noteit_faculty_profile', JSON.stringify(next))
+      } catch (e) {
+        console.warn('[AuthContext] Failed saving updated faculty profile:', e)
       }
       return next
     })
