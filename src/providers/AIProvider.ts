@@ -47,12 +47,30 @@ export const extractJsonObject = (rawText: string): string => {
   return cleaned;
 };
 
-export const safeJsonParse = <T = any>(rawText: string, fallbackDefault: T = {} as T): T => {
-  if (!rawText || !rawText.trim()) return fallbackDefault;
+export const normalizeSchemaOutput = (parsed: any, schema?: any): any => {
+  if (!parsed || typeof parsed !== 'object') return parsed;
+  if (!schema || !schema.properties) return parsed;
+
+  const result: any = { ...parsed };
+  for (const [key, prop] of Object.entries<any>(schema.properties)) {
+    if (prop.type === 'ARRAY' && !Array.isArray(result[key])) {
+      result[key] = [];
+    } else if (prop.type === 'OBJECT' && (!result[key] || typeof result[key] !== 'object')) {
+      result[key] = {};
+    } else if (prop.type === 'STRING' && (result[key] === null || result[key] === undefined)) {
+      result[key] = '';
+    }
+  }
+  return result;
+};
+
+export const safeJsonParse = <T = any>(rawText: string, fallbackDefault: T = {} as T, schema?: any): T => {
+  if (!rawText || !rawText.trim()) return normalizeSchemaOutput(fallbackDefault, schema);
   const cleaned = extractJsonObject(rawText);
   
+  let parsed: any = null;
   try {
-    return JSON.parse(cleaned);
+    parsed = JSON.parse(cleaned);
   } catch (firstErr) {
     console.warn('[JSON REPAIR] Standard JSON.parse failed. Executing auto-repair sequence...', firstErr);
 
@@ -61,28 +79,32 @@ export const safeJsonParse = <T = any>(rawText: string, fallbackDefault: T = {} 
       .replace(/[\u0000-\u001F\u007F-\u009F]/g, (c) => c === '\n' ? '\\n' : c === '\r' ? '\\r' : c === '\t' ? '\\t' : '');
     
     try {
-      return JSON.parse(repaired);
+      parsed = JSON.parse(repaired);
     } catch (e2) {}
 
-    // Attempt 2: Auto-close unterminated string quotes & brackets
-    let quoteCount = (repaired.match(/(?<!\\)"/g) || []).length;
-    if (quoteCount % 2 !== 0) {
-      repaired += '"';
-    }
+    if (!parsed) {
+      // Attempt 2: Auto-close unterminated string quotes & brackets
+      let quoteCount = (repaired.match(/(?<!\\)"/g) || []).length;
+      if (quoteCount % 2 !== 0) {
+        repaired += '"';
+      }
 
-    let openBraces = (repaired.match(/\{/g) || []).length - (repaired.match(/\}/g) || []).length;
-    let openBrackets = (repaired.match(/\[/g) || []).length - (repaired.match(/\]/g) || []).length;
+      let openBraces = (repaired.match(/\{/g) || []).length - (repaired.match(/\}/g) || []).length;
+      let openBrackets = (repaired.match(/\[/g) || []).length - (repaired.match(/\]/g) || []).length;
 
-    while (openBrackets > 0) { repaired += ']'; openBrackets--; }
-    while (openBraces > 0) { repaired += '}'; openBraces--; }
+      while (openBrackets > 0) { repaired += ']'; openBrackets--; }
+      while (openBraces > 0) { repaired += '}'; openBraces--; }
 
-    try {
-      return JSON.parse(repaired);
-    } catch (e3) {
-      console.error('[JSON REPAIR FAILED] Could not parse JSON response:', e3);
-      return fallbackDefault;
+      try {
+        parsed = JSON.parse(repaired);
+      } catch (e3) {
+        console.error('[JSON REPAIR FAILED] Could not parse JSON response:', e3);
+        parsed = fallbackDefault;
+      }
     }
   }
+
+  return normalizeSchemaOutput(parsed, schema);
 };
 
 export abstract class BaseProvider implements AIProvider {

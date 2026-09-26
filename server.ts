@@ -761,32 +761,53 @@ app.post('/api/ai/provider-proxy', authenticateFirebaseUser, enforceAiUsage, asy
     console.log(`\n[provider-proxy] 🚀 Executing "${actualAction}" using Provider: ${providerName.toUpperCase()} (Model: ${selectedModel})\n`);
 
     const executeProxyCall = async (provider: any, modelToUse: string) => {
-      if (actualAction === 'transcribeAudio') {
-        const base64 = inlineData?.data || req.body.base64Audio;
-        const mType = inlineData?.mimeType || req.body.mimeType || 'audio/webm';
-        return await provider.transcribeAudio(base64, mType, modelToUse);
-      } else if (actualAction === 'generateStructuredOutput') {
-        return await provider.generateStructuredOutput(prompt, responseSchema, modelToUse);
-      } else if (actualAction === 'generateQuiz') {
-        return await provider.generateQuiz(prompt, modelToUse);
-      } else if (actualAction === 'generateMindMap') {
-        return await provider.generateMindMap(prompt, modelToUse);
-      } else if (actualAction === 'generateFlashcards') {
-        return await provider.generateFlashcards(prompt, modelToUse);
-      } else if (actualAction === 'generatePresentation') {
-        return await provider.generatePresentation(prompt, modelToUse);
-      } else if (actualAction === 'generateNotes') {
-        return await provider.generateNotes(prompt, modelToUse);
-      } else {
-        return await provider.generateText(prompt, modelToUse);
-      }
+      const callPromise = (async () => {
+        if (actualAction === 'transcribeAudio') {
+          const base64 = inlineData?.data || req.body.base64Audio;
+          const mType = inlineData?.mimeType || req.body.mimeType || 'audio/webm';
+          return await provider.transcribeAudio(base64, mType, modelToUse);
+        } else if (actualAction === 'generateStructuredOutput') {
+          return await provider.generateStructuredOutput(prompt, responseSchema, modelToUse);
+        } else if (actualAction === 'generateQuiz') {
+          return await provider.generateQuiz(prompt, modelToUse);
+        } else if (actualAction === 'generateMindMap') {
+          return await provider.generateMindMap(prompt, modelToUse);
+        } else if (actualAction === 'generateFlashcards') {
+          return await provider.generateFlashcards(prompt, modelToUse);
+        } else if (actualAction === 'generatePresentation') {
+          return await provider.generatePresentation(prompt, modelToUse);
+        } else if (actualAction === 'generateNotes') {
+          return await provider.generateNotes(prompt, modelToUse);
+        } else {
+          return await provider.generateText(prompt, modelToUse);
+        }
+      })();
+
+      // Fast Failover: Enforce 12s per-attempt timeout so hanging provider calls abort quickly
+      return await withTimeout(callPromise, 12000, `AI Provider call timed out after 12s (${modelToUse})`);
     };
 
     const markKeyRateLimited = async (presetId: string, errorMsg: string) => {
       if (!data?.savedKeys || !Array.isArray(data.savedKeys)) return;
-      const midnightUTC = new Date();
-      midnightUTC.setUTCHours(24, 0, 0, 0); // Next 00:00 UTC reset
-      const cooldownIso = midnightUTC.toISOString();
+      
+      const lowerErr = (errorMsg || '').toLowerCase();
+      const isDailyQuotaOrBilling = lowerErr.includes('quota') ||
+        lowerErr.includes('credit') ||
+        lowerErr.includes('billing') ||
+        lowerErr.includes('exceeded your current quota') ||
+        lowerErr.includes('insufficient_quota') ||
+        lowerErr.includes('monthly limit');
+
+      let cooldownIso: string;
+      if (isDailyQuotaOrBilling) {
+        // Daily/Monthly quota exhausted -> Cooldown reset at next 00:00 UTC
+        const midnightUTC = new Date();
+        midnightUTC.setUTCHours(24, 0, 0, 0);
+        cooldownIso = midnightUTC.toISOString();
+      } else {
+        // Transient 429 RPM/TPM rate limit spike -> 3 minute cooldown
+        cooldownIso = new Date(Date.now() + 3 * 60 * 1000).toISOString();
+      }
 
       const updatedKeys = data.savedKeys.map((k: any) => {
         if (k.id === presetId) {
@@ -857,13 +878,19 @@ app.post('/api/ai/provider-proxy', authenticateFirebaseUser, enforceAiUsage, asy
       // Tier 1: Ranked backup keys in order of rank priority (1, 2, 3...)
       if (data?.savedKeys && Array.isArray(data.savedKeys)) {
         const sortedPresets = [...data.savedKeys].sort((a: any, b: any) => (a.rank || 99) - (b.rank || 99));
-        // Filter out currently active key AND any keys that are in RATE_LIMITED cooldown until midnight UTC
+        // Filter out currently active key AND any keys in active cooldown
         const backupPresets = sortedPresets.filter((k: any) => {
           if (k.encryptedKey === rawKey || k.encryptedKey === data?.encryptedApiKey) return false;
           const isLimited = k.status === 'Rate Limited' || k.status === 'RATE_LIMITED';
-          if (isLimited && k.rateLimitedUntil && new Date(k.rateLimitedUntil) > new Date()) {
-            console.log(`[provider-proxy] Skipping Rank #${k.rank} (${k.provider}) - Quota limit exhausted until ${k.rateLimitedUntil}`);
-            return false;
+          if (isLimited && k.rateLimitedUntil) {
+            const isExpired = new Date(k.rateLimitedUntil) <= new Date();
+            if (!isExpired) {
+              console.log(`[provider-proxy] Skipping Rank #${k.rank} (${k.provider}) - Cooldown active until ${k.rateLimitedUntil}`);
+              return false;
+            } else {
+              // Cooldown has elapsed -> auto-restore status to Healthy
+              k.status = 'Healthy';
+            }
           }
           return true;
         });

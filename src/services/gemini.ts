@@ -16,7 +16,7 @@ export const blobToBase64 = (blob: Blob): Promise<string> => {
 
 const extractJsonObject = (rawText: string): string => {
   let cleaned = rawText.trim();
-  
+
   // Remove markdown code fences if present (e.g. ```json ... ```)
   const jsonBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/i;
   const match = cleaned.match(jsonBlockRegex);
@@ -59,13 +59,13 @@ export const getAIConfig = () => {
     }
     return (typeof import.meta !== 'undefined' && (import.meta as any)?.env?.[key]) || '';
   };
-  
+
   const envGeminiKey = getEnv('VITE_GEMINI_API_KEY') || getEnv('VITE_API_KEY') || getEnv('VITE_GOOGLE_API_KEY') || '';
   const envOpenAiKey = getEnv('VITE_OPENAI_API_KEY') || '';
   const envOpenRouterKey = getEnv('VITE_OPENROUTER_API_KEY') || '';
 
   const provider = isBrowser ? (localStorage.getItem('noteit_active_ai_provider') || localStorage.getItem('noteit_ai_provider') || (envOpenRouterKey ? 'openrouter' : 'gemini')) : 'gemini';
-  
+
   const customGeminiKey = isBrowser ? (localStorage.getItem('noteit_user_api_key_gemini') || localStorage.getItem('noteit_user_api_key') || envGeminiKey) : envGeminiKey;
   const customOpenAiKey = isBrowser ? (localStorage.getItem('noteit_user_api_key_openai') || localStorage.getItem('noteit_user_api_key') || envOpenAiKey) : envOpenAiKey;
   const customOpenRouterKey = isBrowser ? (localStorage.getItem('noteit_user_api_key_openrouter') || envOpenRouterKey) : envOpenRouterKey;
@@ -88,7 +88,7 @@ export const executeOpenAICall = async (
   onBusy?: (isBusy: boolean) => void
 ): Promise<any> => {
   const url = 'https://api.openai.com/v1/chat/completions';
-  
+
   if (onBusy) onBusy(true);
   try {
     const headers: any = {
@@ -387,7 +387,8 @@ export const executeGeminiCall = async (
         const directRes = await fetch(directUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestBody)
+          body: JSON.stringify(requestBody),
+          signal: AbortSignal.timeout ? AbortSignal.timeout(10000) : undefined
         });
 
         if (directRes.ok) {
@@ -1403,7 +1404,7 @@ export const formatTranscriptWithOpenRouter = async (
 };
 
 export const generateLectureContent = async (
-  base64Audio: string, 
+  base64Audio: string,
   mimeType: string = 'audio/webm',
   onBusy?: (isBusy: boolean) => void,
   mode: 'academic' | 'executive' | 'revision' = 'academic',
@@ -1455,7 +1456,7 @@ export const generateLectureContent = async (
   // Phase 2: Send formatted transcript to Gemini for deep academic note synthesis
   if (onProgress) onProgress(3, `OpenRouter pre-formatting complete. Passing formatted transcript to Gemini AI for final note synthesis…`);
   const data = await generateInitialLectureAssets(openRouterRes.formattedTranscript, apiKey, onBusy);
-  
+
   return {
     ...data,
     transcript: rawTranscript,
@@ -1509,10 +1510,10 @@ export const parseFallbackRawTranscriptToAssets = (
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed) continue;
-    const isHeading = /^#{1,4}\s+/.test(trimmed) || 
-                      /^(unit|chapter|section|module|part)\s+\d+/i.test(trimmed) ||
-                      /^\d+[\.\)]\s+[A-Z]/.test(trimmed);
-    
+    const isHeading = /^#{1,4}\s+/.test(trimmed) ||
+      /^(unit|chapter|section|module|part)\s+\d+/i.test(trimmed) ||
+      /^\d+[\.\)]\s+[A-Z]/.test(trimmed);
+
     if (isHeading) {
       if (currentContent.length > 0) {
         pushSection(currentSectionTitle, currentContent);
